@@ -18,8 +18,21 @@ echo ""
 echo "[2/4] Compilando frontend e backend..."
 npm run build
 
+mkdir -p dist resources/js
+if [ -f "node_modules/@neutralinojs/lib/dist/neutralino.js" ]; then
+    cp "node_modules/@neutralinojs/lib/dist/neutralino.js" "resources/js/neutralino.js"
+    cp "node_modules/@neutralinojs/lib/dist/neutralino.js" "dist/neutralino.js"
+else
+    touch resources/js/neutralino.js
+fi
+
 echo ""
-echo "[3/4] Construindo binários do Neutralino.js..."
+echo "[3/4] Baixando binários e empacotando com Neutralino.js..."
+npx @neutralinojs/neu update --force
+if [ -f "node_modules/@neutralinojs/lib/dist/neutralino.js" ]; then
+    cp "node_modules/@neutralinojs/lib/dist/neutralino.js" "resources/js/neutralino.js"
+    cp "node_modules/@neutralinojs/lib/dist/neutralino.js" "dist/neutralino.js"
+fi
 npx @neutralinojs/neu build --release
 
 echo ""

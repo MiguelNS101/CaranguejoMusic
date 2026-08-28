@@ -1,0 +1,1 @@
+// NeutralinoJS client placeholder

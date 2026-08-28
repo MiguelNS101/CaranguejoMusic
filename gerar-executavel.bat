@@ -22,8 +22,24 @@ echo.
 echo [2/4] Compilando interface e servidor Express/Discord...
 call npm run build
 
+:: Garantir estrutura de resources e neutralino.js
+if not exist "resources\js\" mkdir "resources\js"
+if not exist "dist\" mkdir "dist"
+
+if exist "node_modules\@neutralinojs\lib\dist\neutralino.js" (
+    copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "resources\js\neutralino.js" >nul
+    copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "dist\neutralino.js" >nul
+) else (
+    echo. > "resources\js\neutralino.js"
+)
+
 echo.
-echo [3/4] Empacotando com Neutralino.js (Binarios Portable)...
+echo [3/4] Baixando binarios e empacotando com Neutralino.js...
+call npx @neutralinojs/neu update --force
+if exist "node_modules\@neutralinojs\lib\dist\neutralino.js" (
+    copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "resources\js\neutralino.js" >nul
+    copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "dist\neutralino.js" >nul
+)
 call npx @neutralinojs/neu build --release
 
 echo.
