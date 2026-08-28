@@ -19,12 +19,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      - name: Install Dependencies
+      - name: Install Dependencies for Windows
         run: |
-          npm install --include=optional
-          npm install @rollup/rollup-win32-x64-msvc --no-save --include=optional || true
+          if (Test-Path "package-lock.json") { Remove-Item "package-lock.json" -Force }
+          npm install --no-audit --no-fund
 
       - name: Build Web & Server
         run: npm run build
