@@ -1,0 +1,6 @@
+{
+  "name": "RPG Bot & Escudo do Mestre",
+  "description": "Painel 2-em-1 de Escudo do Mestre com Bot Discord para reprodução de áudio, filas, soundboard, mensagens no servidor e catálogo local de NPCs com Docker.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
