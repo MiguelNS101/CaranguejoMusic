@@ -22,9 +22,22 @@ echo.
 echo [2/4] Compilando interface e servidor Express/Discord...
 call npm run build
 
-:: Garantir estrutura de resources e neutralino.js
+:: Garantir estrutura de resources, icons e neutralino.js
+if not exist "assets\" mkdir "assets"
+if not exist "public\" mkdir "public"
+if not exist "resources\" mkdir "resources"
+if not exist "resources\icons\" mkdir "resources\icons"
 if not exist "resources\js\" mkdir "resources\js"
+if not exist "extensions\" mkdir "extensions"
 if not exist "dist\" mkdir "dist"
+
+:: Copiar icone se necessario
+if not exist "assets\icon.png" (
+    if exist "public\icon.png" copy /Y "public\icon.png" "assets\icon.png" >nul
+)
+if not exist "resources\icons\appIcon.png" (
+    if exist "assets\icon.png" copy /Y "assets\icon.png" "resources\icons\appIcon.png" >nul
+)
 
 if exist "node_modules\@neutralinojs\lib\dist\neutralino.js" (
     copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "resources\js\neutralino.js" >nul
@@ -35,7 +48,7 @@ if exist "node_modules\@neutralinojs\lib\dist\neutralino.js" (
 
 echo.
 echo [3/4] Baixando binarios e empacotando com Neutralino.js...
-call npx @neutralinojs/neu update --force
+call npx @neutralinojs/neu update
 if exist "node_modules\@neutralinojs\lib\dist\neutralino.js" (
     copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "resources\js\neutralino.js" >nul
     copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "dist\neutralino.js" >nul
@@ -45,13 +58,27 @@ call npx @neutralinojs/neu build --release
 echo.
 echo [4/4] Montando pasta portatil pronta para uso em 'dist-portable\'...
 if not exist "dist-portable\" mkdir "dist-portable"
+if not exist "dist-portable\dist\" mkdir "dist-portable\dist"
 if not exist "dist-portable\data\" mkdir "dist-portable\data"
 if not exist "dist-portable\data\music\" mkdir "dist-portable\data\music"
 if not exist "dist-portable\data\sfx\" mkdir "dist-portable\data\sfx"
 if not exist "dist-portable\data\npcs\" mkdir "dist-portable\data\npcs"
 if not exist "dist-portable\data\saves\" mkdir "dist-portable\data\saves"
 
-:: Copiar arquivos essenciais
+:: Copiar arquivos compilados do Neutralino
+if exist "dist\MasterScreen-RPG\" (
+    xcopy /E /I /Y "dist\MasterScreen-RPG\*" "dist-portable\" >nul
+)
+if exist "bin\" (
+    xcopy /E /I /Y "bin\*" "dist-portable\" >nul
+)
+
+:: Copiar servidor e assets para dist-portable
+if exist "dist\server.cjs" copy /Y "dist\server.cjs" "dist-portable\dist\server.cjs" >nul
+if exist "dist\index.html" copy /Y "dist\index.html" "dist-portable\dist\index.html" >nul
+if exist "dist\assets\" xcopy /E /I /Y "dist\assets\*" "dist-portable\dist\assets\" >nul
+
+:: Copiar arquivos de configuracao
 if not exist "dist-portable\.env" (
     if exist ".env" (
         copy ".env" "dist-portable\.env" >nul
@@ -60,21 +87,19 @@ if not exist "dist-portable\.env" (
     )
 )
 
-:: Copiar binarios do Neutralino gerados
-if exist "bin\" (
-    xcopy /E /I /Y "bin\*" "dist-portable\" >nul
-)
-
 :: Criar script de inicializacao rapida dentro da pasta portable
 echo @echo off > "dist-portable\MasterScreen-RPG.bat"
+echo chcp 65001 ^> nul >> "dist-portable\MasterScreen-RPG.bat"
 echo title Master Screen RPG >> "dist-portable\MasterScreen-RPG.bat"
+echo cd /d "%%~dp0" >> "dist-portable\MasterScreen-RPG.bat"
+echo start "" /b node dist/server.cjs >> "dist-portable\MasterScreen-RPG.bat"
+echo timeout /t 1 /nobreak ^> nul >> "dist-portable\MasterScreen-RPG.bat"
 echo if exist "MasterScreen-RPG-win_x64.exe" ( >> "dist-portable\MasterScreen-RPG.bat"
-echo     start MasterScreen-RPG-win_x64.exe >> "dist-portable\MasterScreen-RPG.bat"
-echo ) else if exist "MasterScreen-RPG.exe" ( >> "dist-portable\MasterScreen-RPG.bat"
-echo     start MasterScreen-RPG.exe >> "dist-portable\MasterScreen-RPG.bat"
+echo     start "" MasterScreen-RPG-win_x64.exe >> "dist-portable\MasterScreen-RPG.bat"
+echo ) else if exist "neutralino-win_x64.exe" ( >> "dist-portable\MasterScreen-RPG.bat"
+echo     start "" neutralino-win_x64.exe >> "dist-portable\MasterScreen-RPG.bat"
 echo ) else ( >> "dist-portable\MasterScreen-RPG.bat"
 echo     start http://localhost:3000 >> "dist-portable\MasterScreen-RPG.bat"
-echo     node dist/server.cjs >> "dist-portable\MasterScreen-RPG.bat"
 echo ) >> "dist-portable\MasterScreen-RPG.bat"
 
 echo.
