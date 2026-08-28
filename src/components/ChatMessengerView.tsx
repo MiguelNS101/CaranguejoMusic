@@ -447,8 +447,15 @@ export const ChatMessengerView: React.FC = () => {
           <div className="bg-[#313338] rounded-2xl p-4 shadow-xl border border-[#2D3139] min-h-[300px]">
             {/* Discord Header Sim */}
             <div className="flex items-start gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-400 shrink-0 font-bold">
-                C
+              <div className="w-10 h-10 rounded-full bg-[#1E232F] border border-orange-500/30 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                <img
+                  src="/icon.png"
+                  alt="CaranguejoRPG Bot"
+                  className="w-8 h-8 object-contain"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLElement).style.display = 'none';
+                  }}
+                />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">

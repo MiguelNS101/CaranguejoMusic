@@ -38,10 +38,15 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Brand & Bot Status */}
         <div className="flex items-center justify-between w-full md:w-auto gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-amber-500 p-0.5 shadow-md shadow-indigo-500/20 flex items-center justify-center">
-              <div className="w-full h-full bg-[#0F1113] rounded-[10px] flex items-center justify-center">
-                <Shield className="w-5 h-5 text-indigo-400" />
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 border border-orange-500/30 p-1 shadow-md shadow-orange-500/10 flex items-center justify-center">
+              <img
+                src="/icon.png"
+                alt="CaranguejoRPG"
+                className="w-full h-full object-contain drop-shadow"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

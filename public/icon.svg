@@ -1,0 +1,205 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Crab Shell Gradient -->
+    <radialGradient id="shellGrad" cx="40%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#FF7A3D" />
+      <stop offset="50%" stop-color="#F04818" />
+      <stop offset="85%" stop-color="#C82A08" />
+      <stop offset="100%" stop-color="#961A02" />
+    </radialGradient>
+    
+    <!-- Claw Gradient -->
+    <radialGradient id="clawGrad" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FF854D" />
+      <stop offset="60%" stop-color="#EE4212" />
+      <stop offset="100%" stop-color="#A62205" />
+    </radialGradient>
+
+    <!-- Underbelly / Jaw Gradient -->
+    <linearGradient id="bellyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFE3BD" />
+      <stop offset="70%" stop-color="#F7C98C" />
+      <stop offset="100%" stop-color="#DDA362" />
+    </linearGradient>
+
+    <!-- Boombox Body Gradient -->
+    <linearGradient id="boomboxGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#424855" />
+      <stop offset="30%" stop-color="#2B303C" />
+      <stop offset="80%" stop-color="#1C2028" />
+      <stop offset="100%" stop-color="#11141A" />
+    </linearGradient>
+
+    <!-- Speaker Grille Gradient -->
+    <radialGradient id="speakerGrad" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#2E3440" />
+      <stop offset="60%" stop-color="#181B22" />
+      <stop offset="100%" stop-color="#0C0E12" />
+    </radialGradient>
+
+    <!-- Shadow Filter -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <g filter="url(#dropShadow)">
+    <!-- LEGS (BACK/SIDES) -->
+    <!-- Left Legs -->
+    <!-- Leg 1 Top Left -->
+    <path d="M 160 270 C 120 250, 80 270, 70 310 C 65 328, 75 338, 85 325 C 98 300, 130 290, 160 295 Z" fill="url(#clawGrad)" stroke="#6E1200" stroke-width="4" stroke-linejoin="round" />
+    <!-- Leg 2 Mid Left -->
+    <path d="M 140 300 C 100 290, 60 320, 52 365 C 50 380, 60 388, 68 375 C 80 345, 110 335, 140 330 Z" fill="url(#clawGrad)" stroke="#6E1200" stroke-width="4" stroke-linejoin="round" />
+    <!-- Leg 3 Low Left -->
+    <path d="M 130 340 C 95 345, 60 385, 65 425 C 68 438, 78 440, 82 428 C 90 395, 115 380, 145 365 Z" fill="url(#clawGrad)" stroke="#6E1200" stroke-width="4" stroke-linejoin="round" />
+
+    <!-- Right Legs -->
+    <!-- Leg 1 Top Right -->
+    <path d="M 352 270 C 392 250, 432 270, 442 310 C 447 328, 437 338, 427 325 C 414 300, 382 290, 352 295 Z" fill="url(#clawGrad)" stroke="#6E1200" stroke-width="4" stroke-linejoin="round" />
+    <!-- Leg 2 Mid Right -->
+    <path d="M 372 300 C 412 290, 452 320, 460 365 C 462 380, 452 388, 444 375 C 432 345, 402 335, 372 330 Z" fill="url(#clawGrad)" stroke="#6E1200" stroke-width="4" stroke-linejoin="round" />
+    <!-- Leg 3 Low Right -->
+    <path d="M 382 340 C 417 345, 452 385, 447 425 C 444 438, 434 440, 430 428 C 422 395, 397 380, 367 365 Z" fill="url(#clawGrad)" stroke="#6E1200" stroke-width="4" stroke-linejoin="round" />
+
+    <!-- CRAB MAIN BODY / SHELL -->
+    <!-- Shell outline -->
+    <path d="M 140 240 C 130 180, 200 130, 256 130 C 312 130, 382 180, 372 240 C 388 265, 370 305, 340 315 C 310 325, 202 325, 172 315 C 142 305, 124 265, 140 240 Z" 
+          fill="url(#shellGrad)" stroke="#6E1200" stroke-width="6" stroke-linejoin="round" />
+
+    <!-- Shell Shell Highlights & Details -->
+    <path d="M 190 160 C 230 145, 280 145, 320 160 C 280 152, 230 152, 190 160 Z" fill="#FFA070" opacity="0.6" />
+    <!-- Shell Side Ridges -->
+    <path d="M 136 242 C 122 250, 120 262, 134 268" stroke="#6E1200" stroke-width="4" stroke-linecap="round" fill="none" />
+    <path d="M 376 242 C 390 250, 392 262, 378 268" stroke="#6E1200" stroke-width="4" stroke-linecap="round" fill="none" />
+
+    <!-- Underbelly / Jaw -->
+    <path d="M 175 270 C 210 285, 302 285, 337 270 C 330 305, 182 305, 175 270 Z" 
+          fill="url(#bellyGrad)" stroke="#875520" stroke-width="3.5" />
+
+    <!-- Cute Smiling Mouth -->
+    <path d="M 235 278 Q 256 294 277 278" stroke="#4A1200" stroke-width="4.5" stroke-linecap="round" fill="#8B0000" />
+    <path d="M 246 287 Q 256 293 266 287" fill="#FF6B81" />
+
+    <!-- RIGHT EYE (Cute Cartoon Glossy Eye) -->
+    <g transform="translate(325, 230)">
+      <ellipse cx="0" cy="0" rx="22" ry="26" fill="#0D1117" stroke="#6E1200" stroke-width="3" />
+      <!-- Big Sparkle Highlight -->
+      <circle cx="-6" cy="-8" r="8" fill="#FFFFFF" />
+      <circle cx="7" cy="8" r="4" fill="#FFFFFF" />
+    </g>
+
+    <!-- LEFT EYE - PIRATE EYEPATCH -->
+    <!-- Eyepatch Strap -->
+    <path d="M 140 262 Q 210 200 320 155" stroke="#1C2028" stroke-width="9" stroke-linecap="round" fill="none" />
+    <!-- Eyepatch Patch -->
+    <ellipse cx="195" cy="225" rx="35" ry="32" transform="rotate(-12, 195, 225)" fill="#1C2028" stroke="#0C0E12" stroke-width="4" />
+    <ellipse cx="195" cy="225" rx="31" ry="28" transform="rotate(-12, 195, 225)" fill="#2B303C" />
+
+    <!-- Skull & Crossbones on Eyepatch -->
+    <g transform="translate(195, 225) rotate(-12) scale(0.65)">
+      <!-- Crossbones -->
+      <path d="M -24 -18 L 24 18 M -24 18 L 24 -18" stroke="#E6EDF3" stroke-width="6" stroke-linecap="round" />
+      <circle cx="-24" cy="-18" r="4" fill="#E6EDF3" />
+      <circle cx="24" cy="18" r="4" fill="#E6EDF3" />
+      <circle cx="-24" cy="18" r="4" fill="#E6EDF3" />
+      <circle cx="24" cy="-18" r="4" fill="#E6EDF3" />
+      <!-- Skull -->
+      <path d="M -14 -6 C -14 -18, 14 -18, 14 -6 C 14 3, 8 7, 7 14 L -7 14 C -8 7, -14 3, -14 -6 Z" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5" />
+      <!-- Eye Sockets -->
+      <circle cx="-5" cy="-3" r="3.5" fill="#1C2028" />
+      <circle cx="5" cy="-3" r="3.5" fill="#1C2028" />
+      <!-- Teeth notches -->
+      <line x1="-3" y1="10" x2="-3" y2="14" stroke="#1C2028" stroke-width="1.5" />
+      <line x1="3" y1="10" x2="3" y2="14" stroke="#1C2028" stroke-width="1.5" />
+    </g>
+
+    <!-- RETRO BOOMBOX (STEREO CASSETTE PLAYER) -->
+    <!-- Handle -->
+    <path d="M 195 295 L 195 272 C 195 264, 317 264, 317 272 L 317 295" 
+          stroke="#5A6275" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="M 195 295 L 195 272 C 195 264, 317 264, 317 272 L 317 295" 
+          stroke="#2E3440" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+    <!-- Main Boombox Casing -->
+    <rect x="170" y="290" width="172" height="120" rx="14" 
+          fill="url(#boomboxGrad)" stroke="#0C0E12" stroke-width="5" />
+    
+    <!-- Top Chrome/Silver Trim -->
+    <path d="M 175 294 L 337 294" stroke="#8B95A5" stroke-width="3" stroke-linecap="round" />
+
+    <!-- Left Speaker -->
+    <circle cx="214" cy="358" r="30" fill="url(#speakerGrad)" stroke="#4C566A" stroke-width="3" />
+    <circle cx="214" cy="358" r="24" fill="#181B22" stroke="#2E3440" stroke-width="2" stroke-dasharray="3,3" />
+    <circle cx="214" cy="358" r="12" fill="#3B4252" stroke="#D8DEE9" stroke-width="1.5" />
+
+    <!-- Right Speaker -->
+    <circle cx="298" cy="358" r="30" fill="url(#speakerGrad)" stroke="#4C566A" stroke-width="3" />
+    <circle cx="298" cy="358" r="24" fill="#181B22" stroke="#2E3440" stroke-width="2" stroke-dasharray="3,3" />
+    <circle cx="298" cy="358" r="12" fill="#3B4252" stroke="#D8DEE9" stroke-width="1.5" />
+
+    <!-- Center Display / Graphic Equalizer -->
+    <rect x="247" y="320" width="18" height="36" rx="4" fill="#0D1117" stroke="#3B4252" stroke-width="1.5" />
+    <!-- Equalizer LED bars -->
+    <line x1="251" y1="348" x2="254" y2="348" stroke="#2ECC71" stroke-width="2.5" />
+    <line x1="251" y1="343" x2="254" y2="343" stroke="#2ECC71" stroke-width="2.5" />
+    <line x1="251" y1="338" x2="254" y2="338" stroke="#F1C40F" stroke-width="2.5" />
+    <line x1="251" y1="333" x2="254" y2="333" stroke="#E74C3C" stroke-width="2.5" />
+    <line x1="257" y1="348" x2="260" y2="348" stroke="#2ECC71" stroke-width="2.5" />
+    <line x1="257" y1="343" x2="260" y2="343" stroke="#2ECC71" stroke-width="2.5" />
+    <line x1="257" y1="338" x2="260" y2="338" stroke="#F1C40F" stroke-width="2.5" />
+
+    <!-- Control Buttons -->
+    <rect x="246" y="365" width="20" height="8" rx="2" fill="#4C566A" stroke="#2E3440" stroke-width="1" />
+    <circle cx="250" cy="382" r="3" fill="#E74C3C" />
+    <circle cx="256" cy="382" r="3" fill="#F39C12" />
+    <circle cx="262" cy="382" r="3" fill="#3498DB" />
+
+    <!-- FRONT CLAWS (Gripping the boombox) -->
+    <!-- Left Big Claw -->
+    <g transform="translate(150, 310)">
+      <path d="M 0 0 C -35 20, -50 75, -20 115 C 5 145, 45 140, 52 110 C 58 85, 30 75, 22 55 C 15 35, 25 15, 0 0 Z" 
+            fill="url(#clawGrad)" stroke="#6E1200" stroke-width="5" stroke-linejoin="round" />
+      <!-- Pincer top tip -->
+      <path d="M -15 85 C -2 70, 22 75, 40 85 C 44 95, 30 105, 10 102 C -10 98, -12 92, -15 85 Z" 
+            fill="#FFA070" opacity="0.5" />
+    </g>
+
+    <!-- Right Big Claw -->
+    <g transform="translate(362, 310)">
+      <path d="M 0 0 C 35 20, 50 75, 20 115 C -5 145, -45 140, -52 110 C -58 85, -30 75, -22 55 C -15 35, -25 15, 0 0 Z" 
+            fill="url(#clawGrad)" stroke="#6E1200" stroke-width="5" stroke-linejoin="round" />
+      <!-- Pincer top tip -->
+      <path d="M 15 85 C 2 70, -22 75, -40 85 C -44 95, -30 105, -10 102 C 10 98, 12 92, 15 85 Z" 
+            fill="#FFA070" opacity="0.5" />
+    </g>
+
+    <!-- FLOATING MUSICAL NOTES (UPPER RIGHT) -->
+    <!-- Double Note ♫ -->
+    <g transform="translate(385, 150) rotate(-15)" filter="url(#dropShadow)">
+      <ellipse cx="8" cy="35" rx="9" ry="7" transform="rotate(-20, 8, 35)" fill="#1E232F" stroke="#FF7A3D" stroke-width="2" />
+      <ellipse cx="36" cy="26" rx="9" ry="7" transform="rotate(-20, 36, 26)" fill="#1E232F" stroke="#FF7A3D" stroke-width="2" />
+      <line x1="15" y1="32" x2="15" y2="5" stroke="#1E232F" stroke-width="4.5" stroke-linecap="round" />
+      <line x1="43" y1="23" x2="43" y2="-4" stroke="#1E232F" stroke-width="4.5" stroke-linecap="round" />
+      <path d="M 13 8 L 45 -1 L 45 6 L 13 15 Z" fill="#1E232F" stroke="#FF7A3D" stroke-width="1.5" />
+    </g>
+
+    <!-- Single Note ♪ -->
+    <g transform="translate(405, 215) rotate(12)" filter="url(#dropShadow)">
+      <ellipse cx="8" cy="22" rx="8" ry="6" transform="rotate(-20, 8, 22)" fill="#1E232F" stroke="#FF7A3D" stroke-width="2" />
+      <line x1="14" y1="20" x2="14" y2="2" stroke="#1E232F" stroke-width="4" stroke-linecap="round" />
+      <path d="M 14 2 C 22 2, 28 8, 26 16 C 24 10, 18 6, 14 6 Z" fill="#1E232F" />
+    </g>
+
+    <!-- Small Note ♪ Top Left -->
+    <g transform="translate(85, 190) rotate(-22)" filter="url(#dropShadow)">
+      <ellipse cx="8" cy="20" rx="7" ry="5.5" transform="rotate(-20, 8, 20)" fill="#1E232F" stroke="#FF7A3D" stroke-width="1.5" />
+      <line x1="13" y1="18" x2="13" y2="2" stroke="#1E232F" stroke-width="3.5" stroke-linecap="round" />
+      <path d="M 13 2 C 20 2, 25 7, 23 14 C 21 9, 16 5, 13 5 Z" fill="#1E232F" />
+    </g>
+  </g>
+</svg>
