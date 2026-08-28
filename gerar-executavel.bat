@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 > nul
-title Master Screen RPG - Gerador de Executavel Portable
+title CaranguejoRPG - Gerador de Executavel Portable
 
 echo ========================================================
-echo   ⚔️  MASTER SCREEN RPG - GERADOR PORTABLE (.EXE)  ⚔️
+echo       🦀  CARANGUEJO RPG - GERADOR PORTABLE (.EXE)  🦀
 echo ========================================================
 echo.
 
@@ -66,8 +66,8 @@ if not exist "dist-portable\data\npcs\" mkdir "dist-portable\data\npcs"
 if not exist "dist-portable\data\saves\" mkdir "dist-portable\data\saves"
 
 :: Copiar arquivos compilados do Neutralino
-if exist "dist\MasterScreen-RPG\" (
-    xcopy /E /I /Y "dist\MasterScreen-RPG\*" "dist-portable\" >nul
+if exist "dist\CaranguejoRPG\" (
+    xcopy /E /I /Y "dist\CaranguejoRPG\*" "dist-portable\" >nul
 )
 if exist "bin\" (
     xcopy /E /I /Y "bin\*" "dist-portable\" >nul
@@ -88,19 +88,21 @@ if not exist "dist-portable\.env" (
 )
 
 :: Criar script de inicializacao rapida dentro da pasta portable
-echo @echo off > "dist-portable\MasterScreen-RPG.bat"
-echo chcp 65001 ^> nul >> "dist-portable\MasterScreen-RPG.bat"
-echo title Master Screen RPG >> "dist-portable\MasterScreen-RPG.bat"
-echo cd /d "%%~dp0" >> "dist-portable\MasterScreen-RPG.bat"
-echo start "" /b node dist/server.cjs >> "dist-portable\MasterScreen-RPG.bat"
-echo timeout /t 1 /nobreak ^> nul >> "dist-portable\MasterScreen-RPG.bat"
-echo if exist "MasterScreen-RPG-win_x64.exe" ( >> "dist-portable\MasterScreen-RPG.bat"
-echo     start "" MasterScreen-RPG-win_x64.exe >> "dist-portable\MasterScreen-RPG.bat"
-echo ) else if exist "neutralino-win_x64.exe" ( >> "dist-portable\MasterScreen-RPG.bat"
-echo     start "" neutralino-win_x64.exe >> "dist-portable\MasterScreen-RPG.bat"
-echo ) else ( >> "dist-portable\MasterScreen-RPG.bat"
-echo     start http://localhost:3000 >> "dist-portable\MasterScreen-RPG.bat"
-echo ) >> "dist-portable\MasterScreen-RPG.bat"
+echo @echo off > "dist-portable\CaranguejoRPG.bat"
+echo chcp 65001 ^> nul >> "dist-portable\CaranguejoRPG.bat"
+echo title CaranguejoRPG - Escudo do Mestre >> "dist-portable\CaranguejoRPG.bat"
+echo cd /d "%%~dp0" >> "dist-portable\CaranguejoRPG.bat"
+echo start "" /b node dist/server.cjs >> "dist-portable\CaranguejoRPG.bat"
+echo timeout /t 1 /nobreak ^> nul >> "dist-portable\CaranguejoRPG.bat"
+echo if exist "CaranguejoRPG-win_x64.exe" ( >> "dist-portable\CaranguejoRPG.bat"
+echo     start "" CaranguejoRPG-win_x64.exe >> "dist-portable\CaranguejoRPG.bat"
+echo ) else if exist "CaranguejoRPG.exe" ( >> "dist-portable\CaranguejoRPG.bat"
+echo     start "" CaranguejoRPG.exe >> "dist-portable\CaranguejoRPG.bat"
+echo ) else if exist "neutralino-win_x64.exe" ( >> "dist-portable\CaranguejoRPG.bat"
+echo     start "" neutralino-win_x64.exe >> "dist-portable\CaranguejoRPG.bat"
+echo ) else ( >> "dist-portable\CaranguejoRPG.bat"
+echo     start http://localhost:3000 >> "dist-portable\CaranguejoRPG.bat"
+echo ) >> "dist-portable\CaranguejoRPG.bat"
 
 echo.
 echo ========================================================
@@ -110,7 +112,7 @@ echo.
 echo  COMO USAR:
 echo  1. Abra a pasta 'dist-portable\'
 echo  2. Edite o arquivo '.env' se quiser configurar seu Bot
-echo  3. Execute 'MasterScreen-RPG.exe' (ou 'MasterScreen-RPG.bat')
+echo  3. Execute 'CaranguejoRPG.bat' ou 'CaranguejoRPG-win_x64.exe'
 echo ========================================================
 echo.
 pause

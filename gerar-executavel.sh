@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 echo "========================================================"
-echo "  ⚔️  MASTER SCREEN RPG - GERADOR PORTABLE (.EXE/APP)  ⚔️"
+echo "  🦀  CARANGUEJO RPG - GERADOR PORTABLE (.EXE/APP)  🦀"
 echo "========================================================"
 echo ""
 
@@ -47,8 +47,8 @@ echo ""
 echo "[4/4] Criando pasta portable..."
 mkdir -p dist-portable/dist dist-portable/data/music dist-portable/data/sfx dist-portable/data/npcs dist-portable/data/saves
 
-if [ -d "dist/MasterScreen-RPG" ]; then
-    cp -r dist/MasterScreen-RPG/* dist-portable/
+if [ -d "dist/CaranguejoRPG" ]; then
+    cp -r dist/CaranguejoRPG/* dist-portable/
 fi
 if [ -d "bin" ]; then
     cp -r bin/* dist-portable/

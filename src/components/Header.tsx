@@ -46,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-bold tracking-wide text-[#FFFFFF] font-rpg">
-                  BardRPG
+                  CaranguejoRPG
                 </h1>
                 <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
                   Escudo do Mestre

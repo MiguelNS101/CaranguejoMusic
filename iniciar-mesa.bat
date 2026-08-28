@@ -1,9 +1,9 @@
 @echo off
 chcp 65001 > nul
-title Master Screen RPG - Launcher Automatico
+title CaranguejoRPG - Launcher Automatico
 
 echo ========================================================
-echo        ⚔️  MASTER SCREEN RPG - INICIALIZADOR  ⚔️
+echo        🦀  CARANGUEJO RPG - INICIALIZADOR  🦀
 echo ========================================================
 echo.
 

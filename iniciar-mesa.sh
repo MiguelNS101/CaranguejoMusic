@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 echo "========================================================"
-echo "       ⚔️  MASTER SCREEN RPG - INICIALIZADOR  ⚔️"
+echo "       🦀  CARANGUEJO RPG - INICIALIZADOR  🦀"
 echo "========================================================"
 echo ""
 

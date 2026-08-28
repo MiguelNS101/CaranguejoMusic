@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  rpg-bot-shield:
+  caranguejo-rpg:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: rpg_bot_master_shield
+    container_name: caranguejo_rpg
     restart: unless-stopped
     ports:
       - "3000:3000"

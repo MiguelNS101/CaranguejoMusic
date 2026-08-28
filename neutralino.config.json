@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/neutralinojs/neutralinojs/main/schemas/neutralino.config.schema.json",
-  "applicationId": "app.masterscreen.rpg",
+  "applicationId": "app.caranguejorpg",
   "version": "1.0.0",
   "defaultMode": "window",
   "port": 0,
@@ -15,7 +15,7 @@
   "nativeBlockList": [],
   "modes": {
     "window": {
-      "title": "Master Screen RPG - Escudo do Mestre & Bot de Som",
+      "title": "CaranguejoRPG - Escudo do Mestre & Bot de Som",
       "width": 1440,
       "height": 920,
       "minWidth": 1024,
@@ -33,7 +33,7 @@
     }
   },
   "cli": {
-    "binaryName": "MasterScreen-RPG",
+    "binaryName": "CaranguejoRPG",
     "resourcesPath": "/dist/",
     "extensionsPath": "/extensions/",
     "clientLibrary": "/resources/js/neutralino.js",

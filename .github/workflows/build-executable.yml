@@ -1,0 +1,95 @@
+name: Build and Release Portable Executable
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-portable:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Web & Server
+        run: npm run build
+
+      - name: Setup Neutralino Assets and Client
+        run: |
+          mkdir -Force assets, public, resources\icons, resources\js, extensions, dist
+          if (Test-Path "public\icon.png") { Copy-Item "public\icon.png" "assets\icon.png" -Force }
+          if (Test-Path "assets\icon.png") { Copy-Item "assets\icon.png" "resources\icons\appIcon.png" -Force }
+          if (Test-Path "node_modules\@neutralinojs\lib\dist\neutralino.js") {
+            Copy-Item "node_modules\@neutralinojs\lib\dist\neutralino.js" "resources\js\neutralino.js" -Force
+            Copy-Item "node_modules\@neutralinojs\lib\dist\neutralino.js" "dist\neutralino.js" -Force
+          }
+
+      - name: Update Neutralino Binaries
+        run: npx @neutralinojs/neu update
+
+      - name: Build Neutralino Release
+        run: npx @neutralinojs/neu build --release
+
+      - name: Package Portable Directory
+        run: |
+          mkdir -Force dist-portable, dist-portable\dist, dist-portable\data\music, dist-portable\data\sfx, dist-portable\data\npcs, dist-portable\data\saves
+          if (Test-Path "dist\CaranguejoRPG") { Copy-Item -Recurse -Force "dist\CaranguejoRPG\*" "dist-portable\" }
+          if (Test-Path "bin") { Copy-Item -Recurse -Force "bin\*" "dist-portable\" }
+          if (Test-Path "dist\server.cjs") { Copy-Item "dist\server.cjs" "dist-portable\dist\server.cjs" -Force }
+          if (Test-Path "dist\index.html") { Copy-Item "dist\index.html" "dist-portable\dist\index.html" -Force }
+          if (Test-Path "dist\assets") { Copy-Item -Recurse -Force "dist\assets" "dist-portable\dist\" }
+          if (Test-Path ".env.example") { Copy-Item ".env.example" "dist-portable\.env" -Force }
+          
+          # Create Launcher Script
+          @"
+          @echo off
+          chcp 65001 > nul
+          title CaranguejoRPG - Escudo do Mestre
+          cd /d "%~dp0"
+          start "" /b node dist/server.cjs
+          timeout /t 1 /nobreak > nul
+          if exist "CaranguejoRPG-win_x64.exe" (
+              start "" CaranguejoRPG-win_x64.exe
+          ) else if exist "CaranguejoRPG.exe" (
+              start "" CaranguejoRPG.exe
+          ) else if exist "neutralino-win_x64.exe" (
+              start "" neutralino-win_x64.exe
+          ) else (
+              start http://localhost:3000
+          )
+          "@ | Out-File -Encoding ASCII "dist-portable\CaranguejoRPG.bat"
+
+      - name: Compress Portable Zip
+        run: |
+          Compress-Archive -Path dist-portable\* -DestinationPath CaranguejoRPG-Portable-Windows.zip -Force
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CaranguejoRPG-Portable-Windows
+          path: CaranguejoRPG-Portable-Windows.zip
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: CaranguejoRPG-Portable-Windows.zip
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

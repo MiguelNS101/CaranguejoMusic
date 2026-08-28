@@ -622,7 +622,7 @@ NODE_ENV=production
                     O comando gera uma pasta pronta <code className="text-indigo-300 font-mono">dist-portable/</code> contendo:
                   </p>
                   <ul className="list-disc list-inside text-[11px] text-[#9E9E9E] ml-2 space-y-0.5">
-                    <li><strong className="text-white">MasterScreen-RPG.exe</strong> (o executável portátil de ~5MB)</li>
+                    <li><strong className="text-white">CaranguejoRPG-win_x64.exe</strong> (ou <strong className="text-white">CaranguejoRPG.bat</strong> - executável portátil de ~5MB)</li>
                     <li><strong className="text-white">.env</strong> (onde ficam seu Token do Discord e portas)</li>
                     <li><strong className="text-white">data/</strong> (suas músicas, soundboard e fichas de NPCs)</li>
                   </ul>
