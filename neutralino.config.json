@@ -8,6 +8,10 @@
   "url": "/",
   "enableServer": true,
   "enableNativeAPI": true,
+  "nativeAllowList": [
+    "*"
+  ],
+  "nativeBlockList": [],
   "logging": {
     "enabled": false,
     "writeToLogFile": false

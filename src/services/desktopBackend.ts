@@ -17,6 +17,7 @@ let spawnedProcessId: any = null;
 let healthCheckPromise: Promise<boolean> | null = null;
 let lastHealthCheckTime = 0;
 let lastPingLatency = 0;
+let neutralinoInitialized = false;
 
 export function addDesktopLog(
   level: 'info' | 'warn' | 'error' | 'success',
@@ -35,7 +36,7 @@ export function addDesktopLog(
     details
   };
   desktopLogs.unshift(entry);
-  if (desktopLogs.length > 200) {
+  if (desktopLogs.length > 250) {
     desktopLogs.pop();
   }
 
@@ -126,6 +127,7 @@ export function isDesktopEnvironment(): boolean {
   return (
     (window as any).NL_PORT !== undefined ||
     (window as any).Neutralino !== undefined ||
+    (window as any).NL_TOKEN !== undefined ||
     window.location.protocol === 'file:' ||
     ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
       window.location.port !== '' &&
@@ -148,10 +150,10 @@ export async function ensureDesktopBackend(): Promise<boolean> {
     addDesktopLog('warn', 'Servidor na porta 3000 não respondeu. Tentando inicializar backend em segundo plano...');
     await initDesktopBackend();
 
-    // Poll for up to 6 seconds
+    // Poll for up to 8 seconds
     const start = Date.now();
-    while (Date.now() - start < 6000) {
-      await new Promise((r) => setTimeout(r, 400));
+    while (Date.now() - start < 8000) {
+      await new Promise((r) => setTimeout(r, 450));
       if (await checkBackendHealth()) {
         addDesktopLog('success', 'Servidor local subiu e respondeu com sucesso!');
         window.dispatchEvent(new CustomEvent('desktop-backend-ready'));
@@ -159,7 +161,7 @@ export async function ensureDesktopBackend(): Promise<boolean> {
       }
     }
 
-    addDesktopLog('error', 'Servidor local não iniciou automaticamente em 6 segundos. Verifique se Iniciar-CaranguejoRPG.bat foi executado.');
+    addDesktopLog('error', 'Servidor local não iniciou automaticamente em 8 segundos. Verifique se Iniciar-CaranguejoRPG.bat foi executado na pasta.');
     return false;
   })();
 
@@ -174,10 +176,10 @@ export async function forceRestartBackend(): Promise<boolean> {
   addDesktopLog('warn', 'Solicitado reinício forçado do motor local...');
   await initDesktopBackend();
   const start = Date.now();
-  while (Date.now() - start < 5000) {
+  while (Date.now() - start < 6000) {
     await new Promise((r) => setTimeout(r, 400));
     if (await checkBackendHealth()) {
-      addDesktopLog('success', 'Motor reiniciado e pronto para conexões.');
+      addDesktopLog('success', 'Motor reiniciado e pronto para conexões na porta 3000.');
       window.dispatchEvent(new CustomEvent('desktop-backend-ready'));
       return true;
     }
@@ -189,8 +191,19 @@ export async function initDesktopBackend() {
   if (isBackendStarted) return;
   isBackendStarted = true;
 
+  // Try initializing Neutralino if available
+  if (!neutralinoInitialized && typeof Neutralino !== 'undefined' && Neutralino.init) {
+    try {
+      Neutralino.init();
+      neutralinoInitialized = true;
+      addDesktopLog('info', 'Neutralino.js client API inicializado.');
+    } catch (e: any) {
+      addDesktopLog('warn', `Neutralino.init avisou: ${e?.message}`);
+    }
+  }
+
   if (!isDesktopEnvironment()) {
-    addDesktopLog('info', 'Ambiente web padrão detectado (não requer spawn de executável desktop).');
+    addDesktopLog('info', 'Ambiente web padrão detectado.');
     return;
   }
 
@@ -203,33 +216,49 @@ export async function initDesktopBackend() {
 
   addDesktopLog('info', 'Iniciando procedimentos de auto-lançamento do motor Node.js e Discord Bot...');
 
-  const nlPath = (window as any).NL_PATH || '.';
-  addDesktopLog('info', `Caminho base detectado (NL_PATH): "${nlPath}"`);
+  let nlPath = (window as any).NL_PATH || '.';
+  const nlPort = (window as any).NL_PORT;
+  const nlToken = (window as any).NL_TOKEN;
+
+  addDesktopLog('info', `Ambiente desktop detectado (NL_PATH: "${nlPath}", NL_PORT: ${nlPort || 'N/A'}, NL_TOKEN: ${nlToken ? 'Sim' : 'Não'})`);
+
+  // Remove trailing slashes
+  if (nlPath.endsWith('\\') || nlPath.endsWith('/')) {
+    nlPath = nlPath.slice(0, -1);
+  }
 
   const sanitizedNlPath = nlPath.replace(/\\/g, '/');
 
-  // Ordered list of launch commands for Windows Desktop
+  // Command variations to ensure compatibility with Windows paths, drives and spaces
   const launchCommands = [
-    // 1. Direct path with embedded node.exe
+    // 1. Windows cmd with cd /d to avoid current directory issues
+    `cmd.exe /c "cd /d "${nlPath}" && if exist node.exe (start "" /b node.exe dist/server.cjs) else (start "" /b node dist/server.cjs)"`,
+    // 2. Direct embedded node.exe with full paths and quotes
     `"${nlPath}\\node.exe" "${nlPath}\\dist\\server.cjs"`,
-    // 2. Forward slash format
-    `"${sanitizedNlPath}/node.exe" "${sanitizedNlPath}/dist/server.cjs"`,
-    // 3. Batch launcher script in same folder
-    `cmd /c start "" /b "${nlPath}\\Iniciar-CaranguejoRPG.bat"`,
-    // 4. Background start via cmd with node.exe
-    `cmd /c start "" /b "${nlPath}\\node.exe" "${nlPath}\\dist\\server.cjs"`,
+    // 3. Batch launcher script in same directory
+    `cmd.exe /c "cd /d "${nlPath}" && start "" /b Iniciar-CaranguejoRPG.bat"`,
+    // 4. Forward slash format
+    `cmd.exe /c "cd /d "${sanitizedNlPath}" && if exist node.exe (start "" /b node.exe dist/server.cjs) else (start "" /b node dist/server.cjs)"`,
     // 5. System node fallback
-    `cmd /c start "" /b node "${nlPath}\\dist\\server.cjs"`,
+    `cmd.exe /c "cd /d "${nlPath}" && start "" /b node dist/server.cjs"`,
     // 6. Relative node.exe
-    `.\\node.exe dist/server.cjs`,
-    // 7. System node
-    `node dist/server.cjs`
+    `cmd.exe /c "if exist node.exe (start "" /b node.exe dist/server.cjs) else (start "" /b node dist/server.cjs)"`
   ];
 
   for (const cmd of launchCommands) {
     try {
-      addDesktopLog('info', `Tentando comando: ${cmd}`);
+      addDesktopLog('info', `Executando: ${cmd}`);
       if (typeof Neutralino !== 'undefined' && Neutralino.os) {
+        if (Neutralino.os.execCommand) {
+          const execRes = await Neutralino.os.execCommand(cmd, { background: true }).catch((e: any) => {
+            addDesktopLog('warn', `execCommand retornou erro: ${e?.message}`);
+            return null;
+          });
+          if (execRes) {
+            addDesktopLog('info', `Comando enviado via execCommand (PID ${execRes.pid || 'OK'})`);
+          }
+        }
+
         if (Neutralino.os.spawnProcess) {
           const proc = await Neutralino.os.spawnProcess(cmd).catch((e: any) => {
             addDesktopLog('warn', `spawnProcess falhou para: ${cmd}`, e?.message);
@@ -237,25 +266,18 @@ export async function initDesktopBackend() {
           });
           if (proc) {
             spawnedProcessId = proc;
-            addDesktopLog('success', `Processo disparado via Neutralino.os.spawnProcess (PID ${proc.id || proc.pid || 'OK'})`);
+            addDesktopLog('success', `Processo disparado via spawnProcess (PID ${proc.id || proc.pid || 'OK'})`);
           }
         }
-        if (Neutralino.os.execCommand) {
-          Neutralino.os.execCommand(cmd, { background: true }).catch((e: any) => {
-            addDesktopLog('warn', `execCommand falhou para: ${cmd}`, e?.message);
-            return null;
-          });
-          addDesktopLog('info', `Executado via Neutralino.os.execCommand em background.`);
-        }
       } else {
-        addDesktopLog('warn', 'Neutralino.os não disponível no momento para disparar o comando.');
+        addDesktopLog('warn', 'Neutralino.os API indisponível no momento.');
       }
     } catch (e: any) {
-      addDesktopLog('error', `Erro ao tentar executar comando "${cmd}": ${e?.message}`);
+      addDesktopLog('error', `Erro ao tentar executar comando: ${e?.message}`);
     }
 
     // Quick verification
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       await new Promise((r) => setTimeout(r, 400));
       if (await checkBackendHealth()) {
         addDesktopLog('success', 'Motor local conectado e respondendo na porta 3000!');
@@ -275,14 +297,14 @@ export async function initDesktopBackend() {
     }
   }
 
-  addDesktopLog('warn', 'Fim das tentativas automáticas. Se o bot não responder, abra o Iniciar-CaranguejoRPG.bat.');
+  addDesktopLog('warn', 'Motor local não respondeu automaticamente. Dê 2 cliques em "Iniciar-CaranguejoRPG.bat" na pasta do app.');
 }
 
 // Listen to Neutralino lifecycle
 try {
   if (typeof Neutralino !== 'undefined' && Neutralino.events?.on) {
     Neutralino.events.on('ready', () => {
-      addDesktopLog('info', 'Neutralino Desktop pronto. Verificando motor...');
+      addDesktopLog('info', 'Evento Neutralino ready disparado.');
       initDesktopBackend();
     });
 
