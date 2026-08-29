@@ -143,6 +143,15 @@ async function main() {
     copyFolderRecursive(binDir, distPortableDir);
   }
 
+  // Ensure both CaranguejoRPG.exe and CaranguejoRPG-win_x64.exe exist in dist-portable
+  const exeWin64 = path.join(distPortableDir, 'CaranguejoRPG-win_x64.exe');
+  const exePlain = path.join(distPortableDir, 'CaranguejoRPG.exe');
+  if (fs.existsSync(exeWin64)) {
+    fs.copyFileSync(exeWin64, exePlain);
+  } else if (fs.existsSync(exePlain)) {
+    fs.copyFileSync(exePlain, exeWin64);
+  }
+
   // Copy dist build files
   const serverCjs = path.join(rootDir, 'dist', 'server.cjs');
   if (fs.existsSync(serverCjs)) {
@@ -180,53 +189,52 @@ async function main() {
   const nodeModulesDst = path.join(distPortableDir, 'node_modules');
   copyFolderRecursive(nodeModulesSrc, nodeModulesDst);
 
-  // Generate Launcher Batch Script inside dist-portable
-  const launcherBatContent = `@echo off
-chcp 65001 > nul
-title CaranguejoRPG - Escudo do Mestre
-cd /d "%~dp0"
+  // Generate clean ASCII Launcher Batch Script inside dist-portable (with CRLF)
+  const launcherBatContent = [
+    '@echo off',
+    'title CaranguejoRPG',
+    'cd /d "%~dp0"',
+    '',
+    'echo ========================================================',
+    'echo       CARANGUEJO RPG - INICIANDO APLICATIVO',
+    'echo ========================================================',
+    'echo.',
+    '',
+    'where node >nul 2>nul',
+    'if %errorlevel% neq 0 (',
+    '    echo [AVISO] Node.js nao encontrado no PATH do Windows.',
+    '    echo Tentando carregar servidor local...',
+    ')',
+    '',
+    'echo [i] Iniciando servidor do bot e motor de som local...',
+    'start "CaranguejoRPG-Server" /b node dist/server.cjs',
+    '',
+    'timeout /t 2 /nobreak > nul',
+    '',
+    'if exist "CaranguejoRPG.exe" (',
+    '    echo [i] Abrindo CaranguejoRPG.exe...',
+    '    start "" "CaranguejoRPG.exe"',
+    ') else if exist "CaranguejoRPG-win_x64.exe" (',
+    '    echo [i] Abrindo CaranguejoRPG-win_x64.exe...',
+    '    start "" "CaranguejoRPG-win_x64.exe"',
+    ') else (',
+    '    echo [i] Abrindo no seu navegador...',
+    '    start http://localhost:3000',
+    ')',
+    '',
+    'echo [OK] Aplicativo em execucao! Pode minimizar esta janela.',
+    ''
+  ].join('\r\n');
 
-echo ========================================================
-echo       🦀  CARANGUEJO RPG - INICIANDO APLICATIVO  🦀
-echo ========================================================
-echo.
-
-where node >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [AVISO] O Node.js nao foi detectado no PATH do Windows.
-    echo Certifique-se de ter o Node.js v18+ instalado (https://nodejs.org).
-    echo.
-)
-
-echo [i] Iniciando servidor do bot e motor de som local na porta 3000...
-start "CaranguejoRPG Server" /b node dist/server.cjs
-
-timeout /t 2 /nobreak > nul
-
-if exist "CaranguejoRPG-win_x64.exe" (
-    echo [i] Abrindo janela desktop do CaranguejoRPG...
-    start "" CaranguejoRPG-win_x64.exe
-) else if exist "CaranguejoRPG.exe" (
-    echo [i] Abrindo janela desktop do CaranguejoRPG...
-    start "" CaranguejoRPG.exe
-) else if exist "neutralino-win_x64.exe" (
-    echo [i] Abrindo janela desktop do CaranguejoRPG...
-    start "" neutralino-win_x64.exe
-) else (
-    echo [i] Abrindo no seu navegador padrao...
-    start http://localhost:3000
-)
-
-echo.
-echo [✓] Aplicativo em execucao! Pode minimizar esta janela.
-`;
   fs.writeFileSync(path.join(distPortableDir, 'Iniciar-CaranguejoRPG.bat'), launcherBatContent, 'utf-8');
   fs.writeFileSync(path.join(distPortableDir, 'CaranguejoRPG.bat'), launcherBatContent, 'utf-8');
 
   // Create VBS launcher (runs silently without black CMD window if desired)
-  const vbsContent = `Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "cmd /c Iniciar-CaranguejoRPG.bat", 0, False
-`;
+  const vbsContent = [
+    'Set WshShell = CreateObject("WScript.Shell")',
+    'WshShell.Run "cmd /c Iniciar-CaranguejoRPG.bat", 0, False',
+    ''
+  ].join('\r\n');
   fs.writeFileSync(path.join(distPortableDir, 'Iniciar-Sem-Janela-Preta.vbs'), vbsContent, 'utf-8');
 
   console.log('\n========================================================');
@@ -234,7 +242,7 @@ WshShell.Run "cmd /c Iniciar-CaranguejoRPG.bat", 0, False
   console.log(`Pasta: ${distPortableDir}`);
   console.log('\nCOMO EXECUTAR:');
   console.log('1. Abra a pasta "dist-portable"');
-  console.log('2. Dê 2 cliques em "CaranguejoRPG-win_x64.exe" ou "Iniciar-CaranguejoRPG.bat"');
+  console.log('2. Dê 2 cliques direto em "CaranguejoRPG.exe"');
   console.log('========================================================\n');
 }
 
