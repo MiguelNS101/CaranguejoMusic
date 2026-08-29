@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableDelayedExpansion
 chcp 65001 > nul
 title CaranguejoRPG - Gerador de Executavel Portable
 
@@ -10,36 +11,45 @@ echo.
 :: 1. Verificar Node.js
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [!] Node.js nao encontrado. Instale em https://nodejs.org/
+    echo [!] Node.js nao foi encontrado no sistema.
+    echo     Instale o Node.js LTS em https://nodejs.org/ e tente novamente.
+    echo.
     pause
     exit /b 1
 )
 
 echo [1/4] Instalando dependencias necessarias (Audio Opus, Discord.js, Interface)...
-call npm install --legacy-peer-deps --no-audit --no-fund
+cmd /c "npm install --legacy-peer-deps --no-audit --no-fund"
 if %errorlevel% neq 0 (
     echo [!] Tentando instalacao alternativa com --force...
-    call npm install --force --no-audit --no-fund
+    cmd /c "npm install --force --no-audit --no-fund"
 )
 
 :: Verificar se o vite foi instalado
 if not exist "node_modules\vite\" (
-    echo [!] Erro ao instalar dependencias do projeto. Verifique sua conexao de internet.
+    echo.
+    echo [!] Erro critico: dependencias principais nao foram instaladas.
+    echo     Verifique sua conexao com a internet ou permissoes de pasta.
+    echo.
     pause
     exit /b 1
 )
 
 echo.
 echo [2/4] Compilando interface React e servidor Express/Discord...
-call npm run build
+cmd /c "npm run build"
 if %errorlevel% neq 0 (
+    echo.
     echo [!] Erro durante a compilacao (npm run build).
+    echo.
     pause
     exit /b 1
 )
 
 if not exist "dist\index.html" (
-    echo [!] Erro: O arquivo dist\index.html nao foi gerado.
+    echo.
+    echo [!] Erro: O arquivo dist\index.html nao foi gerado na compilacao.
+    echo.
     pause
     exit /b 1
 )
@@ -70,12 +80,20 @@ if exist "node_modules\@neutralinojs\lib\dist\neutralino.js" (
 
 echo.
 echo [3/4] Baixando binarios e empacotando com Neutralino.js...
-call npx @neutralinojs/neu update
+cmd /c "npx --yes @neutralinojs/neu update"
+
 if exist "node_modules\@neutralinojs\lib\dist\neutralino.js" (
     copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "resources\js\neutralino.js" >nul
     copy /Y "node_modules\@neutralinojs\lib\dist\neutralino.js" "dist\neutralino.js" >nul
 )
-call npx @neutralinojs/neu build --release
+
+cmd /c "npx --yes @neutralinojs/neu build --release"
+if %errorlevel% neq 0 (
+    echo [!] Aviso no neu build, tentando comando neu padrao...
+    if exist "node_modules\.bin\neu.cmd" (
+        cmd /c "node_modules\.bin\neu.cmd build --release"
+    )
+)
 
 echo.
 echo [4/4] Montando pasta portatil pronta para uso em 'dist-portable\'...
@@ -103,7 +121,7 @@ if exist "package.json" copy /Y "package.json" "dist-portable\package.json" >nul
 
 :: Copiar node_modules para execucao independente do server
 if exist "node_modules\" (
-    echo [i] Copiando modulos de audio e dependencias para dist-portable...
+    echo [i] Copiando dependencias e modulos de audio para dist-portable...
     if not exist "dist-portable\node_modules\" mkdir "dist-portable\node_modules"
     xcopy /E /I /Y /Q "node_modules\*" "dist-portable\node_modules\" >nul
 )
@@ -123,7 +141,7 @@ echo chcp 65001 ^> nul >> "dist-portable\CaranguejoRPG.bat"
 echo title CaranguejoRPG - Escudo do Mestre >> "dist-portable\CaranguejoRPG.bat"
 echo cd /d "%%~dp0" >> "dist-portable\CaranguejoRPG.bat"
 echo start "" /b node dist/server.cjs >> "dist-portable\CaranguejoRPG.bat"
-echo timeout /t 1 /nobreak ^> nul >> "dist-portable\CaranguejoRPG.bat"
+echo timeout /t 2 /nobreak ^> nul >> "dist-portable\CaranguejoRPG.bat"
 echo if exist "CaranguejoRPG-win_x64.exe" ( >> "dist-portable\CaranguejoRPG.bat"
 echo     start "" CaranguejoRPG-win_x64.exe >> "dist-portable\CaranguejoRPG.bat"
 echo ) else if exist "CaranguejoRPG.exe" ( >> "dist-portable\CaranguejoRPG.bat"
