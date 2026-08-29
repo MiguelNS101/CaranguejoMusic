@@ -16,9 +16,9 @@ echo "[✓] Node.js detectado: $(node -v)"
 echo ""
 
 # 2. Check node_modules
-if [ ! -d "node_modules" ]; then
+if [ ! -d "node_modules" ] || [ ! -d "node_modules/vite" ] || [ ! -d "node_modules/tsx" ]; then
     echo "[i] Instalando dependências de áudio e bot (Opus, Discord.js, FFmpeg)..."
-    npm install --include=optional || npm install
+    npm install --legacy-peer-deps --no-audit --no-fund || npm install --force --no-audit --no-fund
     echo "[✓] Dependências configuradas com sucesso!"
 fi
 

@@ -23,14 +23,19 @@ if %errorlevel% neq 0 (
 echo [✓] Node.js detectado com sucesso!
 echo.
 
-:: 2. Instalar dependencias se nao existirem
-if not exist "node_modules\" (
+:: 2. Instalar ou reparar dependencias se nao existirem
+set NEED_INSTALL=0
+if not exist "node_modules\" set NEED_INSTALL=1
+if not exist "node_modules\vite\" set NEED_INSTALL=1
+if not exist "node_modules\tsx\" set NEED_INSTALL=1
+
+if %NEED_INSTALL%==1 (
     echo [i] Instalando dependencias necessarias (Audio Opus, Discord.js, Interface)...
     echo     (Isso so acontece na primeira inicializacao)
-    call npm install --include=optional
+    call npm install --legacy-peer-deps --no-audit --no-fund
     if %errorlevel% neq 0 (
-        echo [!] Tentando instalacao padrao com opusscript e ffmpeg-static...
-        call npm install
+        echo [!] Tentando instalacao alternativa com --force...
+        call npm install --force --no-audit --no-fund
     )
     echo [✓] Dependencias e motores de audio configurados com sucesso!
     echo.
@@ -50,4 +55,10 @@ echo ========================================================
 echo.
 
 call npm run dev
+if %errorlevel% neq 0 (
+    echo.
+    echo [!] O servidor foi finalizado ou encontrou um erro.
+    echo     Se uma porta estiver ocupada, feche outros servidores Node ou reinicie a maquina.
+    echo.
+)
 pause

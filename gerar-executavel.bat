@@ -15,12 +15,34 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [1/4] Instalando dependencias necessarias...
-call npm install
+echo [1/4] Instalando dependencias necessarias (Audio Opus, Discord.js, Interface)...
+call npm install --legacy-peer-deps --no-audit --no-fund
+if %errorlevel% neq 0 (
+    echo [!] Tentando instalacao alternativa com --force...
+    call npm install --force --no-audit --no-fund
+)
+
+:: Verificar se o vite foi instalado
+if not exist "node_modules\vite\" (
+    echo [!] Erro ao instalar dependencias do projeto. Verifique sua conexao de internet.
+    pause
+    exit /b 1
+)
 
 echo.
-echo [2/4] Compilando interface e servidor Express/Discord...
+echo [2/4] Compilando interface React e servidor Express/Discord...
 call npm run build
+if %errorlevel% neq 0 (
+    echo [!] Erro durante a compilacao (npm run build).
+    pause
+    exit /b 1
+)
+
+if not exist "dist\index.html" (
+    echo [!] Erro: O arquivo dist\index.html nao foi gerado.
+    pause
+    exit /b 1
+)
 
 :: Garantir estrutura de resources, icons e neutralino.js
 if not exist "assets\" mkdir "assets"

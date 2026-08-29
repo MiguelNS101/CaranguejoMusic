@@ -28,7 +28,7 @@ jobs:
       - name: Install Dependencies for Windows
         run: |
           if (Test-Path "package-lock.json") { Remove-Item "package-lock.json" -Force }
-          npm install --include=optional --no-audit --no-fund
+          npm install --legacy-peer-deps --no-audit --no-fund
 
       - name: Build Web & Server
         run: npm run build

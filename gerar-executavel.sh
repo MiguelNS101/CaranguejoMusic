@@ -12,11 +12,15 @@ if ! command -v node &> /dev/null; then
 fi
 
 echo "[1/4] Instalando dependências..."
-npm install
+npm install --legacy-peer-deps --no-audit --no-fund || npm install --force --no-audit --no-fund
 
 echo ""
 echo "[2/4] Compilando frontend e backend..."
 npm run build
+if [ ! -f "dist/index.html" ]; then
+    echo "[!] Erro: A compilação falhou e dist/index.html não foi gerado."
+    exit 1
+fi
 
 mkdir -p assets public resources/icons resources/js extensions dist
 
