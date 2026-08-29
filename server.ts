@@ -17,13 +17,15 @@ async function startServer() {
   const PORT = 3000;
 
 
-  // CORS middleware for Desktop .exe (Neutralino) & Local Clients
+  // CORS middleware for Desktop .exe (Neutralino), Electron & Local Web Clients
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Range, *');
+    res.header('Access-Control-Allow-Private-Network', 'true');
+    res.header('Access-Control-Max-Age', '86400');
     if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+      return res.status(200).end();
     }
     next();
   });

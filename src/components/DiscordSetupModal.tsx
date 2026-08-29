@@ -582,37 +582,52 @@ NODE_ENV=production
             )}
 
             {/* Feedback & Actions */}
-            <div className="pt-3 border-t border-[#2D3139] flex items-center justify-between">
-              <div>
-                {feedback.status === 'success' && (
-                  <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {feedback.msg}
-                  </span>
-                )}
-                {feedback.status === 'error' && (
-                  <span className="flex items-center gap-1 text-xs text-rose-400 font-medium">
-                    <AlertCircle className="w-4 h-4" />
-                    {feedback.msg}
-                  </span>
-                )}
-              </div>
+            <div className="pt-3 border-t border-[#2D3139] flex flex-col gap-3">
+              {feedback.status !== 'idle' && (
+                <div
+                  className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs ${
+                    feedback.status === 'success'
+                      ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                      : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                  }`}
+                >
+                  {feedback.status === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 space-y-1">
+                    <p className="font-semibold leading-tight">
+                      {feedback.status === 'success' ? 'Sucesso' : 'Atenção ao Conectar'}
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-[#E0E0E0] break-words">
+                      {feedback.msg}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B]"
-                >
-                  Fechar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all"
-                >
-                  {isSaving ? 'Salvando & Conectando...' : 'Salvar & Conectar Bot'}
-                </button>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-[#9E9E9E]">
+                  {botStatus.isOnline ? `🟢 Bot Conectado: @${botStatus.username}` : '⚪ Bot Offline (Modo Local)'}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-xl text-xs text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B]"
+                  >
+                    Fechar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all"
+                  >
+                    {isSaving ? 'Salvando & Conectando...' : 'Salvar & Conectar Bot'}
+                  </button>
+                </div>
               </div>
             </div>
 

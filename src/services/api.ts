@@ -3,7 +3,19 @@
  * Cloud Run / AI Studio container, or Desktop executable (Neutralino.js / Electron)
  * where the frontend is served on a different local port than the backend (port 3000).
  */
-export function resolveApiUrl(url: string): string {
+
+let cachedWorkingBase: string | null = null;
+
+export function getLocalBaseUrl(): string {
+  if (cachedWorkingBase) return cachedWorkingBase;
+  return 'http://localhost:3000';
+}
+
+export function setWorkingBaseUrl(base: string) {
+  cachedWorkingBase = base;
+}
+
+export function resolveApiUrl(url: string, baseOverride?: string): string {
   if (!url) return '';
   if (
     url.startsWith('http://') ||
@@ -26,7 +38,7 @@ export function resolveApiUrl(url: string): string {
       window.location.port !== '3000';
 
     if (isDesktop || isLocalDifferentPort) {
-      const base = 'http://localhost:3000';
+      const base = baseOverride || getLocalBaseUrl();
       return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
     }
   }
@@ -39,7 +51,20 @@ export function resolveApiUrl(url: string): string {
  */
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const resolved = resolveApiUrl(input);
-  return fetch(resolved, init);
+  try {
+    return await fetch(resolved, init);
+  } catch (err: any) {
+    // If localhost failed in desktop/local mode, attempt 127.0.0.1 as fallback
+    if (typeof window !== 'undefined' && resolved.includes('localhost:3000')) {
+      const fallbackUrl = resolved.replace('localhost:3000', '127.0.0.1:3000');
+      try {
+        const res = await fetch(fallbackUrl, init);
+        setWorkingBaseUrl('http://127.0.0.1:3000');
+        return res;
+      } catch {}
+    }
+    throw err;
+  }
 }
 
 /**
@@ -50,9 +75,18 @@ export async function safeFetchJson<T = any>(
   url: string,
   options?: RequestInit
 ): Promise<{ success: boolean; data?: T; error?: string; status: number }> {
+  const isDesktopEnv =
+    typeof window !== 'undefined' &&
+    ((window as any).NL_PORT !== undefined ||
+      (window as any).Neutralino !== undefined ||
+      window.location.protocol === 'file:' ||
+      ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+        window.location.port !== '3000'));
+
+  const primaryUrl = resolveApiUrl(url);
+
   try {
-    const fullUrl = resolveApiUrl(url);
-    const res = await fetch(fullUrl, {
+    const res = await fetch(primaryUrl, {
       ...options,
       headers: {
         'Accept': 'application/json',
@@ -83,11 +117,51 @@ export async function safeFetchJson<T = any>(
       status: res.status
     };
   } catch (err: any) {
+    // If primary localhost failed, try 127.0.0.1 fallback
+    if (isDesktopEnv && primaryUrl.includes('localhost:3000')) {
+      try {
+        const altUrl = primaryUrl.replace('localhost:3000', '127.0.0.1:3000');
+        const altRes = await fetch(altUrl, {
+          ...options,
+          headers: {
+            'Accept': 'application/json',
+            ...(options?.headers || {})
+          }
+        });
+
+        const altText = await altRes.text();
+        let altData: any = null;
+        if (altText && altText.trim().length > 0) {
+          try {
+            altData = JSON.parse(altText);
+          } catch {
+            altData = { rawText: altText };
+          }
+        }
+
+        if (!altRes.ok) {
+          const errMsg = altData?.error || altData?.message || `Erro HTTP ${altRes.status}`;
+          return { success: false, data: altData, error: errMsg, status: altRes.status };
+        }
+
+        setWorkingBaseUrl('http://127.0.0.1:3000');
+        return {
+          success: altData ? (altData.success !== false) : true,
+          data: altData as T,
+          error: altData?.error,
+          status: altRes.status
+        };
+      } catch {}
+    }
+
+    const fallbackMsg = isDesktopEnv
+      ? 'Não foi possível comunicar com o servidor local (porta 3000). Certifique-se de ter iniciado o aplicativo pelo "Iniciar-CaranguejoRPG.bat".'
+      : (err?.message || 'Falha na comunicação com o servidor.');
+
     return {
       success: false,
-      error: err?.message || 'Falha na comunicação com o servidor local.',
+      error: fallbackMsg,
       status: 0
     };
   }
 }
-
