@@ -15,7 +15,7 @@ import {
   WodDiceRollResult,
   DiscordGuild
 } from '../types';
-import { safeFetchJson } from '../services/api';
+import { safeFetchJson, apiFetch, resolveApiUrl } from '../services/api';
 
 interface AudioContextType {
   // Playback
@@ -156,6 +156,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const sfxAudioMap = useRef<Map<string, HTMLAudioElement>>(new Map());
   const lastSeekTimestampRef = useRef<number>(0);
+  const isSeekingRef = useRef<boolean>(false);
 
   // Initialize HTML5 Audio Element for web player
   useEffect(() => {
@@ -164,8 +165,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audioRef.current = audio;
 
     const handleTimeUpdate = () => {
-      // Prevent stale reset right after a seek
-      if (Date.now() - lastSeekTimestampRef.current < 1200) {
+      // Do not process time updates if audio element is actively seeking or within seek grace window
+      if (audio.seeking) return;
+      if (isSeekingRef.current) return;
+      if (Date.now() - lastSeekTimestampRef.current < 1000) {
         return;
       }
       if (!isNaN(audio.currentTime) && isFinite(audio.currentTime)) {
@@ -173,6 +176,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
+      }
+    };
+
+    const handleSeeked = () => {
+      isSeekingRef.current = false;
+      if (!isNaN(audio.currentTime) && isFinite(audio.currentTime)) {
+        setCurrentTime(audio.currentTime);
       }
     };
 
@@ -201,6 +211,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('seeked', handleSeeked);
     audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('canplay', handleCanPlay);
@@ -212,6 +223,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => {
       audio.pause();
       audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('seeked', handleSeeked);
       audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('canplay', handleCanPlay);
@@ -344,20 +356,24 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setCurrentTime(startOffset);
 
     if (audioRef.current) {
-      const isSameSrc = audioRef.current.src && audioRef.current.src.endsWith(track.url);
+      const resolvedUrl = resolveApiUrl(track.url);
+      const isSameSrc = audioRef.current.src && (audioRef.current.src === resolvedUrl || audioRef.current.src.endsWith(track.url));
       if (!isSameSrc) {
-        audioRef.current.src = track.url;
+        audioRef.current.src = resolvedUrl;
       }
       audioRef.current.muted = !isLocalAudioEnabled || isMuted;
       audioRef.current.volume = isMuted ? 0 : volume;
 
       if (startOffset > 0) {
+        isSeekingRef.current = true;
         lastSeekTimestampRef.current = Date.now();
         const applySeek = () => {
           try {
             if (audioRef.current) audioRef.current.currentTime = startOffset;
           } catch (e) {
             console.warn('Seek offset apply error:', e);
+          } finally {
+            setTimeout(() => { isSeekingRef.current = false; }, 800);
           }
         };
         if (audioRef.current.readyState >= 1) {
@@ -365,6 +381,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else {
           audioRef.current.addEventListener('loadedmetadata', applySeek, { once: true });
         }
+      } else if (!isSameSrc) {
+        audioRef.current.currentTime = 0;
       }
 
       if (immediate) {
@@ -373,7 +391,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // Stream directly into Discord Voice Channel
-    fetch('/api/bot/voice/play', {
+    safeFetchJson('/api/bot/voice/play', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -393,7 +411,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    fetch('/api/bot/voice/stop', { method: 'POST' }).catch(() => {});
+    safeFetchJson('/api/bot/voice/stop', { method: 'POST' }).catch(() => {});
     setPlaybackState('idle');
     setCurrentTime(0);
   };
@@ -420,13 +438,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (audioRef.current) {
         audioRef.current.pause();
       }
-      fetch('/api/bot/voice/pause', { method: 'POST' }).catch(() => {});
+      safeFetchJson('/api/bot/voice/pause', { method: 'POST' }).catch(() => {});
       setPlaybackState('paused');
     } else {
       const trackToPlay = currentTrack || (musicTracks.length > 0 ? musicTracks[0] : null);
       if (!trackToPlay) return;
 
-      const isCurrentLoaded = audioRef.current?.src && audioRef.current.src.endsWith(trackToPlay.url);
+      const resolvedUrl = resolveApiUrl(trackToPlay.url);
+      const isCurrentLoaded = audioRef.current?.src && (audioRef.current.src === resolvedUrl || audioRef.current.src.endsWith(trackToPlay.url));
 
       if (playbackState === 'paused' && isCurrentLoaded) {
         if (audioRef.current) {
@@ -438,7 +457,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           });
         }
         if (currentTime > 0) {
-          fetch('/api/bot/voice/seek', {
+          safeFetchJson('/api/bot/voice/seek', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -448,7 +467,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             })
           }).catch(() => {});
         } else {
-          fetch('/api/bot/voice/resume', { method: 'POST' }).catch(() => {});
+          safeFetchJson('/api/bot/voice/resume', { method: 'POST' }).catch(() => {});
         }
         setPlaybackState('playing');
       } else {
@@ -462,24 +481,28 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const rawDuration = duration > 0 ? duration : (audioRef.current?.duration || (currentTrack?.duration || 0));
     const target = rawDuration > 0 ? Math.max(0, Math.min(rawDuration, seconds)) : Math.max(0, seconds);
 
+    isSeekingRef.current = true;
     lastSeekTimestampRef.current = Date.now();
     setCurrentTime(target);
 
-    if (audioRef.current) {
-      if (!audioRef.current.src && currentTrack?.url) {
-        audioRef.current.src = currentTrack.url;
+    if (audioRef.current && currentTrack) {
+      const resolvedUrl = resolveApiUrl(currentTrack.url);
+      const isLoaded = audioRef.current.src && (audioRef.current.src === resolvedUrl || audioRef.current.src.endsWith(currentTrack.url));
+      if (!isLoaded) {
+        audioRef.current.src = resolvedUrl;
       }
       try {
         if (audioRef.current.readyState >= 1) {
           audioRef.current.currentTime = target;
         } else {
           const onMeta = () => {
-            if (audioRef.current) audioRef.current.currentTime = target;
+            if (audioRef.current) {
+              try {
+                audioRef.current.currentTime = target;
+              } catch {}
+            }
           };
           audioRef.current.addEventListener('loadedmetadata', onMeta, { once: true });
-        }
-        if (playbackState === 'playing') {
-          audioRef.current.play().catch(e => console.warn('Play after seek notice:', e));
         }
       } catch (e) {
         console.warn('Audio seek warning:', e);
@@ -488,7 +511,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Sync Discord Bot voice stream offset
     if (currentTrack) {
-      fetch('/api/bot/voice/seek', {
+      safeFetchJson('/api/bot/voice/seek', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -498,13 +521,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         })
       }).catch(() => {});
     }
+
+    // Timeout safety fallback to release seeking flag
+    setTimeout(() => {
+      isSeekingRef.current = false;
+    }, 1500);
   };
 
   const setVolume = (vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
     setVolumeState(clamped);
     if (clamped > 0 && isMuted) setIsMuted(false);
-    fetch('/api/bot/voice/volume', {
+    safeFetchJson('/api/bot/voice/volume', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ volume: isMuted ? 0 : clamped })
@@ -514,7 +542,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleMute = () => {
     setIsMuted(prev => {
       const next = !prev;
-      fetch('/api/bot/voice/volume', {
+      safeFetchJson('/api/bot/voice/volume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ volume: next ? 0 : volume })
@@ -573,7 +601,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // If local web preview is activated, play in browser
     if (isLocalAudioEnabled) {
       try {
-        const sfxAudio = new Audio(item.url);
+        const resolvedUrl = resolveApiUrl(item.url);
+        const sfxAudio = new Audio(resolvedUrl);
         const sfxVol = ((item.volume ?? 90) / 100) * (isMuted ? 0 : volume);
         sfxAudio.volume = Math.max(0, Math.min(1, sfxVol));
 
@@ -606,7 +635,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // Stream SFX directly to Discord Voice Channel
-    fetch('/api/bot/voice/sfx', {
+    safeFetchJson('/api/bot/voice/sfx', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -642,7 +671,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const setActiveLayoutId = async (id: string) => {
     setActiveLayoutIdState(id);
     try {
-      await fetch('/api/soundboard-layouts/active', {
+      await safeFetchJson('/api/soundboard-layouts/active', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ layoutId: id })
@@ -653,39 +682,38 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const createSoundboardLayout = async (layout: Partial<SoundboardLayout>): Promise<SoundboardLayout> => {
-    const res = await fetch('/api/soundboard-layouts', {
+    const res = await safeFetchJson<SoundboardLayout>('/api/soundboard-layouts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(layout)
     });
-    const created = await res.json();
+    const created = res.data || (layout as SoundboardLayout);
     setSoundboardLayouts(prev => [...prev, created]);
     setActiveLayoutIdState(created.id);
     return created;
   };
 
   const updateSoundboardLayout = async (id: string, updates: Partial<SoundboardLayout>): Promise<SoundboardLayout> => {
-    const res = await fetch(`/api/soundboard-layouts/${id}`, {
+    const res = await safeFetchJson<SoundboardLayout>(`/api/soundboard-layouts/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
     });
-    const updated = await res.json();
-    setSoundboardLayouts(prev => prev.map(l => l.id === id ? updated : l));
+    const updated = res.data || (updates as SoundboardLayout);
+    setSoundboardLayouts(prev => prev.map(l => l.id === id ? { ...l, ...updated } : l));
     return updated;
   };
 
   const deleteSoundboardLayout = async (id: string) => {
-    const res = await fetch(`/api/soundboard-layouts/${id}`, { method: 'DELETE' });
-    const data = await res.json();
+    const res = await safeFetchJson<{ activeLayoutId?: string }>(`/api/soundboard-layouts/${id}`, { method: 'DELETE' });
     setSoundboardLayouts(prev => prev.filter(l => l.id !== id));
-    if (data.activeLayoutId) setActiveLayoutIdState(data.activeLayoutId);
+    if (res.data?.activeLayoutId) setActiveLayoutIdState(res.data.activeLayoutId);
   };
 
   const updateLayoutButtons = async (layoutId: string, buttons: SoundboardButtonConfig[]) => {
     setSoundboardLayouts(prev => prev.map(l => l.id === layoutId ? { ...l, buttons, updatedAt: Date.now() } : l));
     try {
-      await fetch(`/api/soundboard-layouts/${layoutId}`, {
+      await safeFetchJson(`/api/soundboard-layouts/${layoutId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ buttons })
@@ -715,61 +743,56 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       loopMode
     };
 
-    const res = await fetch('/api/sessions/save', {
+    const res = await safeFetchJson<{ allSessions: SessionSaveMeta[] }>('/api/sessions/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, description, clientSnapshot })
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      setSavedSessions(data.allSessions || []);
+    if (res.success && res.data) {
+      setSavedSessions(res.data.allSessions || []);
     } else {
-      throw new Error('Falha ao salvar a sessão atual.');
+      throw new Error(res.error || 'Falha ao salvar a sessão atual.');
     }
   };
 
   const loadSavedSession = async (id: string) => {
-    const res = await fetch(`/api/sessions/load/${id}`, { method: 'POST' });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.state) {
-        setFolders(data.state.folders || []);
-        setMusicTracks(data.state.musicTracks || []);
-        setSoundboardItems(data.state.soundboardItems || []);
-        setSoundboardLayouts(data.state.soundboardLayouts || []);
-        if (data.state.activeSoundboardLayoutId) setActiveLayoutIdState(data.state.activeSoundboardLayoutId);
-        setNpcs(data.state.npcs || []);
-        setSessionNotes(data.state.sessionNotes || '');
-        setInitiativeList(data.state.initiativeList || []);
-        if (data.state.currentTrack) playTrack(data.state.currentTrack, false);
-      }
+    const res = await safeFetchJson<{ state?: any }>(`/api/sessions/load/${id}`, { method: 'POST' });
+    if (res.success && res.data?.state) {
+      const data = res.data;
+      setFolders(data.state.folders || []);
+      setMusicTracks(data.state.musicTracks || []);
+      setSoundboardItems(data.state.soundboardItems || []);
+      setSoundboardLayouts(data.state.soundboardLayouts || []);
+      if (data.state.activeSoundboardLayoutId) setActiveLayoutIdState(data.state.activeSoundboardLayoutId);
+      setNpcs(data.state.npcs || []);
+      setSessionNotes(data.state.sessionNotes || '');
+      setInitiativeList(data.state.initiativeList || []);
+      if (data.state.currentTrack) playTrack(data.state.currentTrack, false);
     } else {
-      throw new Error('Falha ao carregar arquivo de save.');
+      throw new Error(res.error || 'Falha ao carregar arquivo de save.');
     }
   };
 
   const deleteSavedSession = async (id: string) => {
-    const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      const data = await res.json();
-      setSavedSessions(data.allSessions || []);
+    const res = await safeFetchJson<{ allSessions: SessionSaveMeta[] }>(`/api/sessions/${id}`, { method: 'DELETE' });
+    if (res.success && res.data) {
+      setSavedSessions(res.data.allSessions || []);
     }
   };
 
   const importSessionFromFile = async (file: File) => {
     const text = await file.text();
     const parsed = JSON.parse(text);
-    const res = await fetch('/api/sessions/import', {
+    const res = await safeFetchJson<{ allSessions: SessionSaveMeta[] }>('/api/sessions/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(parsed)
     });
-    if (res.ok) {
-      const data = await res.json();
-      setSavedSessions(data.allSessions || []);
+    if (res.success && res.data) {
+      setSavedSessions(res.data.allSessions || []);
     } else {
-      throw new Error('Formato de arquivo de sessão inválido.');
+      throw new Error(res.error || 'Formato de arquivo de sessão inválido.');
     }
   };
 
@@ -792,7 +815,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     if (folderId) formData.append('folderId', folderId);
 
-    const res = await fetch(`/api/upload/bulk?type=${category}`, {
+    const res = await apiFetch(`/api/upload/bulk?type=${category}`, {
       method: 'POST',
       body: formData
     });
@@ -817,7 +840,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     label?: string,
     broadcastToDiscord: boolean = true
   ): Promise<WodDiceRollResult> => {
-    const res = await fetch('/api/dice/wod', {
+    const res = await safeFetchJson<{ roll: WodDiceRollResult }>('/api/dice/wod', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -830,19 +853,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       })
     });
 
-    const data = await res.json();
-    if (data.roll) {
-      setWodRolls(prev => [data.roll, ...prev.slice(0, 49)]);
-      return data.roll;
+    if (res.success && res.data?.roll) {
+      setWodRolls(prev => [res.data!.roll, ...prev.slice(0, 49)]);
+      return res.data.roll;
     }
-    throw new Error('Erro ao processar rolagem WoD.');
+    throw new Error(res.error || 'Erro ao processar rolagem WoD.');
   };
 
   // CRUD Helpers
   const saveNotes = async (notes: string) => {
     setSessionNotes(notes);
     try {
-      await fetch('/api/notes', {
+      await safeFetchJson('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes })
@@ -853,77 +875,77 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const createFolder = async (folder: Omit<Folder, 'id' | 'createdAt'>): Promise<Folder> => {
-    const res = await fetch('/api/folders', {
+    const res = await safeFetchJson<Folder>('/api/folders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(folder)
     });
-    const created = await res.json();
+    const created = res.data || { ...folder, id: `f-${Date.now()}`, createdAt: Date.now() };
     setFolders(prev => [...prev, created]);
     return created;
   };
 
   const deleteFolder = async (id: string) => {
-    await fetch(`/api/folders/${id}`, { method: 'DELETE' });
+    await safeFetchJson(`/api/folders/${id}`, { method: 'DELETE' });
     setFolders(prev => prev.filter(f => f.id !== id));
   };
 
   const createMusicTrack = async (track: Partial<MusicTrack>): Promise<MusicTrack> => {
-    const res = await fetch('/api/music', {
+    const res = await safeFetchJson<MusicTrack>('/api/music', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(track)
     });
-    const created = await res.json();
+    const created = res.data || (track as MusicTrack);
     setMusicTracks(prev => [created, ...prev]);
     return created;
   };
 
   const deleteMusicTrack = async (id: string) => {
-    await fetch(`/api/music/${id}`, { method: 'DELETE' });
+    await safeFetchJson(`/api/music/${id}`, { method: 'DELETE' });
     setMusicTracks(prev => prev.filter(t => t.id !== id));
   };
 
   const createSoundboardItem = async (item: Partial<SoundboardItem>): Promise<SoundboardItem> => {
-    const res = await fetch('/api/soundboard', {
+    const res = await safeFetchJson<SoundboardItem>('/api/soundboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item)
     });
-    const created = await res.json();
+    const created = res.data || (item as SoundboardItem);
     setSoundboardItems(prev => [...prev, created]);
     return created;
   };
 
   const deleteSoundboardItem = async (id: string) => {
-    await fetch(`/api/soundboard/${id}`, { method: 'DELETE' });
+    await safeFetchJson(`/api/soundboard/${id}`, { method: 'DELETE' });
     setSoundboardItems(prev => prev.filter(s => s.id !== id));
   };
 
   const createNpc = async (npc: Partial<NPC>): Promise<NPC> => {
-    const res = await fetch('/api/npcs', {
+    const res = await safeFetchJson<NPC>('/api/npcs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(npc)
     });
-    const created = await res.json();
+    const created = res.data || (npc as NPC);
     setNpcs(prev => [created, ...prev]);
     return created;
   };
 
   const updateNpc = async (id: string, updates: Partial<NPC>): Promise<NPC> => {
-    const res = await fetch(`/api/npcs/${id}`, {
+    const res = await safeFetchJson<NPC>(`/api/npcs/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates)
     });
-    const updated = await res.json();
-    setNpcs(prev => prev.map(n => n.id === id ? updated : n));
+    const updated = res.data || (updates as NPC);
+    setNpcs(prev => prev.map(n => n.id === id ? { ...n, ...updated } : n));
     return updated;
   };
 
   const deleteNpc = async (id: string) => {
-    await fetch(`/api/npcs/${id}`, { method: 'DELETE' });
+    await safeFetchJson(`/api/npcs/${id}`, { method: 'DELETE' });
     setNpcs(prev => prev.filter(n => n.id !== id));
   };
 

@@ -30,6 +30,7 @@ import { useAudio } from '../context/AudioContext';
 import { MusicTrack, LoopMode } from '../types';
 import { FolderImportModal } from './FolderImportModal';
 import { AudioScrubber } from './AudioScrubber';
+import { apiFetch, resolveApiUrl } from '../services/api';
 
 export const MusicPlayerView: React.FC = () => {
   const {
@@ -105,7 +106,7 @@ export const MusicPlayerView: React.FC = () => {
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/upload?type=music', {
+      const res = await apiFetch('/api/upload?type=music', {
         method: 'POST',
         body: formData
       });

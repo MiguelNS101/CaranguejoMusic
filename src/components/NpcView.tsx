@@ -22,6 +22,7 @@ import confetti from 'canvas-confetti';
 import { useAudio } from '../context/AudioContext';
 import { NPC } from '../types';
 import { FolderImportModal } from './FolderImportModal';
+import { apiFetch, resolveApiUrl } from '../services/api';
 
 export const NpcView: React.FC = () => {
   const {
@@ -132,7 +133,7 @@ export const NpcView: React.FC = () => {
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/upload?type=npc', {
+      const res = await apiFetch('/api/upload?type=npc', {
         method: 'POST',
         body: formData
       });
@@ -167,7 +168,7 @@ export const NpcView: React.FC = () => {
         formData.append('folderId', selectedFolderId);
       }
 
-      const res = await fetch('/api/upload/bulk?type=npc', {
+      const res = await apiFetch('/api/upload/bulk?type=npc', {
         method: 'POST',
         body: formData
       });

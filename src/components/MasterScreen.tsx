@@ -38,6 +38,7 @@ import {
 import confetti from 'canvas-confetti';
 import { useAudio } from '../context/AudioContext';
 import { NPC, SoundboardItem, DiceRollResult, WodDiceRollResult } from '../types';
+import { safeFetchJson, resolveApiUrl } from '../services/api';
 import { AudioScrubber } from './AudioScrubber';
 
 interface MasterScreenProps {
@@ -149,7 +150,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
     setNarrativeFeedback({ status: 'idle' });
 
     try {
-      const res = await fetch('/api/bot/send-message', {
+      const res = await safeFetchJson<{ success: boolean; error?: string }>('/api/bot/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -157,13 +158,12 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
           type: 'narrative'
         })
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success && res.data?.success !== false) {
         setNarrativeFeedback({ status: 'success', msg: 'Narração enviada ao Discord!' });
         setNarrativeText('');
         setTimeout(() => setNarrativeFeedback({ status: 'idle' }), 3000);
       } else {
-        setNarrativeFeedback({ status: 'error', msg: data.error || 'Falha ao enviar ao Discord.' });
+        setNarrativeFeedback({ status: 'error', msg: res.data?.error || res.error || 'Falha ao enviar ao Discord.' });
       }
     } catch (err: any) {
       setNarrativeFeedback({ status: 'error', msg: err?.message || 'Erro de conexão' });
@@ -181,7 +181,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
     const notation = `${count}d${sides}${diceModifier > 0 ? `+${diceModifier}` : diceModifier < 0 ? `${diceModifier}` : ''}`;
 
     try {
-      const res = await fetch('/api/bot/roll-dice', {
+      const res = await safeFetchJson<{ roll: DiceRollResult }>('/api/bot/roll-dice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -191,12 +191,12 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
         })
       });
 
-      const data = await res.json();
-      if (data.roll) {
-        setLastRoll(data.roll);
-        setRollHistory(prev => [data.roll, ...prev.slice(0, 7)]);
+      if (res.success && res.data?.roll) {
+        const roll = res.data.roll;
+        setLastRoll(roll);
+        setRollHistory(prev => [roll, ...prev.slice(0, 7)]);
 
-        if (data.roll.isCriticalSuccess) {
+        if (roll.isCriticalSuccess) {
           confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
         }
       }

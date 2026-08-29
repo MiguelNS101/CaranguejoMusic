@@ -34,6 +34,7 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { SoundboardItem, SoundboardLayout, SoundboardButtonConfig } from '../types';
 import { FolderImportModal } from './FolderImportModal';
+import { apiFetch } from '../services/api';
 
 export const SoundboardView: React.FC = () => {
   const {
@@ -111,7 +112,7 @@ export const SoundboardView: React.FC = () => {
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/upload?type=sfx', {
+      const res = await apiFetch('/api/upload?type=sfx', {
         method: 'POST',
         body: formData
       });

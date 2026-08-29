@@ -1,4 +1,48 @@
 /**
+ * Resolves API and media URLs properly whether running in standard web browser,
+ * Cloud Run / AI Studio container, or Desktop executable (Neutralino.js / Electron)
+ * where the frontend is served on a different local port than the backend (port 3000).
+ */
+export function resolveApiUrl(url: string): string {
+  if (!url) return '';
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('blob:') ||
+    url.startsWith('data:')
+  ) {
+    return url;
+  }
+
+  if (typeof window !== 'undefined') {
+    const isDesktop =
+      (window as any).NL_PORT !== undefined ||
+      (window as any).Neutralino !== undefined ||
+      window.location.protocol === 'file:';
+
+    const isLocalDifferentPort =
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+      window.location.port !== '' &&
+      window.location.port !== '3000';
+
+    if (isDesktop || isLocalDifferentPort) {
+      const base = 'http://localhost:3000';
+      return url.startsWith('/') ? `${base}${url}` : `${base}/${url}`;
+    }
+  }
+
+  return url;
+}
+
+/**
+ * Standard fetch wrapped with automatic URL resolution for API / media endpoints.
+ */
+export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const resolved = resolveApiUrl(input);
+  return fetch(resolved, init);
+}
+
+/**
  * Safe fetch utility to prevent "Unexpected end of JSON input" errors.
  * Parses response text and safely converts to JSON or provides clean fallback.
  */
@@ -7,7 +51,8 @@ export async function safeFetchJson<T = any>(
   options?: RequestInit
 ): Promise<{ success: boolean; data?: T; error?: string; status: number }> {
   try {
-    const res = await fetch(url, {
+    const fullUrl = resolveApiUrl(url);
+    const res = await fetch(fullUrl, {
       ...options,
       headers: {
         'Accept': 'application/json',
@@ -45,3 +90,4 @@ export async function safeFetchJson<T = any>(
     };
   }
 }
+
