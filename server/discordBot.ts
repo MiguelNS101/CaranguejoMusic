@@ -288,10 +288,10 @@ export class DiscordBotService {
   }
 
   public async start(token: string): Promise<{ success: boolean; error?: string }> {
-    if (this.isConnecting) return { success: false, error: 'Bot is already connecting...' };
+    if (this.isConnecting) return { success: false, error: 'Bot já está em processo de conexão...' };
     if (!token || token.trim() === '') {
       this.logDiagnostic('error', 'bot', 'Tentativa de login com token vazio.');
-      return { success: false, error: 'Token is empty.' };
+      return { success: false, error: 'O token do Discord está vazio. Cole o token do bot nas configurações.' };
     }
 
     try {
@@ -308,27 +308,84 @@ export class DiscordBotService {
         this.client = null;
       }
 
-      this.client = new Client({
-        intents: [
-          GatewayIntentBits.Guilds,
-          GatewayIntentBits.GuildMessages,
-          GatewayIntentBits.MessageContent,
-          GatewayIntentBits.GuildVoiceStates,
-        ]
-      });
+      const cleanToken = token.trim();
 
-      this.setupEventHandlers();
+      // Try full intents (Guilds, Messages, MessageContent, Voice)
+      try {
+        this.client = new Client({
+          intents: [
+            GatewayIntentBits.Guilds,
+            GatewayIntentBits.GuildMessages,
+            GatewayIntentBits.MessageContent,
+            GatewayIntentBits.GuildVoiceStates,
+          ]
+        });
 
-      await this.client.login(token.trim());
-      this.isConnecting = false;
-      this.logDiagnostic('success', 'bot', `Autenticação bem-sucedida! Bot conectado como @${this.client?.user?.tag}.`);
-      return { success: true };
+        this.setupEventHandlers();
+
+        // 12-second login timeout
+        const loginPromise = this.client.login(cleanToken);
+        const timeoutPromise = new Promise<{ isTimeout: true }>((resolve) =>
+          setTimeout(() => resolve({ isTimeout: true }), 12000)
+        );
+
+        const raceRes = await Promise.race([loginPromise, timeoutPromise]);
+        if (raceRes && typeof raceRes === 'object' && (raceRes as any).isTimeout) {
+          this.isConnecting = false;
+          const timeoutMsg = 'Tempo limite excedido ao autenticar no Discord. Verifique sua conexão à internet ou o token fornecido.';
+          this.lastError = timeoutMsg;
+          this.logDiagnostic('warn', 'bot', timeoutMsg);
+          return { success: false, error: timeoutMsg };
+        }
+
+        this.isConnecting = false;
+        this.logDiagnostic('success', 'bot', `Autenticação bem-sucedida! Bot conectado como @${this.client?.user?.tag}.`);
+        return { success: true };
+      } catch (firstErr: any) {
+        const errStr = (firstErr?.message || '').toLowerCase();
+        // Check for disallowed intent (e.g. MessageContent intent not enabled in Discord Developer Portal)
+        if (
+          firstErr?.code === 'DisallowedIntents' ||
+          errStr.includes('intent') ||
+          errStr.includes('disallowed_intents')
+        ) {
+          this.logDiagnostic('warn', 'bot', 'Intents privilegiadas não habilitadas no Developer Portal. Conectando em modo Essencial (Voz + Comandos Slash/Mestre)...');
+          if (this.client) {
+            try { await this.client.destroy(); } catch {}
+          }
+
+          this.client = new Client({
+            intents: [
+              GatewayIntentBits.Guilds,
+              GatewayIntentBits.GuildVoiceStates,
+            ]
+          });
+
+          this.setupEventHandlers();
+          await this.client.login(cleanToken);
+          this.isConnecting = false;
+          this.logDiagnostic('success', 'bot', `Bot conectado com sucesso em modo de Voz e Som como @${this.client?.user?.tag}!`);
+          return { success: true };
+        }
+        throw firstErr;
+      }
     } catch (err: any) {
       this.isConnecting = false;
-      this.lastError = err?.message || 'Failed to login with provided Discord token.';
-      this.logDiagnostic('error', 'bot', `Falha ao autenticar bot no Discord: ${this.lastError}`, err?.stack);
-      console.error('Discord bot login error:', this.lastError);
-      return { success: false, error: this.lastError };
+      let rawMsg = err?.message || 'Falha ao autenticar o bot no Discord.';
+      let userFriendly = rawMsg;
+
+      if (rawMsg.includes('TOKEN_INVALID') || rawMsg.toLowerCase().includes('invalid token') || rawMsg.toLowerCase().includes('an invalid token')) {
+        userFriendly = 'Token do Discord inválido. Copie novamente o Bot Token no Discord Developer Portal.';
+      } else if (rawMsg.includes('DISALLOWED_INTENTS')) {
+        userFriendly = 'Permissão de Intents negada. Habilite "Privileged Gateway Intents" (Message Content Intent) no Discord Developer Portal.';
+      } else if (rawMsg.includes('ENOTFOUND') || rawMsg.includes('EAI_AGAIN')) {
+        userFriendly = 'Sem conexão com os servidores do Discord. Verifique sua conexão com a internet.';
+      }
+
+      this.lastError = userFriendly;
+      this.logDiagnostic('error', 'bot', `Falha ao autenticar bot no Discord: ${userFriendly}`, err?.stack);
+      console.error('Discord bot login error:', userFriendly);
+      return { success: false, error: userFriendly };
     }
   }
 

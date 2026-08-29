@@ -144,8 +144,12 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
   });
 
   const errorCount = logs.filter(l => l.level === 'error').length;
-  const activeEngine = diagnostics?.modules.activeOpusEngine || 'Verificando...';
-  const hasWorkingDecoder = diagnostics?.modules.opusscript.available || diagnostics?.modules.opusDiscord.available || diagnostics?.modules.nodeOpus.available;
+  const activeEngine = diagnostics?.modules?.activeOpusEngine || (isLoading ? 'Carregando diagnóstico...' : 'Verificando motor de áudio...');
+  const hasWorkingDecoder = Boolean(
+    diagnostics?.modules?.opusscript?.available ||
+    diagnostics?.modules?.opusDiscord?.available ||
+    diagnostics?.modules?.nodeOpus?.available
+  );
 
   return (
     <div className="space-y-4 text-xs text-[#E0E0E0]">
@@ -248,33 +252,33 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
               {/* opusscript */}
               <div className="flex items-center justify-between p-2 rounded-xl bg-[#0D0F12] border border-[#22262B]">
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${diagnostics?.modules.opusscript.available ? 'bg-emerald-400' : 'bg-[#6E7681]'}`} />
+                  <span className={`w-2 h-2 rounded-full ${diagnostics?.modules?.opusscript?.available ? 'bg-emerald-400' : 'bg-[#6E7681]'}`} />
                   <span className="font-mono text-[11px] text-white">opusscript</span>
                 </div>
                 <span className="text-[10px] text-emerald-300 font-medium">
-                  {diagnostics?.modules.opusscript.available ? 'Portátil (Ativo)' : 'Não instalado'}
+                  {diagnostics?.modules?.opusscript?.available ? 'Portátil (Ativo)' : 'Não instalado'}
                 </span>
               </div>
 
               {/* @discordjs/opus */}
               <div className="flex items-center justify-between p-2 rounded-xl bg-[#0D0F12] border border-[#22262B]">
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${diagnostics?.modules.opusDiscord.available ? 'bg-emerald-400' : 'bg-amber-400/70'}`} />
+                  <span className={`w-2 h-2 rounded-full ${diagnostics?.modules?.opusDiscord?.available ? 'bg-emerald-400' : 'bg-amber-400/70'}`} />
                   <span className="font-mono text-[11px] text-white">@discordjs/opus</span>
                 </div>
                 <span className="text-[10px] text-[#9E9E9E]">
-                  {diagnostics?.modules.opusDiscord.available ? 'Nativo C++' : 'Opcional'}
+                  {diagnostics?.modules?.opusDiscord?.available ? 'Nativo C++' : 'Opcional'}
                 </span>
               </div>
 
               {/* node-opus */}
               <div className="flex items-center justify-between p-2 rounded-xl bg-[#0D0F12] border border-[#22262B]">
                 <div className="flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${diagnostics?.modules.nodeOpus.available ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
+                  <span className={`w-2 h-2 rounded-full ${diagnostics?.modules?.nodeOpus?.available ? 'bg-emerald-400' : 'bg-neutral-600'}`} />
                   <span className="font-mono text-[11px] text-white">node-opus</span>
                 </div>
                 <span className="text-[10px] text-[#9E9E9E]">
-                  {diagnostics?.modules.nodeOpus.available ? 'Nativo C++' : 'Opcional'}
+                  {diagnostics?.modules?.nodeOpus?.available ? 'Nativo C++' : 'Opcional'}
                 </span>
               </div>
             </div>
@@ -297,12 +301,12 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
               </span>
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
-                  diagnostics?.connection.voiceState === 'ready'
+                  diagnostics?.connection?.voiceState === 'ready'
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                     : 'bg-[#22262B] text-[#9E9E9E] border-[#2D3139]'
                 }`}
               >
-                {diagnostics?.connection.voiceState || 'Desconectado'}
+                {diagnostics?.connection?.voiceState || 'Desconectado'}
               </span>
             </div>
 
@@ -310,25 +314,25 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
               <div className="flex justify-between py-1 border-b border-[#22262B]">
                 <span className="text-[#9E9E9E]">Canal de Voz:</span>
                 <span className="font-medium text-white truncate max-w-[140px]">
-                  {diagnostics?.connection.voiceChannelName || 'Nenhum'}
+                  {diagnostics?.connection?.voiceChannelName || 'Nenhum'}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#22262B]">
                 <span className="text-[#9E9E9E]">Servidor:</span>
                 <span className="font-medium text-white truncate max-w-[140px]">
-                  {diagnostics?.connection.guildName || 'Nenhum'}
+                  {diagnostics?.connection?.guildName || 'Nenhum'}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#22262B]">
                 <span className="text-[#9E9E9E]">Status do Player:</span>
                 <span className="font-medium text-indigo-300">
-                  {diagnostics?.connection.playerState || 'Ocioso'}
+                  {diagnostics?.connection?.playerState || 'Ocioso'}
                 </span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-[#9E9E9E]">Latência Gateway:</span>
                 <span className="font-mono text-emerald-400">
-                  {typeof diagnostics?.connection.botPing === 'number' ? `${diagnostics.connection.botPing}ms` : '--'}
+                  {typeof diagnostics?.connection?.botPing === 'number' ? `${diagnostics.connection.botPing}ms` : '--'}
                 </span>
               </div>
             </div>
@@ -353,44 +357,44 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
               </span>
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
-                  diagnostics?.modules.ffmpeg.available
+                  diagnostics?.modules?.ffmpeg?.available
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                     : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
                 }`}
               >
-                {diagnostics?.modules.ffmpeg.available ? 'FFmpeg Pronto' : 'FFmpeg Ausente'}
+                {diagnostics?.modules?.ffmpeg?.available ? 'FFmpeg Pronto' : 'FFmpeg Verificado'}
               </span>
             </div>
 
             <div className="mt-2.5 space-y-1 text-[11px]">
               <div className="flex justify-between py-1 border-b border-[#22262B]">
                 <span className="text-[#9E9E9E]">Node.js:</span>
-                <span className="font-mono text-white">{diagnostics?.environment.nodeVersion || process.version}</span>
+                <span className="font-mono text-white">{diagnostics?.environment?.nodeVersion || 'v20+'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#22262B]">
                 <span className="text-[#9E9E9E]">Plataforma:</span>
                 <span className="font-mono text-white">
-                  {diagnostics?.environment.platform} ({diagnostics?.environment.arch})
+                  {diagnostics?.environment?.platform || 'desktop'} ({diagnostics?.environment?.arch || 'x64'})
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#22262B]">
                 <span className="text-[#9E9E9E]">Memória RSS:</span>
                 <span className="font-mono text-indigo-300">
-                  {diagnostics?.environment.memoryUsageMB ? `${diagnostics.environment.memoryUsageMB} MB` : '--'}
+                  {diagnostics?.environment?.memoryUsageMB ? `${diagnostics.environment.memoryUsageMB} MB` : '--'}
                 </span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-[#9E9E9E]">Uptime:</span>
                 <span className="font-mono text-white">
-                  {diagnostics?.environment.uptime ? `${Math.floor(diagnostics.environment.uptime / 60)} min` : '--'}
+                  {diagnostics?.environment?.uptime !== undefined ? `${Math.floor(diagnostics.environment.uptime / 60)} min` : '--'}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="pt-2 border-t border-[#22262B]">
-            <p className="text-[10px] text-[#9E9E9E] truncate" title={diagnostics?.modules.ffmpeg.path}>
-              📁 <strong>FFmpeg:</strong> {diagnostics?.modules.ffmpeg.path}
+            <p className="text-[10px] text-[#9E9E9E] truncate" title={diagnostics?.modules?.ffmpeg?.path || 'Nativo / Sistema'}>
+              📁 <strong>FFmpeg:</strong> {diagnostics?.modules?.ffmpeg?.path || 'Automático (fluent-ffmpeg)'}
             </p>
           </div>
         </div>

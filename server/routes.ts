@@ -77,51 +77,69 @@ router.get('/bot/guilds', (req: Request, res: Response) => {
 });
 
 router.post('/bot/config', async (req: Request, res: Response) => {
-  const { token, guildId, voiceChannelId, textChannelId, clientId, autoConnectVoice, prefix } = req.body;
-  
-  const updatedConfig = db.updateBotConfig({
-    token: token !== undefined ? token : db.getBotConfig().token,
-    guildId,
-    voiceChannelId,
-    textChannelId,
-    clientId,
-    autoConnectVoice,
-    prefix
-  });
+  try {
+    const { token, guildId, voiceChannelId, textChannelId, clientId, autoConnectVoice, prefix } = req.body;
+    
+    const updatedConfig = db.updateBotConfig({
+      token: token !== undefined ? token : db.getBotConfig().token,
+      guildId,
+      voiceChannelId,
+      textChannelId,
+      clientId,
+      autoConnectVoice,
+      prefix
+    });
 
-  if (token && token.trim()) {
-    const result = await discordBot.start(token);
-    return res.json({
+    if (token && token.trim()) {
+      const result = await discordBot.start(token);
+      return res.json({
+        success: result.success,
+        config: updatedConfig,
+        botStatus: discordBot.getStatus(),
+        connectionResult: result,
+        error: result.error
+      });
+    }
+
+    res.json({
+      success: true,
       config: updatedConfig,
-      botStatus: discordBot.getStatus(),
-      connectionResult: result
+      botStatus: discordBot.getStatus()
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Erro interno ao salvar configurações do bot.'
     });
   }
-
-  res.json({
-    config: updatedConfig,
-    botStatus: discordBot.getStatus()
-  });
 });
 
 router.post('/bot/start', async (req: Request, res: Response) => {
-  const config = db.getBotConfig();
-  const token = req.body.token || config.token;
-  if (!token) {
-    return res.status(400).json({ error: 'Nenhum token fornecido.' });
-  }
+  try {
+    const config = db.getBotConfig();
+    const token = req.body.token || config.token;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Nenhum token fornecido.' });
+    }
 
-  if (req.body.token) {
-    db.updateBotConfig({ token: req.body.token });
-  }
+    if (req.body.token) {
+      db.updateBotConfig({ token: req.body.token });
+    }
 
-  const result = await discordBot.start(token);
-  res.json({ ...result, botStatus: discordBot.getStatus() });
+    const result = await discordBot.start(token);
+    res.json({ success: result.success, ...result, botStatus: discordBot.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao iniciar o bot.' });
+  }
 });
 
 router.post('/bot/stop', async (req: Request, res: Response) => {
-  await discordBot.stop();
-  res.json({ success: true, botStatus: discordBot.getStatus() });
+  try {
+    await discordBot.stop();
+    res.json({ success: true, botStatus: discordBot.getStatus() });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao parar o bot.' });
+  }
 });
 
 // DISCORD ACTIONS (Aliases for /discord/* and /bot/*)
