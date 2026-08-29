@@ -131,10 +131,10 @@
   "activeSoundboardLayoutId": "layout-default",
   "npcs": [],
   "botConfig": {
-    "token": "MTU0MDQxMjM2MDYwNTMwNjk3MA.GXGa9i.4uwzM1qxCVqmZ9Z7AJfu2E0ZU2zlxWMid4N0Ew",
-    "guildId": "1523823552250249316",
-    "voiceChannelId": "1533859999602704505",
-    "textChannelId": "1533967827663323216",
+    "token": "",
+    "guildId": "",
+    "voiceChannelId": "",
+    "textChannelId": "",
     "clientId": "",
     "autoConnectVoice": true,
     "prefix": "!"
