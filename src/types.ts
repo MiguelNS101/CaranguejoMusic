@@ -71,6 +71,7 @@ export interface DiscordChannel {
   name: string;
   type: 'text' | 'voice';
   guildId: string;
+  isVoiceWithChat?: boolean;
 }
 
 export interface DiscordGuild {

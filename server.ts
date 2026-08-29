@@ -38,7 +38,19 @@ async function startServer() {
   // Vite middleware for dev / static in production
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        watch: {
+          ignored: [
+            '**/data/**',
+            '**/dist-portable/**',
+            '**/bin/**',
+            '**/.tmp/**',
+            '**/resources.neu',
+            '**/data/db.json'
+          ]
+        }
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

@@ -555,10 +555,27 @@ NODE_ENV=production
                       className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70"
                     >
                       <option value="">Nenhum Canal Selecionado</option>
-                      {textChannels.map(tc => (
-                        <option key={tc.id} value={tc.id}># {tc.name}</option>
-                      ))}
+                      {textChannels.length > 0 && (
+                        <optgroup label="💬 Canais de Texto">
+                          {textChannels.map(tc => (
+                            <option key={tc.id} value={tc.id}># {tc.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {voiceChannels.length > 0 && (
+                        <optgroup label="🎙️💬 Chat de Texto dos Canais de Voz">
+                          {voiceChannels.map(vc => (
+                            <option key={vc.id} value={vc.id}>🎙️💬 [Chat de Voz] {vc.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
+                    {voiceChannels.some(vc => vc.id === textChannelId) && (
+                      <p className="text-[11px] text-indigo-300/90 mt-1 flex items-center gap-1">
+                        <span>🎙️💬</span>
+                        <span>Chat de voz selecionado: as mensagens e rolagens serão postadas no chat de texto embutido da sala de voz.</span>
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

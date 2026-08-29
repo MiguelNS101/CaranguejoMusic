@@ -186,14 +186,23 @@ router.post('/bot/roll-dice', handleRollDice);
 // ==========================================
 
 router.post('/bot/voice/play', async (req: Request, res: Response) => {
-  const { trackUrl, volume, voiceChannelId } = req.body;
+  const { trackUrl, volume, voiceChannelId, seekSeconds } = req.body;
   if (!trackUrl) {
     return res.status(400).json({ error: 'URL da faixa é obrigatória.' });
   }
   if (voiceChannelId) {
     await discordBot.ensureVoiceConnection(voiceChannelId);
   }
-  const result = await discordBot.playVoiceAudio(trackUrl, volume ?? 0.8);
+  const result = await discordBot.playVoiceAudio(trackUrl, volume ?? 0.8, typeof seekSeconds === 'number' ? seekSeconds : undefined);
+  res.json(result);
+});
+
+router.post('/bot/voice/seek', async (req: Request, res: Response) => {
+  const { seconds, trackUrl, volume } = req.body;
+  if (typeof seconds !== 'number') {
+    return res.status(400).json({ error: 'Parâmetro seconds é obrigatório.' });
+  }
+  const result = await discordBot.seekVoiceAudio(seconds, trackUrl, volume);
   res.json(result);
 });
 

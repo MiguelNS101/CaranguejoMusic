@@ -102,9 +102,23 @@ async function main() {
     if (!fs.existsSync(iconNeu)) fs.copyFileSync(iconSrc, iconNeu);
   }
 
+  // Clean old .tmp if left over from failed builds
+  const tmpDir = path.join(rootDir, '.tmp');
+  if (fs.existsSync(tmpDir)) {
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  }
+
   // 3. Neutralino Build
   log('Passo [3/4]: Empacotando executável para Windows com Neutralino...');
   runCmd('npx --yes @neutralinojs/neu update', true);
+
+  // Ensure neutralino.js is present in resources and dist
+  const neuClientLib = path.join(rootDir, 'node_modules', '@neutralinojs', 'lib', 'dist', 'neutralino.js');
+  if (fs.existsSync(neuClientLib)) {
+    fs.copyFileSync(neuClientLib, path.join(rootDir, 'resources', 'js', 'neutralino.js'));
+    fs.copyFileSync(neuClientLib, path.join(rootDir, 'dist', 'neutralino.js'));
+  }
+
   runCmd('npx --yes @neutralinojs/neu build --release', true);
 
   // 4. Create dist-portable

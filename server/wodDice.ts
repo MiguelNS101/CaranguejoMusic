@@ -59,25 +59,28 @@ export function rollWodDice(
 
   const totalRawSuccesses = totalRawCrits + totalRawNormalSuccesses;
 
-  // Cancellation rule: "1s cancel successes (priority to crits)"
+  // Regra Mundo das Trevas: Cada 2 dados '1' (um par de 1s) cancelam 1 acerto
+  // Ex: [1, 2, 8] -> 1 único 1 não cancela nada = 1 acerto
+  // Ex: [1, 1, 8] -> 2 uns cancelam 1 acerto = 0 acertos
+  const cancellationsAvailable = Math.floor(totalCriticalFails / 2);
   let remainingCrits = totalRawCrits;
   let remainingNormalSuccesses = totalRawNormalSuccesses;
-  let onesRemaining = totalCriticalFails;
+  let remainingCancellations = cancellationsAvailable;
 
   let cancelledCritsCount = 0;
   let cancelledNormalCount = 0;
 
-  // 1s cancel crits first
-  while (onesRemaining > 0 && remainingCrits > 0) {
+  // Anula acertos críticos primeiro
+  while (remainingCancellations > 0 && remainingCrits > 0) {
     remainingCrits--;
-    onesRemaining--;
+    remainingCancellations--;
     cancelledCritsCount++;
   }
 
-  // Then cancel normal successes
-  while (onesRemaining > 0 && remainingNormalSuccesses > 0) {
+  // Em seguida anula acertos normais
+  while (remainingCancellations > 0 && remainingNormalSuccesses > 0) {
     remainingNormalSuccesses--;
-    onesRemaining--;
+    remainingCancellations--;
     cancelledNormalCount++;
   }
 
@@ -102,7 +105,13 @@ export function rollWodDice(
   lines.push('─────────────────────────────');
   lines.push(`✨ **Total acertos:** **${netSuccesses}** ${netSuccesses === 0 && totalCriticalFails > 0 && totalRawSuccesses === 0 ? '*(FALHA CRÍTICA/BOTCH)*' : ''}`);
   lines.push(`🌟 **Acertos críticos:** **${remainingCrits}** (de ${totalRawCrits} gerados)`);
-  lines.push(`💀 **Erros críticos (1s):** **${totalCriticalFails}** (cancelaram ${cancelledSuccesses} sucesso${cancelledSuccesses !== 1 ? 's' : ''})`);
+  if (totalCriticalFails === 0) {
+    lines.push(`💀 **Erros críticos (1s):** **0**`);
+  } else if (totalCriticalFails === 1) {
+    lines.push(`💀 **Erros críticos (1s):** **1** *(necessário 2 uns para cancelar 1 acerto • nenhum acerto anulado)*`);
+  } else {
+    lines.push(`💀 **Erros críticos (1s):** **${totalCriticalFails}** *(cancelaram ${cancelledSuccesses} acerto${cancelledSuccesses !== 1 ? 's' : ''} • 1 cancelamento a cada dois 1s)*`);
+  }
 
   const formattedOutput = lines.join('\n');
 

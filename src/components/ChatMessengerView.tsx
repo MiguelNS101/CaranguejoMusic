@@ -54,7 +54,7 @@ export const ChatMessengerView: React.FC = () => {
           const textChannels: DiscordChannel[] = [];
           guilds.forEach(g => {
             g.channels.forEach(c => {
-              if (c.type === 'text') textChannels.push(c);
+              textChannels.push(c);
             });
           });
           setChannels(textChannels);
@@ -171,9 +171,18 @@ export const ChatMessengerView: React.FC = () => {
             className="bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-1.5 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70"
           >
             {channels.length > 0 ? (
-              channels.map(c => (
-                <option key={c.id} value={c.id}>#{c.name}</option>
-              ))
+              <>
+                <optgroup label="💬 Canais de Texto">
+                  {channels.filter(c => c.type === 'text').map(c => (
+                    <option key={c.id} value={c.id}>#{c.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="🎙️💬 Chat de Voz">
+                  {channels.filter(c => c.type === 'voice').map(c => (
+                    <option key={c.id} value={c.id}>🎙️💬 [Chat de Voz] {c.name}</option>
+                  ))}
+                </optgroup>
+              </>
             ) : (
               <option value="">Canal Padrão Configurado</option>
             )}

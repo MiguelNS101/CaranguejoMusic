@@ -14,6 +14,7 @@ import {
   joinVoiceChannel,
   createAudioPlayer,
   createAudioResource,
+  StreamType,
   AudioPlayerStatus,
   VoiceConnection,
   AudioPlayer,
@@ -21,6 +22,11 @@ import {
 } from '@discordjs/voice';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
+import https from 'https';
+import { Readable } from 'stream';
+import prism from 'prism-media';
+import { spawn } from 'child_process';
 import { createRequire } from 'module';
 import ffmpegStatic from 'ffmpeg-static';
 import { db } from './db.js';
@@ -45,6 +51,8 @@ export class DiscordBotService {
   private audioPlayer: AudioPlayer | null = null;
   private currentResource: any = null;
   private currentTrackName: string | null = null;
+  private currentTrackUrl: string | null = null;
+  private currentTrackVolume: number = 0.8;
   private isPlayingVoice: boolean = false;
 
   // Diagnostic Logs Circular Buffer
@@ -592,12 +600,12 @@ export class DiscordBotService {
 
     const guilds: DiscordGuild[] = [];
     this.client.guilds.cache.forEach((guild) => {
-      const channels: Array<{ id: string; name: string; type: 'text' | 'voice'; guildId: string }> = [];
+      const channels: Array<{ id: string; name: string; type: 'text' | 'voice'; guildId: string; isVoiceWithChat?: boolean }> = [];
       guild.channels.cache.forEach((ch) => {
-        if (ch.type === ChannelType.GuildText) {
-          channels.push({ id: ch.id, name: ch.name, type: 'text', guildId: guild.id });
-        } else if (ch.type === ChannelType.GuildVoice) {
-          channels.push({ id: ch.id, name: ch.name, type: 'voice', guildId: guild.id });
+        if (ch.type === ChannelType.GuildText || ch.type === ChannelType.GuildAnnouncement) {
+          channels.push({ id: ch.id, name: ch.name, type: 'text', guildId: guild.id, isVoiceWithChat: false });
+        } else if (ch.type === ChannelType.GuildVoice || ch.type === ChannelType.GuildStageVoice) {
+          channels.push({ id: ch.id, name: ch.name, type: 'voice', guildId: guild.id, isVoiceWithChat: true });
         }
       });
 
@@ -810,7 +818,26 @@ export class DiscordBotService {
     }
   }
 
-  public async playVoiceAudio(urlOrPath: string, volume: number = 0.8): Promise<{ success: boolean; error?: string }> {
+  private async getAudioReadableStream(urlOrPath: string): Promise<Readable> {
+    if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
+      const client = urlOrPath.startsWith('https://') ? https : http;
+      return new Promise((resolve, reject) => {
+        client.get(urlOrPath, { headers: { 'User-Agent': 'Mozilla/5.0' } }, res => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            this.getAudioReadableStream(res.headers.location).then(resolve).catch(reject);
+          } else if (res.statusCode === 200) {
+            resolve(res);
+          } else {
+            reject(new Error(`HTTP Status ${res.statusCode} ao carregar áudio.`));
+          }
+        }).on('error', reject);
+      });
+    } else {
+      return fs.createReadStream(urlOrPath);
+    }
+  }
+
+  public async playVoiceAudio(urlOrPath: string, volume: number = 0.8, seekSeconds?: number): Promise<{ success: boolean; error?: string }> {
     const voiceRes = await this.ensureVoiceConnection();
     if (!voiceRes.success || !this.audioPlayer) {
       return { success: false, error: voiceRes.error || 'Não conectado ao canal de voz.' };
@@ -834,6 +861,8 @@ export class DiscordBotService {
       }
 
       this.currentTrackName = trackLabel;
+      this.currentTrackUrl = urlOrPath;
+      this.currentTrackVolume = volume;
 
       // Check if file exists on disk
       if (!fs.existsSync(resolvedPath) && !urlOrPath.startsWith('http://') && !urlOrPath.startsWith('https://')) {
@@ -842,8 +871,37 @@ export class DiscordBotService {
         return { success: false, error: notFoundErr };
       }
 
-      this.logDiagnostic('info', 'audio', `Carregando recurso de áudio "${trackLabel}" (Volume: ${Math.round(volume * 100)}%)...`);
-      const resource = createAudioResource(resolvedPath, { inlineVolume: true });
+      const offsetStr = seekSeconds && seekSeconds > 0 ? ` (a partir de ${Math.round(seekSeconds)}s)` : '';
+      this.logDiagnostic('info', 'audio', `Carregando recurso de áudio "${trackLabel}"${offsetStr} (Volume: ${Math.round(volume * 100)}%)...`);
+
+      let resource: any;
+      if (seekSeconds && seekSeconds > 0) {
+        try {
+          const sourceStream = await this.getAudioReadableStream(resolvedPath);
+          const ffmpeg = new prism.FFmpeg({
+            args: [
+              '-ss', String(Math.floor(seekSeconds)),
+              '-i', '-',
+              '-analyzeduration', '0',
+              '-loglevel', '0',
+              '-f', 's16le',
+              '-ar', '48000',
+              '-ac', '2'
+            ]
+          });
+          const pipeStream = sourceStream.pipe(ffmpeg);
+          resource = createAudioResource(pipeStream, {
+            inputType: StreamType.Raw,
+            inlineVolume: true
+          });
+        } catch (seekErr: any) {
+          console.warn('Prism FFmpeg seek error, falling back to standard createAudioResource:', seekErr);
+          resource = createAudioResource(resolvedPath, { inlineVolume: true });
+        }
+      } else {
+        resource = createAudioResource(resolvedPath, { inlineVolume: true });
+      }
+
       if (resource.volume) {
         resource.volume.setVolume(Math.max(0, Math.min(1, volume)));
       }
@@ -858,6 +916,15 @@ export class DiscordBotService {
     }
   }
 
+  public async seekVoiceAudio(seconds: number, urlOrPath?: string, volume?: number): Promise<{ success: boolean; error?: string }> {
+    const targetUrl = urlOrPath || this.currentTrackUrl;
+    if (!targetUrl) {
+      return { success: false, error: 'Nenhuma faixa selecionada para avançar/retroceder.' };
+    }
+    const targetVol = typeof volume === 'number' ? volume : this.currentTrackVolume;
+    return this.playVoiceAudio(targetUrl, targetVol, seconds);
+  }
+
   public async pauseVoiceAudio(): Promise<{ success: boolean }> {
     if (this.audioPlayer) {
       this.audioPlayer.pause();
@@ -866,10 +933,16 @@ export class DiscordBotService {
     return { success: true };
   }
 
-  public async resumeVoiceAudio(): Promise<{ success: boolean }> {
+  public async resumeVoiceAudio(): Promise<{ success: boolean; error?: string }> {
     if (this.audioPlayer) {
-      this.audioPlayer.unpause();
-      this.isPlayingVoice = true;
+      if (this.audioPlayer.state.status === AudioPlayerStatus.Paused) {
+        this.audioPlayer.unpause();
+        this.isPlayingVoice = true;
+        return { success: true };
+      }
+      if (this.currentTrackUrl) {
+        return this.playVoiceAudio(this.currentTrackUrl, this.currentTrackVolume);
+      }
     }
     return { success: true };
   }

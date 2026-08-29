@@ -155,6 +155,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const sfxAudioMap = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const lastSeekTimestampRef = useRef<number>(0);
 
   // Initialize HTML5 Audio Element for web player
   useEffect(() => {
@@ -163,8 +164,20 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audioRef.current = audio;
 
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      if (!isNaN(audio.duration)) {
+      // Prevent stale reset right after a seek
+      if (Date.now() - lastSeekTimestampRef.current < 1200) {
+        return;
+      }
+      if (!isNaN(audio.currentTime) && isFinite(audio.currentTime)) {
+        setCurrentTime(audio.currentTime);
+      }
+      if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
+    };
+
+    const handleDurationChange = () => {
+      if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
         setDuration(audio.duration);
       }
     };
@@ -177,24 +190,35 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const handlePause = () => setPlaybackState('paused');
     const handleWaiting = () => setPlaybackState('buffering');
     const handleLoadedMetadata = () => {
-      if (!isNaN(audio.duration)) setDuration(audio.duration);
+      if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
+    };
+    const handleCanPlay = () => {
+      if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('durationchange', handleDurationChange);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('waiting', handleWaiting);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     return () => {
       audio.pause();
       audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('durationchange', handleDurationChange);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('canplay', handleCanPlay);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('waiting', handleWaiting);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
     };
   }, []);
 
@@ -262,8 +286,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setSessionNotes(data.sessionNotes || '');
 
         if (!currentTrack && data.musicTracks?.length > 0) {
-          setCurrentTrack(data.musicTracks[0]);
-          setDuration(data.musicTracks[0].duration || 180);
+          const first = data.musicTracks[0];
+          setCurrentTrack(first);
+          setDuration(first.duration || 180);
+          if (audioRef.current && !audioRef.current.src) {
+            audioRef.current.src = first.url;
+          }
         }
       }
     } catch (err) {
@@ -302,19 +330,43 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return () => clearInterval(interval);
   }, []);
 
-  const playTrack = (track: MusicTrack, immediate: boolean = true) => {
-    // If clicking on the track that is ALREADY playing, pause/stop it!
-    if (currentTrack?.id === track.id && playbackState === 'playing') {
+  const playTrack = (track: MusicTrack, immediate: boolean = true, startOffset: number = 0) => {
+    // If clicking on the track that is ALREADY playing and no seek offset requested, toggle pause!
+    if (currentTrack?.id === track.id && playbackState === 'playing' && startOffset === 0) {
       togglePlayPause();
       return;
     }
 
     setCurrentTrack(track);
+    if (track.duration && !isNaN(track.duration) && track.duration > 0) {
+      setDuration(track.duration);
+    }
+    setCurrentTime(startOffset);
+
     if (audioRef.current) {
-      audioRef.current.src = track.url;
+      const isSameSrc = audioRef.current.src && audioRef.current.src.endsWith(track.url);
+      if (!isSameSrc) {
+        audioRef.current.src = track.url;
+      }
       audioRef.current.muted = !isLocalAudioEnabled || isMuted;
       audioRef.current.volume = isMuted ? 0 : volume;
-      audioRef.current.load();
+
+      if (startOffset > 0) {
+        lastSeekTimestampRef.current = Date.now();
+        const applySeek = () => {
+          try {
+            if (audioRef.current) audioRef.current.currentTime = startOffset;
+          } catch (e) {
+            console.warn('Seek offset apply error:', e);
+          }
+        };
+        if (audioRef.current.readyState >= 1) {
+          applySeek();
+        } else {
+          audioRef.current.addEventListener('loadedmetadata', applySeek, { once: true });
+        }
+      }
+
       if (immediate) {
         audioRef.current.play().catch(e => console.warn('Browser autoplay handled:', e));
       }
@@ -326,7 +378,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         trackUrl: track.url,
-        volume: isMuted ? 0 : volume
+        volume: isMuted ? 0 : volume,
+        seekSeconds: startOffset > 0 ? startOffset : undefined
       })
     }).catch(e => console.warn('Discord voice play error:', e));
 
@@ -370,24 +423,80 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fetch('/api/bot/voice/pause', { method: 'POST' }).catch(() => {});
       setPlaybackState('paused');
     } else {
-      if (!currentTrack && musicTracks.length > 0) {
-        playTrack(musicTracks[0], true);
-      } else if (currentTrack) {
+      const trackToPlay = currentTrack || (musicTracks.length > 0 ? musicTracks[0] : null);
+      if (!trackToPlay) return;
+
+      const isCurrentLoaded = audioRef.current?.src && audioRef.current.src.endsWith(trackToPlay.url);
+
+      if (playbackState === 'paused' && isCurrentLoaded) {
         if (audioRef.current) {
           audioRef.current.muted = !isLocalAudioEnabled || isMuted;
           audioRef.current.volume = isMuted ? 0 : volume;
-          audioRef.current.play().catch(e => console.warn('Play error:', e));
+          audioRef.current.play().catch(e => {
+            console.warn('Resume error, replaying track:', e);
+            playTrack(trackToPlay, true, currentTime > 0 ? currentTime : 0);
+          });
         }
-        fetch('/api/bot/voice/resume', { method: 'POST' }).catch(() => {});
+        if (currentTime > 0) {
+          fetch('/api/bot/voice/seek', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              seconds: currentTime,
+              trackUrl: trackToPlay.url,
+              volume: isMuted ? 0 : volume
+            })
+          }).catch(() => {});
+        } else {
+          fetch('/api/bot/voice/resume', { method: 'POST' }).catch(() => {});
+        }
         setPlaybackState('playing');
+      } else {
+        // Start or replay track reliably with current offset
+        playTrack(trackToPlay, true, currentTime > 0 ? currentTime : 0);
       }
     }
   };
 
   const seek = (seconds: number) => {
+    const rawDuration = duration > 0 ? duration : (audioRef.current?.duration || (currentTrack?.duration || 0));
+    const target = rawDuration > 0 ? Math.max(0, Math.min(rawDuration, seconds)) : Math.max(0, seconds);
+
+    lastSeekTimestampRef.current = Date.now();
+    setCurrentTime(target);
+
     if (audioRef.current) {
-      audioRef.current.currentTime = seconds;
-      setCurrentTime(seconds);
+      if (!audioRef.current.src && currentTrack?.url) {
+        audioRef.current.src = currentTrack.url;
+      }
+      try {
+        if (audioRef.current.readyState >= 1) {
+          audioRef.current.currentTime = target;
+        } else {
+          const onMeta = () => {
+            if (audioRef.current) audioRef.current.currentTime = target;
+          };
+          audioRef.current.addEventListener('loadedmetadata', onMeta, { once: true });
+        }
+        if (playbackState === 'playing') {
+          audioRef.current.play().catch(e => console.warn('Play after seek notice:', e));
+        }
+      } catch (e) {
+        console.warn('Audio seek warning:', e);
+      }
+    }
+
+    // Sync Discord Bot voice stream offset
+    if (currentTrack) {
+      fetch('/api/bot/voice/seek', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seconds: target,
+          trackUrl: currentTrack.url,
+          volume: isMuted ? 0 : volume
+        })
+      }).catch(() => {});
     }
   };
 

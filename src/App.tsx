@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AudioProvider } from './context/AudioContext';
 import { Header } from './components/Header';
 import { MasterScreen } from './components/MasterScreen';
@@ -11,7 +11,22 @@ import { FolderManagerModal } from './components/FolderManagerModal';
 import { SessionManagerModal } from './components/SessionManagerModal';
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<'master' | 'music' | 'soundboard' | 'npcs' | 'chat' | 'settings'>('master');
+  const [currentTab, setCurrentTab] = useState<'master' | 'music' | 'soundboard' | 'npcs' | 'chat' | 'settings'>(() => {
+    try {
+      const saved = localStorage.getItem('caranguejo_active_tab');
+      if (saved && ['master', 'music', 'soundboard', 'npcs', 'chat', 'settings'].includes(saved)) {
+        return saved as any;
+      }
+    } catch {}
+    return 'master';
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('caranguejo_active_tab', currentTab);
+    } catch {}
+  }, [currentTab]);
+
   const [isDiscordModalOpen, setIsDiscordModalOpen] = useState<boolean>(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState<boolean>(false);

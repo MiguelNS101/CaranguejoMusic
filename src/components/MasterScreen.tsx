@@ -38,6 +38,7 @@ import {
 import confetti from 'canvas-confetti';
 import { useAudio } from '../context/AudioContext';
 import { NPC, SoundboardItem, DiceRollResult, WodDiceRollResult } from '../types';
+import { AudioScrubber } from './AudioScrubber';
 
 interface MasterScreenProps {
   onOpenMusicTab: () => void;
@@ -458,17 +459,15 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
             </div>
 
             {/* Time scrubber */}
-            <div className="w-full flex items-center gap-2 text-[11px] font-mono text-[#9E9E9E]">
-              <span>{formatTime(currentTime)}</span>
-              <input
-                type="range"
-                min="0"
-                max={duration || 100}
-                value={currentTime}
-                onChange={(e) => seek(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-[#2D3139] rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            <div className="w-full">
+              <AudioScrubber
+                currentTime={currentTime}
+                duration={duration}
+                fallbackDuration={currentTrack?.duration}
+                onSeek={seek}
+                formatTime={formatTime}
+                size="sm"
               />
-              <span>{formatTime(duration)}</span>
             </div>
           </div>
 
@@ -967,10 +966,15 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                       ))}
 
                       {/* Cancelled notes */}
+                      {lastWodRoll.totalCriticalFails === 1 && (
+                        <p className="text-[10px] text-amber-300/90 pt-1 border-t border-[#2D3139]">
+                          ℹ️ 1 dado &apos;1&apos; rolado (são necessários 2 dados &apos;1&apos; para cancelar 1 acerto).
+                        </p>
+                      )}
                       {(lastWodRoll.cancelledSuccesses > 0 || lastWodRoll.cancelledCritsCount > 0) && (
                         <p className="text-[10px] text-rose-300 pt-1 border-t border-[#2D3139]">
                           ℹ️ {lastWodRoll.cancelledCritsCount > 0 ? `${lastWodRoll.cancelledCritsCount} crítico(s) anulado(s) por 1s.` : ''}
-                          {lastWodRoll.cancelledSuccesses > 0 ? ` ${lastWodRoll.cancelledSuccesses} sucesso(s) anulado(s) por 1s.` : ''}
+                          {lastWodRoll.cancelledSuccesses > 0 ? ` ${lastWodRoll.cancelledSuccesses} sucesso(s) anulado(s) (1 cancelamento a cada dois 1s).` : ''}
                         </p>
                       )}
                     </div>

@@ -3,10 +3,11 @@
   "applicationId": "app.caranguejorpg",
   "version": "1.0.0",
   "defaultMode": "window",
-  "port": 3000,
-  "url": "http://localhost:3000",
-  "enableServer": false,
-  "enableNativeAPI": false,
+  "port": 0,
+  "documentRoot": "/dist/",
+  "url": "/",
+  "enableServer": true,
+  "enableNativeAPI": true,
   "logging": {
     "enabled": false,
     "writeToLogFile": false
@@ -19,20 +20,14 @@
       "minWidth": 1024,
       "minHeight": 700,
       "center": true,
-      "fullScreen": false,
-      "alwaysOnTop": false,
       "icon": "/assets/icon.png",
       "enableInspector": false,
-      "borderless": false,
-      "maximize": false,
-      "hidden": false,
-      "resizable": true,
       "exitProcessOnClose": true
     }
   },
   "cli": {
     "binaryName": "CaranguejoRPG",
-    "resourcesPath": "/",
+    "resourcesPath": "/dist/",
     "extensionsPath": "/extensions/",
     "clientLibrary": "/resources/js/neutralino.js",
     "binaryVersion": "5.5.0",

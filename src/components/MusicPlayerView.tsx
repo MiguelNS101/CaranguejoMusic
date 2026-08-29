@@ -29,6 +29,7 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { MusicTrack, LoopMode } from '../types';
 import { FolderImportModal } from './FolderImportModal';
+import { AudioScrubber } from './AudioScrubber';
 
 export const MusicPlayerView: React.FC = () => {
   const {
@@ -320,17 +321,15 @@ export const MusicPlayerView: React.FC = () => {
             </div>
 
             {/* Seek Bar */}
-            <div className="w-full flex items-center gap-2.5 text-xs font-mono text-[#9E9E9E]">
-              <span className="w-10 text-right">{formatTime(currentTime)}</span>
-              <input
-                type="range"
-                min="0"
-                max={duration || 100}
-                value={currentTime}
-                onChange={(e) => seek(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-[#2D3139] rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            <div className="w-full">
+              <AudioScrubber
+                currentTime={currentTime}
+                duration={duration}
+                fallbackDuration={currentTrack?.duration}
+                onSeek={seek}
+                formatTime={formatTime}
+                size="md"
               />
-              <span className="w-10">{formatTime(duration)}</span>
             </div>
           </div>
         </div>
