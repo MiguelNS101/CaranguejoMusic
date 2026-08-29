@@ -155,7 +155,7 @@ export async function safeFetchJson<T = any>(
     }
 
     const fallbackMsg = isDesktopEnv
-      ? 'Não foi possível comunicar com o servidor local (porta 3000). Certifique-se de ter iniciado o aplicativo pelo "Iniciar-CaranguejoRPG.bat".'
+      ? 'O motor local de som e bot (porta 3000) ainda está inicializando ou não está ativo. Aguarde 3 segundos e tente novamente, ou execute "Iniciar-CaranguejoRPG.bat".'
       : (err?.message || 'Falha na comunicação com o servidor.');
 
     return {

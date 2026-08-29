@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import https from 'https';
 
 const rootDir = process.cwd();
 const distPortableDir = path.join(rootDir, 'dist-portable');
@@ -55,13 +56,45 @@ function copyFolderRecursive(source, target) {
   }
 }
 
+async function downloadNodeExecutable(destDir) {
+  const destPath = path.join(destDir, 'node.exe');
+  if (fs.existsSync(destPath) && fs.statSync(destPath).size > 20000000) {
+    logSuccess('Executável autônomo node.exe já presente na pasta portátil.');
+    return;
+  }
+
+  log('Baixando executável autônomo node.exe (Windows x64) para rodar o bot sem precisar instalar Node no PC...');
+  await new Promise((resolve) => {
+    const file = fs.createWriteStream(destPath);
+    https.get('https://nodejs.org/dist/v20.18.0/win-x64/node.exe', (res) => {
+      if (res.statusCode !== 200) {
+        logWarn(`Aviso ao baixar node.exe: status ${res.statusCode}`);
+        file.close();
+        try { fs.unlinkSync(destPath); } catch {}
+        return resolve();
+      }
+      res.pipe(file);
+      file.on('finish', () => {
+        file.close();
+        logSuccess('node.exe empacotado com sucesso na pasta portátil!');
+        resolve();
+      });
+    }).on('error', (err) => {
+      logWarn(`Não foi possível baixar node.exe automaticamente: ${err.message}`);
+      file.close();
+      try { fs.unlinkSync(destPath); } catch {}
+      resolve();
+    });
+  });
+}
+
 async function main() {
   console.log('========================================================');
   console.log('       🦀  CARANGUEJO RPG - GERADOR PORTABLE (.EXE)  🦀');
   console.log('========================================================\n');
 
   // 1. Install dependencies
-  log('Passo [1/4]: Verificando dependências necessárias...');
+  log('Passo [1/5]: Verificando dependências necessárias...');
   const installSuccess = runCmd('npm install --legacy-peer-deps --no-audit --no-fund', true);
   if (!installSuccess) {
     logWarn('Tentando instalação alternativa com --force...');
@@ -70,7 +103,7 @@ async function main() {
   logSuccess('Dependências prontas!');
 
   // 2. Build Vite + Backend
-  log('Passo [2/4]: Compilando interface React e servidor Express/Discord...');
+  log('Passo [2/5]: Compilando interface React e servidor Express/Discord...');
   const buildSuccess = runCmd('npm run build');
   if (!buildSuccess || !fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
     logError('Falha ao compilar o projeto com "npm run build".');
@@ -109,7 +142,7 @@ async function main() {
   }
 
   // 3. Neutralino Build
-  log('Passo [3/4]: Empacotando executável para Windows com Neutralino...');
+  log('Passo [3/5]: Empacotando executável para Windows com Neutralino...');
   runCmd('npx --yes @neutralinojs/neu update', true);
 
   // Ensure neutralino.js is present in resources and dist
@@ -122,7 +155,7 @@ async function main() {
   runCmd('npx --yes @neutralinojs/neu build --release', true);
 
   // 4. Create dist-portable
-  log('Passo [4/4]: Estruturando a pasta portátil em "dist-portable/"...');
+  log('Passo [4/5]: Estruturando a pasta portátil em "dist-portable/"...');
   if (!fs.existsSync(distPortableDir)) {
     fs.mkdirSync(distPortableDir, { recursive: true });
   }
@@ -166,7 +199,7 @@ async function main() {
     copyFolderRecursive(assetsDist, path.join(distPortableDir, 'dist', 'assets'));
   }
 
-  // Copy neutralino.config.json & resources.neu if generated
+  // Copy neutralino.config.json & resources.neu
   const neuConfig = path.join(rootDir, 'neutralino.config.json');
   if (fs.existsSync(neuConfig)) {
     fs.copyFileSync(neuConfig, path.join(distPortableDir, 'neutralino.config.json'));
@@ -189,7 +222,11 @@ async function main() {
   const nodeModulesDst = path.join(distPortableDir, 'node_modules');
   copyFolderRecursive(nodeModulesSrc, nodeModulesDst);
 
-  // Generate clean ASCII Launcher Batch Script inside dist-portable (with CRLF)
+  // 5. Download embedded node.exe
+  log('Passo [5/5]: Verificando/Baixando node.exe portátil...');
+  await downloadNodeExecutable(distPortableDir);
+
+  // Generate clean ASCII Launcher Batch Script inside dist-portable (with CRLF and strict quoting)
   const launcherBatContent = [
     '@echo off',
     'title CaranguejoRPG',
@@ -200,23 +237,21 @@ async function main() {
     'echo ========================================================',
     'echo.',
     '',
-    'where node >nul 2>nul',
-    'if %errorlevel% neq 0 (',
-    '    echo [AVISO] Node.js nao encontrado no PATH do Windows.',
-    '    echo Tentando carregar servidor local...',
-    ')',
-    '',
     'echo [i] Iniciando servidor do bot e motor de som local...',
-    'start "CaranguejoRPG-Server" /b node dist/server.cjs',
+    'if exist "%~dp0node.exe" (',
+    '    start "CaranguejoRPG-Server" /b "%~dp0node.exe" "%~dp0dist\\server.cjs"',
+    ') else (',
+    '    start "CaranguejoRPG-Server" /b node "%~dp0dist\\server.cjs"',
+    ')',
     '',
     'timeout /t 2 /nobreak > nul',
     '',
-    'if exist "CaranguejoRPG.exe" (',
+    'if exist "%~dp0CaranguejoRPG.exe" (',
     '    echo [i] Abrindo CaranguejoRPG.exe...',
-    '    start "" "CaranguejoRPG.exe"',
-    ') else if exist "CaranguejoRPG-win_x64.exe" (',
+    '    start "" "%~dp0CaranguejoRPG.exe"',
+    ') else if exist "%~dp0CaranguejoRPG-win_x64.exe" (',
     '    echo [i] Abrindo CaranguejoRPG-win_x64.exe...',
-    '    start "" "CaranguejoRPG-win_x64.exe"',
+    '    start "" "%~dp0CaranguejoRPG-win_x64.exe"',
     ') else (',
     '    echo [i] Abrindo no seu navegador...',
     '    start http://localhost:3000',
@@ -229,10 +264,10 @@ async function main() {
   fs.writeFileSync(path.join(distPortableDir, 'Iniciar-CaranguejoRPG.bat'), launcherBatContent, 'utf-8');
   fs.writeFileSync(path.join(distPortableDir, 'CaranguejoRPG.bat'), launcherBatContent, 'utf-8');
 
-  // Create VBS launcher (runs silently without black CMD window if desired)
+  // Create VBS launcher (runs silently without black CMD window)
   const vbsContent = [
     'Set WshShell = CreateObject("WScript.Shell")',
-    'WshShell.Run "cmd /c Iniciar-CaranguejoRPG.bat", 0, False',
+    'WshShell.Run "cmd /c """ & CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName) & "\\Iniciar-CaranguejoRPG.bat""", 0, False',
     ''
   ].join('\r\n');
   fs.writeFileSync(path.join(distPortableDir, 'Iniciar-Sem-Janela-Preta.vbs'), vbsContent, 'utf-8');

@@ -16,6 +16,7 @@ import {
   DiscordGuild
 } from '../types';
 import { safeFetchJson, apiFetch, resolveApiUrl } from '../services/api';
+import { ensureDesktopBackend } from '../services/desktopBackend';
 
 interface AudioContextType {
   // Playback
@@ -334,12 +335,28 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   useEffect(() => {
-    refreshState();
-    refreshGuilds();
+    ensureDesktopBackend().then(() => {
+      refreshState();
+      refreshGuilds();
+      refreshBotStatus();
+    });
+
+    const onBackendReady = () => {
+      refreshState();
+      refreshGuilds();
+      refreshBotStatus();
+    };
+
+    window.addEventListener('desktop-backend-ready', onBackendReady);
+
     const interval = setInterval(() => {
       refreshBotStatus();
     }, 6000);
-    return () => clearInterval(interval);
+
+    return () => {
+      window.removeEventListener('desktop-backend-ready', onBackendReady);
+      clearInterval(interval);
+    };
   }, []);
 
   const playTrack = (track: MusicTrack, immediate: boolean = true, startOffset: number = 0) => {

@@ -25,6 +25,7 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { DiscordGuild, DiscordChannel } from '../types';
 import { safeFetchJson } from '../services/api';
+import { ensureDesktopBackend } from '../services/desktopBackend';
 import { DiscordDiagnosticsPanel } from './DiscordDiagnosticsPanel';
 
 interface DiscordSetupModalProps {
@@ -173,6 +174,9 @@ NODE_ENV=production
     setFeedback({ status: 'idle' });
 
     try {
+      // Ensure desktop local backend is ready before saving
+      await ensureDesktopBackend();
+
       const res = await safeFetchJson<any>('/api/bot/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
