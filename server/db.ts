@@ -33,7 +33,7 @@ const DEFAULT_FOLDERS: Folder[] = [
   { id: 'f-m-dungeon', name: 'Masmorra & Mistério', type: 'music', color: '#8b5cf6', icon: 'Compass', createdAt: Date.now() },
   { id: 'f-m-ambient', name: 'Ambiente Natural', type: 'music', color: '#10b981', icon: 'Trees', createdAt: Date.now() },
   
-  // Soundboard Folders (with subfolder organization)
+  // Soundboard Folders
   { id: 'f-s-spells', name: 'Magias & Arcano', type: 'soundboard', color: '#3b82f6', icon: 'Sparkles', createdAt: Date.now() },
   { id: 'f-s-weapons', name: 'Ataques & Impactos', type: 'soundboard', color: '#dc2626', icon: 'ShieldAlert', createdAt: Date.now() },
   { id: 'f-s-monsters', name: 'Rugidos & Monstros', type: 'soundboard', color: '#ea580c', icon: 'Flame', createdAt: Date.now() },
@@ -48,263 +48,25 @@ const DEFAULT_FOLDERS: Folder[] = [
   { id: 'f-n-monsters', name: 'Monstros & Feras', type: 'npc', color: '#8b5cf6', icon: 'Bug', createdAt: Date.now() },
 ];
 
-const DEFAULT_MUSIC_TRACKS: MusicTrack[] = [
-  {
-    id: 'm-1',
-    title: 'Marcha do Dragão Vermelho',
-    artist: 'Trilha Orquestral RPG',
-    duration: 184,
-    url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=epic-battle-trailer-115984.mp3',
-    folderId: 'f-m-combat',
-    tags: ['Combate', 'Chefe', 'Orquestra', 'Épico'],
-    isLocal: false,
-    coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-    createdAt: Date.now()
-  },
-  {
-    id: 'm-2',
-    title: 'A Noite no Dragão Bêbado',
-    artist: 'Bardos de Valfenda',
-    duration: 145,
-    url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3?filename=medieval-tavern-107086.mp3',
-    folderId: 'f-m-tavern',
-    tags: ['Taverna', 'Violão', 'Lute', 'Festa'],
-    isLocal: false,
-    coverUrl: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=400&q=80',
-    createdAt: Date.now()
-  },
-  {
-    id: 'm-3',
-    title: 'Sussurros nas Catacumbas Esquecidas',
-    artist: 'Masmorras Arcanas',
-    duration: 210,
-    url: 'https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f792cb.mp3?filename=dark-ambient-soundscape-123473.mp3',
-    folderId: 'f-m-dungeon',
-    tags: ['Masmorra', 'Suspense', 'Mistério', 'Sombrio'],
-    isLocal: false,
-    coverUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80',
-    createdAt: Date.now()
-  },
-  {
-    id: 'm-4',
-    title: 'Chuva e Vento nas Colinas da Floresta',
-    artist: 'Ambiente Natural',
-    duration: 240,
-    url: 'https://cdn.pixabay.com/download/audio/2022/05/16/audio_db6591201e.mp3?filename=rain-and-thunder-nature-sounds-7803.mp3',
-    folderId: 'f-m-ambient',
-    tags: ['Chuva', 'Trovão', 'Natureza', 'Imersão'],
-    isLocal: false,
-    coverUrl: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?auto=format&fit=crop&w=400&q=80',
-    createdAt: Date.now()
-  }
-];
+const DEFAULT_MUSIC_TRACKS: MusicTrack[] = [];
 
-const DEFAULT_SFX: SoundboardItem[] = [
-  {
-    id: 'sfx-1',
-    name: 'Bola de Fogo (Explosão Arcana)',
-    emoji: '🔥',
-    color: '#ef4444',
-    url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_51c6c066e0.mp3?filename=spell-fire-impact-80493.mp3',
-    duration: 4,
-    folderId: 'f-s-spells',
-    tags: ['Magia', 'Fogo', 'Dano em Área'],
-    volume: 90,
-    isLocal: false,
-    createdAt: Date.now()
-  },
-  {
-    id: 'sfx-2',
-    name: 'Impacto Crítico de Espada',
-    emoji: '⚔️',
-    color: '#dc2626',
-    url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_247a32dbb8.mp3?filename=sword-slash-and-flesh-hit-94883.mp3',
-    duration: 2,
-    folderId: 'f-s-weapons',
-    tags: ['Combate', 'Crítico', 'Espada'],
-    volume: 95,
-    isLocal: false,
-    createdAt: Date.now()
-  },
-  {
-    id: 'sfx-3',
-    name: 'Trovão Distante e Relâmpago',
-    emoji: '⚡',
-    color: '#06b6d4',
-    url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=thunder-strike-1-7170.mp3',
-    duration: 5,
-    folderId: 'f-s-ambient',
-    tags: ['Clima', 'Trovão', 'Susto'],
-    volume: 85,
-    isLocal: false,
-    createdAt: Date.now()
-  },
-  {
-    id: 'sfx-4',
-    name: 'Rugido do Monstro das Sombras',
-    emoji: '👹',
-    color: '#ea580c',
-    url: 'https://cdn.pixabay.com/download/audio/2021/08/04/audio_33877b0369.mp3?filename=monster-roar-6841.mp3',
-    duration: 4,
-    folderId: 'f-s-monsters',
-    tags: ['Monstro', 'Medo', 'Rugido'],
-    volume: 90,
-    isLocal: false,
-    createdAt: Date.now()
-  },
-  {
-    id: 'sfx-5',
-    name: 'Brinde de Canecas na Taverna',
-    emoji: '🍻',
-    color: '#eab308',
-    url: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_9ec169e5d4.mp3?filename=cheering-and-beer-glasses-clinking-89345.mp3',
-    duration: 3,
-    folderId: 'f-s-tavern',
-    tags: ['Taverna', 'Festa', 'Hidromel'],
-    volume: 80,
-    isLocal: false,
-    createdAt: Date.now()
-  },
-  {
-    id: 'sfx-6',
-    name: 'Curativo Mágico & Bênção',
-    emoji: '✨',
-    color: '#10b981',
-    url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c36399c43d.mp3?filename=magic-wand-spell-sparkle-80494.mp3',
-    duration: 3,
-    folderId: 'f-s-spells',
-    tags: ['Cura', 'Magia', 'Sucesso'],
-    volume: 85,
-    isLocal: false,
-    createdAt: Date.now()
-  }
-];
+const DEFAULT_SFX: SoundboardItem[] = [];
 
 const DEFAULT_SOUNDBOARD_LAYOUTS: SoundboardLayout[] = [
   {
-    id: 'layout-combat',
-    name: 'Combate & Batalha',
-    description: 'Layout otimizado com botões rápidos de magias, impactos de espada e rugidos.',
-    themeColor: '#ef4444',
-    icon: 'Swords',
+    id: 'layout-default',
+    name: 'Layout Principal',
+    description: 'Seu layout customizável de efeitos sonoros rápidos.',
+    themeColor: '#6366f1',
+    icon: 'Sparkles',
     isDefault: true,
-    buttons: [
-      { id: 'b-1', itemId: 'sfx-2', size: 'wide', order: 0, customName: 'Crítico de Espada' },
-      { id: 'b-2', itemId: 'sfx-1', size: 'lg', order: 1, customName: 'Bola de Fogo!' },
-      { id: 'b-3', itemId: 'sfx-4', size: 'md', order: 2, customName: 'Rugido do Monstro' },
-      { id: 'b-4', itemId: 'sfx-6', size: 'wide', order: 3, customName: 'Cura Divina' },
-      { id: 'b-5', itemId: 'sfx-3', size: 'sm', order: 4, customName: 'Relâmpago' },
-    ],
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: 'layout-exploration',
-    name: 'Exploração & Clima',
-    description: 'Layout para viagens, clima sombrio, masmorras e suspense.',
-    themeColor: '#06b6d4',
-    icon: 'Compass',
-    isDefault: false,
-    buttons: [
-      { id: 'b-6', itemId: 'sfx-3', size: 'wide', order: 0, customName: 'Trovão Distante' },
-      { id: 'b-7', itemId: 'sfx-4', size: 'md', order: 1, customName: 'Passos / Monstro' },
-      { id: 'b-8', itemId: 'sfx-6', size: 'sm', order: 2, customName: 'Detector Arcano' },
-    ],
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: 'layout-tavern',
-    name: 'Taverna & Social',
-    description: 'Layout descontraído para cidades, encontros com NPCs e descanso.',
-    themeColor: '#f59e0b',
-    icon: 'Beer',
-    isDefault: false,
-    buttons: [
-      { id: 'b-9', itemId: 'sfx-5', size: 'tile', order: 0, customName: 'Brinde de Canecas' },
-      { id: 'b-10', itemId: 'sfx-6', size: 'md', order: 1, customName: 'Truque Mágico' },
-    ],
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: 'layout-npc-custom',
-    name: 'NPC Específico & Diálogo',
-    description: 'Layout personalizado para reações de chefes, monstros e falas marcantes.',
-    themeColor: '#8b5cf6',
-    icon: 'Users',
-    isDefault: false,
-    buttons: [
-      { id: 'b-11', itemId: 'sfx-4', size: 'wide', order: 0, customName: 'Presença Ameaçadora' },
-      { id: 'b-12', itemId: 'sfx-1', size: 'md', order: 1, customName: 'Conjurando Feitiço' },
-    ],
+    buttons: [],
     createdAt: Date.now(),
     updatedAt: Date.now()
   }
 ];
 
-const DEFAULT_NPCS: NPC[] = [
-  {
-    id: 'npc-1',
-    name: 'Arquimago Malakor, o Sussurrante',
-    title: 'Grão-Mestre da Ordem da Obsidiana',
-    description: 'Um conjurador sombrio de olhar penetrante cujos mantos flutuam como névoa da meia-noite. Carrega um cajado esculpido em obsidiana pura que sussurra em línguas esquecidas.',
-    secretDmNotes: 'Malakor é secretamente manipulado pela entidade do espelho no subsolo da torre. Ele tem fraqueza a dano radiante e hesita se vir o medalhão de sua falecida irmã.',
-    imageUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
-    folderId: 'f-n-villains',
-    tags: ['Vilão', 'Mago', 'Nível 14', 'Obsidiana'],
-    alignment: 'Neutro e Mau',
-    race: 'Elfo da Noite',
-    classOrType: 'Arquimago / Feiticeiro',
-    hp: 145,
-    maxHp: 145,
-    ac: 18,
-    cr: 'ND 12',
-    quote: '"Vocês rastejam sob a luz do sol sem compreender a vastidão eterna do silêncio."',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: 'npc-2',
-    name: 'Eldrin Som-de-Prata',
-    title: 'Bardo Andarilho & Informante de Taverna',
-    description: 'Um meio-elfo de sorriso carismático, alaúde de madeira élfica e anéis cheios de truques. Conhece todas as fofocas do reino e sempre aceita um hidromel em troca de segredos.',
-    secretDmNotes: 'Trabalha secretamente para os Corvos da Noite (a guilda de ladrões local), mas tem afeição pelo grupo. Caso seja pago com ouro do reino do sul, revelará a passagem secreta.',
-    imageUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&q=80',
-    folderId: 'f-n-allies',
-    tags: ['Aliado', 'Bardo', 'Taverna', 'Informante'],
-    alignment: 'Caótico e Bom',
-    race: 'Meio-Elfo',
-    classOrType: 'Bardo do Colégio do Conhecimento',
-    hp: 42,
-    maxHp: 42,
-    ac: 14,
-    cr: 'ND 3',
-    quote: '"Uma canção pode abrir mais portas do que o aríete mais pesado do rei!"',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: 'npc-3',
-    name: 'Gromm Dente-de-Ferro',
-    title: 'Ferreiro Veterano da Vila de Pedra-Alta',
-    description: 'Um anão corpulento com cicatrizes de forja e uma barba trançada com anéis de prata bruta. Não suporta enrolação e cobra caro por reparos mágicos, mas seu aço nunca falha.',
-    secretDmNotes: 'Possui escondida embaixo da bigorna uma espada de mitral ancestral forjada por seu avô que concede +2 de ataque contra gigantes.',
-    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&q=80',
-    folderId: 'f-n-citizens',
-    tags: ['Comerciante', 'Anão', 'Ferreiro', 'Forja'],
-    alignment: 'Leal e Neutro',
-    race: 'Anão da Montanha',
-    classOrType: 'Guerreiro / Artífice',
-    hp: 68,
-    maxHp: 68,
-    ac: 16,
-    cr: 'ND 4',
-    quote: '"O aço não mente, forasteiro. Mostre seu ouro ou tire a mão da bigorna."',
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  }
-];
+const DEFAULT_NPCS: NPC[] = [];
 
 const DEFAULT_BOT_CONFIG: BotConfig = {
   token: process.env.DISCORD_BOT_TOKEN || '',

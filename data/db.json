@@ -1,0 +1,148 @@
+{
+  "folders": [
+    {
+      "id": "f-m-combat",
+      "name": "Combate Épico",
+      "type": "music",
+      "color": "#ef4444",
+      "icon": "Swords",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-m-tavern",
+      "name": "Taverna & Descanso",
+      "type": "music",
+      "color": "#f59e0b",
+      "icon": "Beer",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-m-dungeon",
+      "name": "Masmorra & Mistério",
+      "type": "music",
+      "color": "#8b5cf6",
+      "icon": "Compass",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-m-ambient",
+      "name": "Ambiente Natural",
+      "type": "music",
+      "color": "#10b981",
+      "icon": "Trees",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-s-spells",
+      "name": "Magias & Arcano",
+      "type": "soundboard",
+      "color": "#3b82f6",
+      "icon": "Sparkles",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-s-weapons",
+      "name": "Ataques & Impactos",
+      "type": "soundboard",
+      "color": "#dc2626",
+      "icon": "ShieldAlert",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-s-monsters",
+      "name": "Rugidos & Monstros",
+      "type": "soundboard",
+      "color": "#ea580c",
+      "icon": "Flame",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-s-ambient",
+      "name": "Efeitos de Clima & Sala",
+      "type": "soundboard",
+      "color": "#06b6d4",
+      "icon": "CloudRain",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-s-tavern",
+      "name": "Taverna & Risadas",
+      "type": "soundboard",
+      "color": "#eab308",
+      "icon": "PartyPopper",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-s-dialogue",
+      "name": "Vozes & NPCs",
+      "type": "soundboard",
+      "color": "#a855f7",
+      "icon": "Users",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-n-allies",
+      "name": "Aliados & NPCs Amigáveis",
+      "type": "npc",
+      "color": "#10b981",
+      "icon": "Shield",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-n-villains",
+      "name": "Vilões & Chefes",
+      "type": "npc",
+      "color": "#ef4444",
+      "icon": "Skull",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-n-citizens",
+      "name": "Cidadãos & Comerciantes",
+      "type": "npc",
+      "color": "#f59e0b",
+      "icon": "Store",
+      "createdAt": 1788015367405
+    },
+    {
+      "id": "f-n-monsters",
+      "name": "Monstros & Feras",
+      "type": "npc",
+      "color": "#8b5cf6",
+      "icon": "Bug",
+      "createdAt": 1788015367405
+    }
+  ],
+  "musicTracks": [],
+  "soundboardItems": [],
+  "soundboardLayouts": [
+    {
+      "id": "layout-default",
+      "name": "Layout Principal",
+      "description": "Seu layout customizável de efeitos sonoros rápidos.",
+      "themeColor": "#6366f1",
+      "icon": "Sparkles",
+      "isDefault": true,
+      "buttons": [],
+      "createdAt": 1788015367405,
+      "updatedAt": 1788015367405
+    }
+  ],
+  "activeSoundboardLayoutId": "layout-default",
+  "npcs": [],
+  "botConfig": {
+    "token": "MTU0MDQxMjM2MDYwNTMwNjk3MA.GXGa9i.4uwzM1qxCVqmZ9Z7AJfu2E0ZU2zlxWMid4N0Ew",
+    "guildId": "1523823552250249316",
+    "voiceChannelId": "1533859999602704505",
+    "textChannelId": "1533967827663323216",
+    "clientId": "",
+    "autoConnectVoice": true,
+    "prefix": "!"
+  },
+  "sessionNotes": "",
+  "initiativeList": [],
+  "currentTrack": null,
+  "queue": [],
+  "volume": 0.8,
+  "loopMode": "queue"
+}
