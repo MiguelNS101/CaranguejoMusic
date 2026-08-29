@@ -20,12 +20,13 @@ import {
   PhoneOff,
   LogIn,
   Terminal,
-  Activity
+  Activity,
+  RotateCcw
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { DiscordGuild, DiscordChannel } from '../types';
 import { safeFetchJson } from '../services/api';
-import { ensureDesktopBackend } from '../services/desktopBackend';
+import { ensureDesktopBackend, addDesktopLog, forceRestartBackend, isDesktopEnvironment } from '../services/desktopBackend';
 import { DiscordDiagnosticsPanel } from './DiscordDiagnosticsPanel';
 
 interface DiscordSetupModalProps {
@@ -46,6 +47,7 @@ export const DiscordSetupModal: React.FC<DiscordSetupModalProps> = ({ isOpen, on
 
   const [guilds, setGuilds] = useState<DiscordGuild[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveProgressMsg, setSaveProgressMsg] = useState('');
   const [isVoiceConnecting, setIsVoiceConnecting] = useState(false);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'success' | 'error'; msg?: string }>({ status: 'idle' });
   const [activeSubTab, setActiveSubTab] = useState<'bot' | 'diagnostics' | 'guide' | 'docker' | 'portable'>('bot');
@@ -172,11 +174,14 @@ NODE_ENV=production
     e.preventDefault();
     setIsSaving(true);
     setFeedback({ status: 'idle' });
+    setSaveProgressMsg('1/3 Verificando motor local na porta 3000...');
 
     try {
+      addDesktopLog('info', 'Iniciando processo de conexão do Bot do Discord...');
       // Ensure desktop local backend is ready before saving
       await ensureDesktopBackend();
 
+      setSaveProgressMsg('2/3 Enviando configurações para o servidor local...');
       const res = await safeFetchJson<any>('/api/bot/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,26 +193,35 @@ NODE_ENV=production
           textChannelId,
           prefix
         })
-      });
+      }, 15000);
 
+      setSaveProgressMsg('3/3 Processando resposta da autenticação...');
       await refreshBotStatus();
 
       if (res.success) {
         const data = res.data;
         if (data?.connectionResult?.success || data?.botStatus?.isOnline) {
           setFeedback({ status: 'success', msg: 'Bot conectado ao Discord com sucesso!' });
+          addDesktopLog('success', 'Bot conectado com sucesso ao Discord!');
         } else if (data?.connectionResult?.error) {
           setFeedback({ status: 'error', msg: data.connectionResult.error });
+          addDesktopLog('error', `Falha de autenticação do bot: ${data.connectionResult.error}`);
         } else {
           setFeedback({ status: 'success', msg: 'Configurações salvas no servidor local!' });
+          addDesktopLog('success', 'Configurações salvas no banco de dados local.');
         }
       } else {
-        setFeedback({ status: 'error', msg: res.error || 'Erro ao comunicar com o bot.' });
+        const errorMsg = res.error || 'Erro ao comunicar com o bot.';
+        setFeedback({ status: 'error', msg: errorMsg });
+        addDesktopLog('error', `Erro na resposta do servidor: ${errorMsg}`);
       }
     } catch (err: any) {
-      setFeedback({ status: 'error', msg: err?.message || 'Erro ao salvar configurações do bot' });
+      const errorMsg = err?.message || 'Erro ao salvar configurações do bot';
+      setFeedback({ status: 'error', msg: errorMsg });
+      addDesktopLog('error', `Erro de exceção: ${errorMsg}`);
     } finally {
       setIsSaving(false);
+      setSaveProgressMsg('');
     }
   };
 
@@ -589,25 +603,55 @@ NODE_ENV=production
             <div className="pt-3 border-t border-[#2D3139] flex flex-col gap-3">
               {feedback.status !== 'idle' && (
                 <div
-                  className={`p-3 rounded-xl border flex items-start gap-2.5 text-xs ${
+                  className={`p-3 rounded-xl border flex flex-col gap-2 text-xs ${
                     feedback.status === 'success'
                       ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
                       : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
                   }`}
                 >
-                  {feedback.status === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                  )}
-                  <div className="flex-1 space-y-1">
-                    <p className="font-semibold leading-tight">
-                      {feedback.status === 'success' ? 'Sucesso' : 'Atenção ao Conectar'}
-                    </p>
-                    <p className="text-[11px] leading-relaxed text-[#E0E0E0] break-words">
-                      {feedback.msg}
-                    </p>
+                  <div className="flex items-start gap-2.5">
+                    {feedback.status === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <p className="font-semibold leading-tight">
+                        {feedback.status === 'success' ? 'Sucesso' : 'Atenção ao Conectar'}
+                      </p>
+                      <p className="text-[11px] leading-relaxed text-[#E0E0E0] break-words">
+                        {feedback.msg}
+                      </p>
+                    </div>
                   </div>
+
+                  {feedback.status === 'error' && (
+                    <div className="flex items-center gap-2 pt-2 border-t border-rose-500/20 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubTab('diagnostics')}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 text-[11px] font-bold border border-indigo-500/30 flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Activity className="w-3 h-3 text-emerald-400" />
+                        <span>Abrir Diagnóstico & Logs</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsSaving(true);
+                          setSaveProgressMsg('Forçando reinício do motor...');
+                          await forceRestartBackend();
+                          setIsSaving(false);
+                          setSaveProgressMsg('');
+                          await refreshBotStatus();
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-[#2D3139] hover:bg-[#3D424D] text-white text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <RotateCcw className="w-3 h-3 text-amber-400" />
+                        <span>Forçar Início do Motor Local</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -620,16 +664,17 @@ NODE_ENV=production
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-2 rounded-xl text-xs text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B]"
+                    className="px-4 py-2 rounded-xl text-xs text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B] cursor-pointer"
                   >
                     Fechar
                   </button>
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all"
+                    className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer"
                   >
-                    {isSaving ? 'Salvando & Conectando...' : 'Salvar & Conectar Bot'}
+                    {isSaving && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                    <span>{isSaving ? (saveProgressMsg || 'Salvando & Conectando...') : 'Salvar & Conectar Bot'}</span>
                   </button>
                 </div>
               </div>

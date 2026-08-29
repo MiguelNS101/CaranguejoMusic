@@ -332,9 +332,13 @@ export class DiscordBotService {
         const raceRes = await Promise.race([loginPromise, timeoutPromise]);
         if (raceRes && typeof raceRes === 'object' && (raceRes as any).isTimeout) {
           this.isConnecting = false;
+          try {
+            if (this.client) await this.client.destroy();
+          } catch {}
+          this.client = null;
           const timeoutMsg = 'Tempo limite excedido ao autenticar no Discord. Verifique sua conexão à internet ou o token fornecido.';
           this.lastError = timeoutMsg;
-          this.logDiagnostic('warn', 'bot', timeoutMsg);
+          this.logDiagnostic('error', 'bot', timeoutMsg);
           return { success: false, error: timeoutMsg };
         }
 
