@@ -60,25 +60,42 @@ jobs:
           if (Test-Path "package.json") { Copy-Item "package.json" "dist-portable\package.json" -Force }
           if (Test-Path "node_modules") { Copy-Item -Recurse -Force "node_modules" "dist-portable\node_modules" }
           if (Test-Path ".env.example") { Copy-Item ".env.example" "dist-portable\.env" -Force }
+
+          # Download standalone node.exe so the user does not need Node installed
+          Invoke-WebRequest -Uri "https://nodejs.org/dist/v20.18.0/win-x64/node.exe" -OutFile "dist-portable\node.exe"
           
-          # Create Launcher Script
+          # Copy executables
+          if (Test-Path "dist-portable\CaranguejoRPG-win_x64.exe") {
+            Copy-Item "dist-portable\CaranguejoRPG-win_x64.exe" "dist-portable\CaranguejoRPG.exe" -Force
+          }
+
+          # Create Clean Launcher Script
           @"
           @echo off
-          chcp 65001 > nul
-          title CaranguejoRPG - Escudo do Mestre
+          title CaranguejoRPG - Inicializador
           cd /d "%~dp0"
-          start "" /b node dist/server.cjs
-          timeout /t 1 /nobreak > nul
-          if exist "CaranguejoRPG-win_x64.exe" (
-              start "" CaranguejoRPG-win_x64.exe
-          ) else if exist "CaranguejoRPG.exe" (
-              start "" CaranguejoRPG.exe
-          ) else if exist "neutralino-win_x64.exe" (
-              start "" neutralino-win_x64.exe
+          echo ========================================================
+          echo       CARANGUEJO RPG - INICIANDO APLICATIVO
+          echo ========================================================
+          echo.
+          echo [1/2] Iniciando servidor do bot e motor de som local...
+          if exist "%~dp0node.exe" (
+              start "CaranguejoRPG-Server" /min "%~dp0node.exe" "%~dp0dist\server.cjs"
+          ) else (
+              start "CaranguejoRPG-Server" /min node "%~dp0dist\server.cjs"
+          )
+          timeout /t 2 /nobreak > nul
+          echo [2/2] Abrindo interface...
+          if exist "%~dp0CaranguejoRPG.exe" (
+              start "" "%~dp0CaranguejoRPG.exe"
+          ) else if exist "%~dp0CaranguejoRPG-win_x64.exe" (
+              start "" "%~dp0CaranguejoRPG-win_x64.exe"
           ) else (
               start http://localhost:3000
           )
-          "@ | Out-File -Encoding ASCII "dist-portable\CaranguejoRPG.bat"
+          exit
+          "@ | Out-File -Encoding ASCII "dist-portable\Iniciar-CaranguejoRPG.bat"
+          Copy-Item "dist-portable\Iniciar-CaranguejoRPG.bat" "dist-portable\CaranguejoRPG.bat" -Force
 
       - name: Compress Portable Zip
         run: |

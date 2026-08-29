@@ -8,6 +8,7 @@ echo        🦀  CARANGUEJO RPG - INICIALIZADOR  🦀
 echo ========================================================
 echo.
 
+:: 1. Verificar se o Node.js está instalado ou se existe node.exe portátil
 set "NODE_CMD=node"
 where node >nul 2>nul
 if %errorlevel% neq 0 (
@@ -21,7 +22,7 @@ if %errorlevel% neq 0 (
         echo [!] Node.js não foi encontrado no seu computador.
         echo.
         echo Para rodar o CaranguejoRPG a partir do código-fonte do GitHub:
-        echo 1. Baixe e instale o Node.js LTS em https://nodejs.org/
+        echo 1. Baixe e instale o Node.js LTS em https://nodejs.org/ (leva 1 minuto)
         echo 2. Execute este arquivo novamente!
         echo.
         echo Pressione qualquer tecla para abrir a página de download do Node.js...
@@ -31,8 +32,19 @@ if %errorlevel% neq 0 (
     )
 )
 
+echo [i] Iniciando CaranguejoRPG...
+echo.
+
+:: 2. Executar o script de inicialização inteligente
 %NODE_CMD% scripts/start-dev.js
 
+if %errorlevel% neq 0 (
+    echo.
+    echo ========================================================
+    echo [!] O processo foi encerrado com código de aviso/erro.
+    echo ========================================================
+)
+
 echo.
-echo Pressione qualquer tecla para encerrar...
+echo Pressione qualquer tecla para fechar esta janela...
 pause > nul

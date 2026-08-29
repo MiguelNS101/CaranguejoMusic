@@ -1,6 +1,7 @@
 import { execSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
 
 const rootDir = process.cwd();
 
@@ -8,44 +9,80 @@ console.log('========================================================');
 console.log('        🦀  CARANGUEJO RPG - INICIALIZADOR  🦀');
 console.log('========================================================\n');
 
-// 1. Check if node_modules or vite exists
+// 1. Check if node_modules exists
+const expressPath = path.join(rootDir, 'node_modules', 'express');
 const vitePath = path.join(rootDir, 'node_modules', 'vite');
-if (!fs.existsSync(vitePath)) {
-  console.log('[i] Instalando dependências necessárias (Áudio Opus, Discord.js, Interface)...');
-  console.log('    (Isso ocorre apenas na primeira inicialização)');
+
+if (!fs.existsSync(expressPath) || !fs.existsSync(vitePath)) {
+  console.log('[i] Instalando bibliotecas e dependências (Áudio, Discord.js, Interface)...');
+  console.log('    (Isso ocorre apenas uma vez na primeira execução)');
+  console.log('    Aguarde alguns instantes...');
   try {
     execSync('npm install --legacy-peer-deps --no-audit --no-fund', { stdio: 'inherit', cwd: rootDir });
   } catch {
-    console.log('[!] Tentando com --force...');
-    execSync('npm install --force --no-audit --no-fund', { stdio: 'inherit', cwd: rootDir });
+    console.log('[!] Tentando instalação com --force...');
+    try {
+      execSync('npm install --force --no-audit --no-fund', { stdio: 'inherit', cwd: rootDir });
+    } catch (e) {
+      console.error('[✗] Erro na instalação de pacotes:', e?.message);
+    }
   }
-  console.log('[✓] Dependências configuradas com sucesso!\n');
+  console.log('\n[✓] Dependências configuradas com sucesso!\n');
 }
 
-// 2. Open browser automatically
-console.log('[i] Abrindo o painel do Mestre no seu navegador...');
-const openCommand = process.platform === 'win32' ? 'start http://localhost:3000' :
-                    process.platform === 'darwin' ? 'open http://localhost:3000' : 'xdg-open http://localhost:3000';
+// 2. Open browser once the server is verified ready
+function pollAndOpenBrowser() {
+  const url = 'http://localhost:3000';
+  let attempts = 0;
+  const maxAttempts = 30;
 
-setTimeout(() => {
-  try {
-    if (process.platform === 'win32') {
-      execSync('cmd /c "start http://localhost:3000"');
-    } else {
-      execSync(openCommand);
-    }
-  } catch {}
-}, 1500);
+  const check = () => {
+    attempts++;
+    const req = http.get(`${url}/api/health`, (res) => {
+      if (res.statusCode === 200) {
+        console.log(`\n[✓] Servidor online! Abrindo interface em ${url}...\n`);
+        const openCmd = process.platform === 'win32'
+          ? `cmd /c start ${url}`
+          : process.platform === 'darwin'
+            ? `open ${url}`
+            : `xdg-open ${url}`;
+        try { execSync(openCmd); } catch {}
+      } else if (attempts < maxAttempts) {
+        setTimeout(check, 500);
+      }
+    });
 
-// 3. Start server
-console.log('[i] Iniciando o servidor Master Screen na porta 3000...');
+    req.on('error', () => {
+      if (attempts < maxAttempts) {
+        setTimeout(check, 500);
+      } else {
+        // Fallback open anyway
+        const openCmd = process.platform === 'win32' ? `cmd /c start ${url}` : `open ${url}`;
+        try { execSync(openCmd); } catch {}
+      }
+    });
+  };
+
+  setTimeout(check, 1000);
+}
+
+pollAndOpenBrowser();
+
+// 3. Start server process
+console.log('[i] Iniciando motor do CaranguejoRPG na porta 3000...');
 console.log('\n========================================================');
-console.log('  O painel está ativo! Mantenha esta janela aberta.');
-console.log('  Para fechar a aplicação, feche esta janela.');
+console.log('  Mantenha esta janela aberta enquanto joga!');
+console.log('  Para encerrar o CaranguejoRPG, basta fechar esta janela.');
 console.log('========================================================\n');
 
 try {
-  execSync('npx tsx server.ts', { stdio: 'inherit', cwd: rootDir });
+  // Check if tsx is in node_modules/.bin or local
+  const tsxBin = path.join(rootDir, 'node_modules', '.bin', process.platform === 'win32' ? 'tsx.cmd' : 'tsx');
+  if (fs.existsSync(tsxBin)) {
+    execSync(`"${tsxBin}" server.ts`, { stdio: 'inherit', cwd: rootDir });
+  } else {
+    execSync('npx tsx server.ts', { stdio: 'inherit', cwd: rootDir });
+  }
 } catch (err) {
-  console.log('\n[!] O servidor foi encerrado.');
+  console.log('\n[i] Aplicação encerrada.');
 }
