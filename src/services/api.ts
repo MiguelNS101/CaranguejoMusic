@@ -185,7 +185,13 @@ export async function safeFetchJson<T = any>(
       addDesktopLog('error', `Timeout na requisição ${url}`, undefined, 'network');
     } else if (isDesktopEnv) {
       fallbackMsg = 'O motor local de som e bot (porta 3000) não está respondendo. Verifique se Iniciar-CaranguejoRPG.bat está rodando ou use a aba Diagnóstico.';
-      addDesktopLog('error', `Falha de conexão com ${url}: ${err?.message || 'Erro de rede'}`, undefined, 'network');
+      // Throttle network log to prevent spamming the log console every polling cycle
+      const now = Date.now();
+      const lastLog = (window as any)[`_last_log_${url}`] || 0;
+      if (now - lastLog > 10000) {
+        (window as any)[`_last_log_${url}`] = now;
+        addDesktopLog('warn', `Aguardando servidor local responder em ${url}...`, undefined, 'network');
+      }
     } else {
       fallbackMsg = err?.message || 'Falha na comunicação com o servidor.';
     }
