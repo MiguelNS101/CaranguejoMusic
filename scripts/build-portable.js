@@ -229,7 +229,7 @@ async function main() {
   // Generate clean ASCII Launcher Batch Script inside dist-portable (with CRLF and strict quoting)
   const launcherBatContent = [
     '@echo off',
-    'title CaranguejoRPG',
+    'title CaranguejoRPG - Inicializador',
     'cd /d "%~dp0"',
     '',
     'echo ========================================================',
@@ -237,37 +237,60 @@ async function main() {
     'echo ========================================================',
     'echo.',
     '',
-    'echo [i] Iniciando servidor do bot e motor de som local (porta 3000)...',
+    'echo [1/2] Iniciando servidor do bot e motor de som local (porta 3000)...',
     'if exist "%~dp0node.exe" (',
-    '    start "CaranguejoRPG-Server" /b "%~dp0node.exe" "%~dp0dist\\server.cjs"',
+    '    start "CaranguejoRPG-Server" /min "%~dp0node.exe" "%~dp0dist\\server.cjs"',
     ') else (',
-    '    start "CaranguejoRPG-Server" /b node "%~dp0dist\\server.cjs"',
+    '    start "CaranguejoRPG-Server" /min node "%~dp0dist\\server.cjs"',
     ')',
     '',
     'timeout /t 2 /nobreak > nul',
     '',
+    'echo [2/2] Abrindo interface do CaranguejoRPG...',
     'tasklist /fi "imagename eq CaranguejoRPG.exe" | findstr /i "CaranguejoRPG.exe" > nul',
     'if errorlevel 1 (',
     '    if exist "%~dp0CaranguejoRPG.exe" (',
-    '        echo [i] Abrindo janela do CaranguejoRPG...',
     '        start "" "%~dp0CaranguejoRPG.exe"',
     '    ) else if exist "%~dp0CaranguejoRPG-win_x64.exe" (',
-    '        echo [i] Abrindo janela do CaranguejoRPG...',
     '        start "" "%~dp0CaranguejoRPG-win_x64.exe"',
     '    ) else (',
-    '        echo [i] Abrindo no seu navegador...',
     '        start http://localhost:3000',
     '    )',
     ') else (',
-    '    echo [OK] Janela do CaranguejoRPG ja esta aberta!',
+    '    echo [OK] A janela do aplicativo ja esta em execucao.',
     ')',
     '',
-    'echo [OK] Aplicativo em execucao! Pode minimizar esta janela.',
-    ''
+    'echo.',
+    'echo [OK] CaranguejoRPG iniciado com sucesso!',
+    'echo      O servidor local na porta 3000 esta ativo em segundo plano.',
+    'timeout /t 3 /nobreak > nul',
+    'exit'
   ].join('\r\n');
 
   fs.writeFileSync(path.join(distPortableDir, 'Iniciar-CaranguejoRPG.bat'), launcherBatContent, 'utf-8');
   fs.writeFileSync(path.join(distPortableDir, 'CaranguejoRPG.bat'), launcherBatContent, 'utf-8');
+
+  // Create Debug Launcher with visible console & pause on exit
+  const debugBatContent = [
+    '@echo off',
+    'title CaranguejoRPG - Console de Debug do Servidor',
+    'cd /d "%~dp0"',
+    'echo ========================================================',
+    'echo       CARANGUEJO RPG - DEBUG DO SERVIDOR (PORTA 3000)',
+    'echo ========================================================',
+    'echo.',
+    'echo Pressione Ctrl+C para encerrar o servidor.',
+    'echo.',
+    'if exist "%~dp0node.exe" (',
+    '    "%~dp0node.exe" "%~dp0dist\\server.cjs"',
+    ') else (',
+    '    node "%~dp0dist\\server.cjs"',
+    ')',
+    'echo.',
+    'echo O servidor encerrou a execucao.',
+    'pause'
+  ].join('\r\n');
+  fs.writeFileSync(path.join(distPortableDir, 'Iniciar-Servidor-Debug.bat'), debugBatContent, 'utf-8');
 
   // Create VBS launcher (runs silently without black CMD window)
   const vbsContent = [

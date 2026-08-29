@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import routes from './server/routes.js';
 import { UPLOADS_DIR, MUSIC_DIR, SFX_DIR, NPCS_DIR } from './server/db.js';
 
@@ -56,6 +55,7 @@ async function startServer() {
 
   if (!isProduction) {
     try {
+      const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
         server: {
           middlewareMode: true,

@@ -33,7 +33,20 @@ import { db } from './db.js';
 import { BotStatus, DiscordGuild, DiscordMessagePayload, NPC, DiceRollResult, WodDiceRollResult, DiagnosticLog, VoiceDiagnostics } from '../src/types.js';
 import { rollWodDice, parseWodCommand } from './wodDice.js';
 
-const nodeRequire = createRequire(import.meta.url);
+// Helper to safely require packages in both CommonJS bundled output and ESM
+function safeRequire(modulePath: string): any {
+  try {
+    if (typeof require === 'function') {
+      return require(modulePath);
+    }
+  } catch {}
+  try {
+    const { createRequire } = require('module');
+    const req = createRequire(process.cwd());
+    return req(modulePath);
+  } catch {}
+  return null;
+}
 
 // Configure FFMPEG path if ffmpeg-static is installed
 if (ffmpegStatic) {
@@ -106,14 +119,14 @@ export class DiscordBotService {
       path: ffmpegStatic || process.env.FFMPEG_PATH || 'Não configurado'
     };
 
-    // Safe dynamic check for Opus decoders using ESM-compatible createRequire
+    // Safe dynamic check for Opus decoders
     try {
       // @ts-ignore
-      const dOpus = nodeRequire('@discordjs/opus');
+      const dOpus = safeRequire('@discordjs/opus');
       if (dOpus) {
         opusDiscord.available = true;
         try {
-          const pkg = nodeRequire('@discordjs/opus/package.json');
+          const pkg = safeRequire('@discordjs/opus/package.json');
           if (pkg?.version) opusDiscord.version = pkg.version;
         } catch {}
       }
@@ -123,11 +136,11 @@ export class DiscordBotService {
 
     try {
       // @ts-ignore
-      const nOpus = nodeRequire('node-opus');
+      const nOpus = safeRequire('node-opus');
       if (nOpus) {
         nodeOpus.available = true;
         try {
-          const pkg = nodeRequire('node-opus/package.json');
+          const pkg = safeRequire('node-opus/package.json');
           if (pkg?.version) nodeOpus.version = pkg.version;
         } catch {}
       }
@@ -137,11 +150,11 @@ export class DiscordBotService {
 
     try {
       // @ts-ignore
-      const OpusScript = nodeRequire('opusscript');
+      const OpusScript = safeRequire('opusscript');
       if (OpusScript) {
         opusscript.available = true;
         try {
-          const pkg = nodeRequire('opusscript/package.json');
+          const pkg = safeRequire('opusscript/package.json');
           if (pkg?.version) opusscript.version = pkg.version;
         } catch {}
       }
@@ -151,14 +164,14 @@ export class DiscordBotService {
 
     try {
       // @ts-ignore
-      nodeRequire('tweetnacl');
+      safeRequire('tweetnacl');
       tweetnacl.available = true;
       tweetnacl.active = true;
     } catch {}
 
     try {
       // @ts-ignore
-      nodeRequire('libsodium-wrappers');
+      safeRequire('libsodium-wrappers');
       libsodium.available = true;
     } catch {}
 
