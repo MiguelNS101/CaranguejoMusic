@@ -80,6 +80,48 @@ export interface DiscordGuild {
   channels: DiscordChannel[];
 }
 
+export interface DiagnosticLog {
+  id: string;
+  timestamp: string;
+  level: 'info' | 'warn' | 'error' | 'success';
+  source: 'voice' | 'bot' | 'audio' | 'system';
+  message: string;
+  details?: string;
+}
+
+export interface VoiceDiagnostics {
+  modules: {
+    opusDiscord: { available: boolean; version?: string; error?: string };
+    nodeOpus: { available: boolean; version?: string; error?: string };
+    opusscript: { available: boolean; version?: string; error?: string };
+    activeOpusEngine: string;
+    tweetnacl: { available: boolean; active: boolean };
+    libsodium: { available: boolean; active: boolean };
+    ffmpeg: { available: boolean; path?: string };
+  };
+  connection: {
+    botOnline: boolean;
+    botTag?: string;
+    botPing?: number;
+    voiceState: string;
+    voiceChannelName?: string;
+    voiceChannelId?: string;
+    guildName?: string;
+    guildId?: string;
+    voicePing?: number;
+    playerState: string;
+    currentTrack?: string;
+  };
+  environment: {
+    nodeVersion: string;
+    platform: string;
+    arch: string;
+    uptime: number;
+    memoryUsageMB: number;
+  };
+  logs: DiagnosticLog[];
+}
+
 export interface BotConfig {
   token: string;
   guildId?: string;
@@ -93,6 +135,7 @@ export interface BotConfig {
 export interface BotStatus {
   isConfigured: boolean;
   isOnline: boolean;
+  isVoiceConnected?: boolean;
   username?: string;
   avatar?: string;
   guildsCount: number;

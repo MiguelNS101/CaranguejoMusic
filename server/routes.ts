@@ -124,36 +124,62 @@ router.post('/bot/stop', async (req: Request, res: Response) => {
   res.json({ success: true, botStatus: discordBot.getStatus() });
 });
 
-// DISCORD ACTIONS
-router.post('/discord/send-message', async (req: Request, res: Response) => {
-  const result = await discordBot.sendMessage(req.body);
-  res.json(result);
-});
-
-router.post('/discord/post-npc', async (req: Request, res: Response) => {
-  const { npcId, customChannelId } = req.body;
-  const npc = db.getNpcById(npcId);
-  if (!npc) {
-    return res.status(404).json({ error: 'NPC não encontrado.' });
+// DISCORD ACTIONS (Aliases for /discord/* and /bot/*)
+const handleSendMessage = async (req: Request, res: Response) => {
+  try {
+    const result = await discordBot.sendMessage(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao enviar mensagem para o Discord.' });
   }
-  const result = await discordBot.postNpc(npc, customChannelId);
-  res.json(result);
-});
+};
+router.post('/discord/send-message', handleSendMessage);
+router.post('/bot/send-message', handleSendMessage);
+router.post('/discord/message', handleSendMessage);
+router.post('/bot/message', handleSendMessage);
 
-router.post('/discord/announce-turn', async (req: Request, res: Response) => {
-  const { name, initiative, isNpc, round, customChannelId } = req.body;
-  if (!name) {
-    return res.status(400).json({ error: 'Nome do combatente é obrigatório.' });
+const handlePostNpc = async (req: Request, res: Response) => {
+  try {
+    const { npcId, customChannelId } = req.body;
+    const npc = db.getNpcById(npcId);
+    if (!npc) {
+      return res.status(404).json({ success: false, error: 'NPC não encontrado.' });
+    }
+    const result = await discordBot.postNpc(npc, customChannelId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao enviar NPC para o Discord.' });
   }
-  const result = await discordBot.announceTurn(name, initiative ?? 10, !!isNpc, round, customChannelId);
-  res.json(result);
-});
+};
+router.post('/discord/post-npc', handlePostNpc);
+router.post('/bot/post-npc', handlePostNpc);
 
-router.post('/discord/roll-dice', async (req: Request, res: Response) => {
-  const roll = req.body as DiceRollResult;
-  const result = await discordBot.broadcastDiceRoll(roll);
-  res.json(result);
-});
+const handleAnnounceTurn = async (req: Request, res: Response) => {
+  try {
+    const { name, initiative, isNpc, round, customChannelId } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, error: 'Nome do combatente é obrigatório.' });
+    }
+    const result = await discordBot.announceTurn(name, initiative ?? 10, !!isNpc, round, customChannelId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao anunciar turno.' });
+  }
+};
+router.post('/discord/announce-turn', handleAnnounceTurn);
+router.post('/bot/announce-turn', handleAnnounceTurn);
+
+const handleRollDice = async (req: Request, res: Response) => {
+  try {
+    const roll = req.body as DiceRollResult;
+    const result = await discordBot.broadcastDiceRoll(roll);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao transmitir rolagem de dados.' });
+  }
+};
+router.post('/discord/roll-dice', handleRollDice);
+router.post('/bot/roll-dice', handleRollDice);
 
 // ==========================================
 // DISCORD VOICE PLAYBACK ENDPOINTS
@@ -181,6 +207,24 @@ router.post('/bot/voice/resume', async (req: Request, res: Response) => {
   res.json(result);
 });
 
+router.post('/bot/voice/disconnect', async (req: Request, res: Response) => {
+  const result = await discordBot.disconnectVoice();
+  res.json({
+    ...result,
+    botStatus: discordBot.getStatus()
+  });
+});
+
+router.post('/bot/voice/join', async (req: Request, res: Response) => {
+  const { voiceChannelId } = req.body;
+  const result = await discordBot.ensureVoiceConnection(voiceChannelId);
+  res.json({
+    success: result.success,
+    error: result.error,
+    botStatus: discordBot.getStatus()
+  });
+});
+
 router.post('/bot/voice/stop', async (req: Request, res: Response) => {
   const result = await discordBot.stopVoiceAudio();
   res.json(result);
@@ -199,6 +243,38 @@ router.post('/bot/voice/sfx', async (req: Request, res: Response) => {
   }
   const result = await discordBot.playVoiceAudio(sfxUrl, volume ?? 0.9);
   res.json(result);
+});
+
+// ==========================================
+// BOT VOICE & AUDIO DIAGNOSTICS
+// ==========================================
+
+router.get('/bot/diagnostics', (req: Request, res: Response) => {
+  try {
+    const diagnostics = discordBot.getDiagnostics();
+    res.json({ success: true, diagnostics });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Falha ao obter diagnósticos' });
+  }
+});
+
+router.post('/bot/diagnostics/test', async (req: Request, res: Response) => {
+  try {
+    const { voiceChannelId } = req.body;
+    const result = await discordBot.testVoiceDiagnostics(voiceChannelId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao executar teste de diagnóstico' });
+  }
+});
+
+router.post('/bot/diagnostics/clear-logs', (req: Request, res: Response) => {
+  try {
+    discordBot.clearDiagnosticsLogs();
+    res.json({ success: true, message: 'Logs de diagnóstico limpos.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message });
+  }
 });
 
 // ==========================================

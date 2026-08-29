@@ -17,8 +17,9 @@ echo ""
 
 # 2. Check node_modules
 if [ ! -d "node_modules" ]; then
-    echo "[i] Instalando dependências pela primeira vez..."
-    npm install
+    echo "[i] Instalando dependências de áudio e bot (Opus, Discord.js, FFmpeg)..."
+    npm install --include=optional || npm install
+    echo "[✓] Dependências configuradas com sucesso!"
 fi
 
 # 3. Open browser

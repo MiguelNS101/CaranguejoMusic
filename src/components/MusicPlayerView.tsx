@@ -23,7 +23,8 @@ import {
   Clock,
   Layers,
   FolderUp,
-  Headphones
+  Headphones,
+  PhoneOff
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { MusicTrack, LoopMode } from '../types';
@@ -57,7 +58,8 @@ export const MusicPlayerView: React.FC = () => {
     folders,
     createMusicTrack,
     deleteMusicTrack,
-    botStatus
+    botStatus,
+    disconnectVoiceChannel
   } = useAudio();
 
   const [selectedFolderId, setSelectedFolderId] = useState<string>('all');
@@ -186,12 +188,27 @@ export const MusicPlayerView: React.FC = () => {
                 {botStatus.isOnline ? (
                   <span className="text-[10px] text-emerald-400 bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
                     <Radio className="w-3 h-3 text-emerald-400" />
-                    Transmitindo no Discord Bot
+                    {botStatus.connectedVoiceChannel
+                      ? `Voz: ${botStatus.connectedVoiceChannel.name}`
+                      : 'Transmitindo no Discord Bot'}
                   </span>
                 ) : (
                   <span className="text-[10px] text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-500/30">
                     Discord Bot Offline
                   </span>
+                )}
+
+                {/* Disconnect Voice Channel Button */}
+                {botStatus.connectedVoiceChannel && (
+                  <button
+                    type="button"
+                    onClick={() => disconnectVoiceChannel()}
+                    className="text-[10px] px-2.5 py-0.5 rounded-full border border-amber-500/40 bg-amber-950/50 hover:bg-amber-900/70 text-amber-300 flex items-center gap-1 transition-all cursor-pointer font-medium"
+                    title="Desconectar o bot da sala de voz do Discord"
+                  >
+                    <PhoneOff className="w-3 h-3" />
+                    Desconectar da Sala
+                  </button>
                 )}
 
                 {/* Local audio preview toggle */}

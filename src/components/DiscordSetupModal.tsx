@@ -4,6 +4,7 @@ import {
   Key,
   Server,
   Volume2,
+  VolumeX,
   MessageSquare,
   ExternalLink,
   CheckCircle2,
@@ -14,10 +15,17 @@ import {
   Container,
   HelpCircle,
   Copy,
-  Check
+  Check,
+  Radio,
+  PhoneOff,
+  LogIn,
+  Terminal,
+  Activity
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { DiscordGuild, DiscordChannel } from '../types';
+import { safeFetchJson } from '../services/api';
+import { DiscordDiagnosticsPanel } from './DiscordDiagnosticsPanel';
 
 interface DiscordSetupModalProps {
   isOpen: boolean;
@@ -25,7 +33,7 @@ interface DiscordSetupModalProps {
 }
 
 export const DiscordSetupModal: React.FC<DiscordSetupModalProps> = ({ isOpen, onClose }) => {
-  const { botConfig, botStatus, refreshBotStatus } = useAudio();
+  const { botConfig, botStatus, refreshBotStatus, disconnectVoiceChannel, connectVoiceChannel } = useAudio();
 
   const [token, setToken] = useState(botConfig.token || '');
   const [showToken, setShowToken] = useState(false);
@@ -37,8 +45,9 @@ export const DiscordSetupModal: React.FC<DiscordSetupModalProps> = ({ isOpen, on
 
   const [guilds, setGuilds] = useState<DiscordGuild[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isVoiceConnecting, setIsVoiceConnecting] = useState(false);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'success' | 'error'; msg?: string }>({ status: 'idle' });
-  const [activeSubTab, setActiveSubTab] = useState<'bot' | 'guide' | 'docker' | 'portable'>('bot');
+  const [activeSubTab, setActiveSubTab] = useState<'bot' | 'diagnostics' | 'guide' | 'docker' | 'portable'>('bot');
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [copiedEnv, setCopiedEnv] = useState(false);
   const [envRawText, setEnvRawText] = useState('');
@@ -48,11 +57,10 @@ export const DiscordSetupModal: React.FC<DiscordSetupModalProps> = ({ isOpen, on
   // Fetch .env values
   useEffect(() => {
     if (activeSubTab === 'portable' && isOpen) {
-      fetch('/api/config/env')
-        .then(r => r.json())
-        .then(data => {
-          if (data.rawContent) {
-            setEnvRawText(data.rawContent);
+      safeFetchJson<any>('/api/config/env')
+        .then(res => {
+          if (res.data?.rawContent) {
+            setEnvRawText(res.data.rawContent);
           } else {
             setEnvRawText(`# ==========================================
 # RPG Bot & Escudo do Mestre - Configurações
@@ -79,7 +87,7 @@ NODE_ENV=production
     setIsEnvSaving(true);
     setEnvStatus({ status: 'idle' });
     try {
-      const res = await fetch('/api/config/env', {
+      const res = await safeFetchJson<any>('/api/config/env', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,12 +101,11 @@ NODE_ENV=production
           DATA_DIR: './data'
         })
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         setEnvStatus({ status: 'success', msg: 'Arquivo .env salvo no disco com sucesso!' });
         await refreshBotStatus();
       } else {
-        setEnvStatus({ status: 'error', msg: data.error || 'Erro ao salvar' });
+        setEnvStatus({ status: 'error', msg: res.error || 'Erro ao salvar' });
       }
     } catch (e: any) {
       setEnvStatus({ status: 'error', msg: e?.message || 'Erro ao salvar' });
@@ -136,9 +143,9 @@ NODE_ENV=production
   useEffect(() => {
     const fetchGuilds = async () => {
       try {
-        const res = await fetch('/api/bot/guilds');
-        if (res.ok) {
-          const list = await res.json();
+        const res = await safeFetchJson<DiscordGuild[]>('/api/bot/guilds');
+        if (res.success && res.data) {
+          const list = res.data;
           setGuilds(list);
           if (list.length > 0 && !guildId) {
             setGuildId(list[0].id);
@@ -166,7 +173,7 @@ NODE_ENV=production
     setFeedback({ status: 'idle' });
 
     try {
-      const res = await fetch('/api/bot/config', {
+      const res = await safeFetchJson<any>('/api/bot/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -179,30 +186,70 @@ NODE_ENV=production
         })
       });
 
-      const data = await res.json();
       await refreshBotStatus();
 
-      if (data.connectionResult?.success || data.botStatus?.isOnline) {
-        setFeedback({ status: 'success', msg: 'Bot conectado ao Discord com sucesso!' });
-      } else if (data.connectionResult?.error) {
-        setFeedback({ status: 'error', msg: data.connectionResult.error });
+      if (res.success) {
+        const data = res.data;
+        if (data?.connectionResult?.success || data?.botStatus?.isOnline) {
+          setFeedback({ status: 'success', msg: 'Bot conectado ao Discord com sucesso!' });
+        } else if (data?.connectionResult?.error) {
+          setFeedback({ status: 'error', msg: data.connectionResult.error });
+        } else {
+          setFeedback({ status: 'success', msg: 'Configurações salvas no servidor local!' });
+        }
       } else {
-        setFeedback({ status: 'success', msg: 'Configurações salvas!' });
+        setFeedback({ status: 'error', msg: res.error || 'Erro ao comunicar com o bot.' });
       }
     } catch (err: any) {
-      setFeedback({ status: 'error', msg: err?.message || 'Erro ao conectar bot' });
+      setFeedback({ status: 'error', msg: err?.message || 'Erro ao salvar configurações do bot' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDisconnect = async () => {
+  const handleDisconnectBot = async () => {
     try {
-      await fetch('/api/bot/stop', { method: 'POST' });
+      await safeFetchJson('/api/bot/stop', { method: 'POST' });
       await refreshBotStatus();
       setFeedback({ status: 'idle', msg: 'Bot desconectado.' });
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDisconnectVoiceOnly = async () => {
+    try {
+      setIsVoiceConnecting(true);
+      const res = await disconnectVoiceChannel();
+      if (res.success) {
+        setFeedback({ status: 'success', msg: 'Bot desconectado do canal de voz.' });
+      } else {
+        setFeedback({ status: 'error', msg: res.error || 'Falha ao desconectar da voz.' });
+      }
+    } catch (err: any) {
+      setFeedback({ status: 'error', msg: err?.message || 'Erro ao desconectar da voz.' });
+    } finally {
+      setIsVoiceConnecting(false);
+    }
+  };
+
+  const handleJoinVoiceChannel = async () => {
+    if (!voiceChannelId) {
+      setFeedback({ status: 'error', msg: 'Selecione um canal de voz primeiro.' });
+      return;
+    }
+    try {
+      setIsVoiceConnecting(true);
+      const res = await connectVoiceChannel(voiceChannelId);
+      if (res.success) {
+        setFeedback({ status: 'success', msg: 'Bot conectado ao canal de voz com sucesso!' });
+      } else {
+        setFeedback({ status: 'error', msg: res.error || 'Falha ao entrar no canal de voz.' });
+      }
+    } catch (err: any) {
+      setFeedback({ status: 'error', msg: err?.message || 'Erro ao conectar no canal de voz.' });
+    } finally {
+      setIsVoiceConnecting(false);
     }
   };
 
@@ -244,34 +291,43 @@ NODE_ENV=production
         </div>
 
         {/* Sub Navigation */}
-        <div className="flex items-center gap-2 bg-[#141619] p-1 rounded-2xl border border-[#2D3139]">
+        <div className="flex items-center gap-1.5 bg-[#141619] p-1 rounded-2xl border border-[#2D3139] overflow-x-auto">
           <button
             onClick={() => setActiveSubTab('bot')}
-            className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 min-w-[100px] py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeSubTab === 'bot' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-[#9E9E9E] hover:text-[#FFFFFF]'
             }`}
           >
             Conexão do Bot
           </button>
           <button
+            onClick={() => setActiveSubTab('diagnostics')}
+            className={`flex-1 min-w-[130px] py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              activeSubTab === 'diagnostics' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-[#9E9E9E] hover:text-[#FFFFFF]'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Diagnóstico & Logs</span>
+          </button>
+          <button
             onClick={() => setActiveSubTab('portable')}
-            className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            className={`flex-1 min-w-[120px] py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeSubTab === 'portable' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-[#9E9E9E] hover:text-[#FFFFFF]'
             }`}
           >
-            <span>⚡ Portable .exe & .env</span>
+            <span>⚡ Portable .exe</span>
           </button>
           <button
             onClick={() => setActiveSubTab('guide')}
-            className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 min-w-[110px] py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeSubTab === 'guide' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-[#9E9E9E] hover:text-[#FFFFFF]'
             }`}
           >
-            Passo a Passo Discord
+            Guia Discord
           </button>
           <button
             onClick={() => setActiveSubTab('docker')}
-            className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all ${
+            className={`flex-1 min-w-[80px] py-1.5 rounded-xl text-xs font-bold transition-all ${
               activeSubTab === 'docker' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'text-[#9E9E9E] hover:text-[#FFFFFF]'
             }`}
           >
@@ -294,10 +350,15 @@ NODE_ENV=production
                   botStatus.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-[#6E7681]'
                 }`} />
                 <div>
-                  <h4 className="text-xs font-bold">
+                  <h4 className="text-xs font-bold flex items-center gap-2">
                     {botStatus.isOnline
                       ? `Bot Online: ${botStatus.username}`
                       : 'Bot Desconectado (Modo Local Navegador)'}
+                    {botStatus.connectedVoiceChannel && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        🔊 Voz: {botStatus.connectedVoiceChannel.name}
+                      </span>
+                    )}
                   </h4>
                   <p className="text-[11px] text-[#9E9E9E]">
                     {botStatus.isOnline
@@ -307,15 +368,40 @@ NODE_ENV=production
                 </div>
               </div>
 
-              {botStatus.isOnline && (
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleDisconnect}
-                  className="px-3 py-1.5 rounded-lg bg-[#22262B] hover:bg-rose-950/60 hover:text-rose-300 hover:border-rose-800 text-[#E0E0E0] border border-[#2D3139] text-xs font-medium transition-colors"
+                  onClick={() => setActiveSubTab('diagnostics')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#22262B] hover:bg-[#2D3139] text-[#E0E0E0] border border-[#2D3139] text-xs font-medium transition-colors cursor-pointer"
+                  title="Abrir painel de diagnósticos de voz e decodificadores"
                 >
-                  Desconectar
+                  <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Diagnóstico</span>
                 </button>
-              )}
+
+                {botStatus.connectedVoiceChannel && (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectVoiceOnly}
+                    disabled={isVoiceConnecting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-500/40 text-xs font-medium transition-colors"
+                    title="Desconectar o bot da sala de voz atual"
+                  >
+                    <PhoneOff className="w-3.5 h-3.5" />
+                    <span>Desconectar da Sala</span>
+                  </button>
+                )}
+
+                {botStatus.isOnline && (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectBot}
+                    className="px-3 py-1.5 rounded-lg bg-[#22262B] hover:bg-rose-950/60 hover:text-rose-300 hover:border-rose-800 text-[#E0E0E0] border border-[#2D3139] text-xs font-medium transition-colors"
+                  >
+                    Desligar Bot
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Token Input */}
@@ -417,9 +503,36 @@ NODE_ENV=production
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                      Canal de Voz (Áudio / Músicas)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-[#E0E0E0]">
+                        Canal de Voz (Áudio / Músicas)
+                      </label>
+                      {voiceChannelId && (
+                        <div className="flex items-center gap-1">
+                          {botStatus.connectedVoiceChannel ? (
+                            <button
+                              type="button"
+                              onClick={handleDisconnectVoiceOnly}
+                              disabled={isVoiceConnecting}
+                              className="text-[10px] px-2 py-0.5 rounded bg-amber-950/60 hover:bg-amber-900 text-amber-300 border border-amber-500/40 flex items-center gap-1"
+                            >
+                              <PhoneOff className="w-2.5 h-2.5" />
+                              Desconectar
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={handleJoinVoiceChannel}
+                              disabled={isVoiceConnecting}
+                              className="text-[10px] px-2 py-0.5 rounded bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 flex items-center gap-1"
+                            >
+                              <LogIn className="w-2.5 h-2.5" />
+                              Entrar na Sala
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                     <select
                       value={voiceChannelId}
                       onChange={(e) => setVoiceChannelId(e.target.value)}
@@ -487,6 +600,14 @@ NODE_ENV=production
             </div>
 
           </form>
+        )}
+
+        {/* TAB: Real-time Audio & Voice Diagnostics */}
+        {activeSubTab === 'diagnostics' && (
+          <DiscordDiagnosticsPanel
+            currentVoiceChannelId={voiceChannelId || botConfig.voiceChannelId}
+            onRefreshBot={refreshBotStatus}
+          />
         )}
 
         {/* TAB 2: Step-by-step Guide */}

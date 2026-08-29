@@ -28,7 +28,7 @@ jobs:
       - name: Install Dependencies for Windows
         run: |
           if (Test-Path "package-lock.json") { Remove-Item "package-lock.json" -Force }
-          npm install --no-audit --no-fund
+          npm install --include=optional --no-audit --no-fund
 
       - name: Build Web & Server
         run: npm run build
@@ -57,6 +57,8 @@ jobs:
           if (Test-Path "dist\server.cjs") { Copy-Item "dist\server.cjs" "dist-portable\dist\server.cjs" -Force }
           if (Test-Path "dist\index.html") { Copy-Item "dist\index.html" "dist-portable\dist\index.html" -Force }
           if (Test-Path "dist\assets") { Copy-Item -Recurse -Force "dist\assets" "dist-portable\dist\" }
+          if (Test-Path "package.json") { Copy-Item "package.json" "dist-portable\package.json" -Force }
+          if (Test-Path "node_modules") { Copy-Item -Recurse -Force "node_modules" "dist-portable\node_modules" }
           if (Test-Path ".env.example") { Copy-Item ".env.example" "dist-portable\.env" -Force }
           
           # Create Launcher Script

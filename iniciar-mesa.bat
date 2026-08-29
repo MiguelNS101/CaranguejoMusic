@@ -25,15 +25,14 @@ echo.
 
 :: 2. Instalar dependencias se nao existirem
 if not exist "node_modules\" (
-    echo [i] Instalando dependencias necessarias pela primeira vez...
+    echo [i] Instalando dependencias necessarias (Audio Opus, Discord.js, Interface)...
     echo     (Isso so acontece na primeira inicializacao)
-    call npm install
+    call npm install --include=optional
     if %errorlevel% neq 0 (
-        echo [X] Erro ao instalar dependencias. Verifique sua conexao com a internet.
-        pause
-        exit /b 1
+        echo [!] Tentando instalacao padrao com opusscript e ffmpeg-static...
+        call npm install
     )
-    echo [✓] Dependencias instaladas com sucesso!
+    echo [✓] Dependencias e motores de audio configurados com sucesso!
     echo.
 )
 

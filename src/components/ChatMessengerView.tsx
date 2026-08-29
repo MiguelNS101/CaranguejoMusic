@@ -16,6 +16,7 @@ import {
 import confetti from 'canvas-confetti';
 import { useAudio } from '../context/AudioContext';
 import { DiscordChannel, DiscordGuild } from '../types';
+import { safeFetchJson } from '../services/api';
 
 export const ChatMessengerView: React.FC = () => {
   const { botStatus } = useAudio();
@@ -47,9 +48,9 @@ export const ChatMessengerView: React.FC = () => {
   useEffect(() => {
     const fetchChannels = async () => {
       try {
-        const res = await fetch('/api/bot/guilds');
-        if (res.ok) {
-          const guilds: DiscordGuild[] = await res.json();
+        const res = await safeFetchJson<DiscordGuild[]>('/api/bot/guilds');
+        if (res.success && Array.isArray(res.data)) {
+          const guilds = res.data;
           const textChannels: DiscordChannel[] = [];
           guilds.forEach(g => {
             g.channels.forEach(c => {
@@ -123,13 +124,12 @@ export const ChatMessengerView: React.FC = () => {
     }
 
     try {
-      const res = await fetch('/api/bot/send-message', {
+      const res = await safeFetchJson<{ success: boolean; error?: string }>('/api/bot/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success && res.data?.success) {
         setFeedback({ status: 'success', msg: 'Mensagem enviada com sucesso para o Discord!' });
         if (messageType === 'narrative' || messageType === 'plain') {
           setTextContent('');
@@ -137,10 +137,10 @@ export const ChatMessengerView: React.FC = () => {
         confetti({ particleCount: 25, spread: 50, origin: { y: 0.7 } });
         setTimeout(() => setFeedback({ status: 'idle' }), 3500);
       } else {
-        setFeedback({ status: 'error', msg: data.error || 'Falha ao enviar mensagem.' });
+        setFeedback({ status: 'error', msg: res.data?.error || res.error || 'Falha ao enviar mensagem ao Discord.' });
       }
     } catch (err: any) {
-      setFeedback({ status: 'error', msg: err?.message || 'Erro de conexão' });
+      setFeedback({ status: 'error', msg: err?.message || 'Erro de conexão com o servidor.' });
     } finally {
       setIsSending(false);
     }

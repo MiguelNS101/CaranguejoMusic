@@ -73,10 +73,18 @@ if exist "bin\" (
     xcopy /E /I /Y "bin\*" "dist-portable\" >nul
 )
 
-:: Copiar servidor e assets para dist-portable
+:: Copiar servidor, assets e modulos de audio para dist-portable
 if exist "dist\server.cjs" copy /Y "dist\server.cjs" "dist-portable\dist\server.cjs" >nul
 if exist "dist\index.html" copy /Y "dist\index.html" "dist-portable\dist\index.html" >nul
 if exist "dist\assets\" xcopy /E /I /Y "dist\assets\*" "dist-portable\dist\assets\" >nul
+if exist "package.json" copy /Y "package.json" "dist-portable\package.json" >nul
+
+:: Copiar node_modules para execucao independente do server
+if exist "node_modules\" (
+    echo [i] Copiando modulos de audio e dependencias para dist-portable...
+    if not exist "dist-portable\node_modules\" mkdir "dist-portable\node_modules"
+    xcopy /E /I /Y /Q "node_modules\*" "dist-portable\node_modules\" >nul
+)
 
 :: Copiar arquivos de configuracao
 if not exist "dist-portable\.env" (

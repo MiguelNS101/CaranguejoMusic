@@ -193,6 +193,25 @@ Clique em **"Conectar Bot"**. O bot entrará na sala de voz na hora!
 
 ---
 
+## 🩺 Diagnóstico de Voz & Motor de Áudio Opus
+
+O **CaranguejoRPG** conta com uma aba dedicada de **Diagnóstico & Logs** dentro do modal do Discord (acessível pelo botão *"Diagnóstico & Logs"* ou pelo botão *"Diagnóstico"* no card de status).
+
+### Motor Híbrido de Codificação Opus:
+O Discord Voice necessita de um codificador Opus para transmitir os pacotes de áudio. O CaranguejoRPG utiliza uma arquitetura resiliente com redundância automática:
+
+1. **`@discordjs/opus` (Nativo C++):** Utilizado para máxima performance quando compiladores nativos (Visual Studio C++ Build Tools ou gcc) estão disponíveis no sistema operacional.
+2. **`opusscript` (JavaScript / WebAssembly):** Codificador portátil autônomo. **Não requer nenhuma ferramenta C++ ou Python instalada**. Se o módulo nativo não puder ser compilado na sua máquina, o CaranguejoRPG faz o fallback transparente e reproduz suas músicas e SFX com 100% de fidelidade!
+3. **`ffmpeg-static` & `tweetnacl`:** Binários de transcodificação e criptografia já inclusos e pré-configurados.
+
+### Painel de Diagnóstico em Tempo Real:
+* **Inspeção de Decodificadores:** Verifica o status do `@discordjs/opus`, `node-opus` e `opusscript`.
+* **Métricas de Conexão:** Exibe status do canal de voz (`ready`, `connecting`, `idle`), latência em milissegundos e estado do player.
+* **Botão "Testar Voz":** Executa um teste em 1 clique do pipeline de codificação de áudio.
+* **Terminal de Logs Interativo:** Filtre logs por erros, eventos de voz, áudio ou sistema, com suporte a cópia de mensagens e exportação de relatório completo em JSON.
+
+---
+
 ## 📂 Estrutura de Arquivos e Pastas
 
 ```text

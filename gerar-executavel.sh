@@ -63,6 +63,14 @@ fi
 if [ -d "dist/assets" ]; then
     cp -r dist/assets dist-portable/dist/
 fi
+if [ -f "package.json" ]; then
+    cp package.json dist-portable/package.json
+fi
+
+if [ -d "node_modules" ]; then
+    echo "[i] Copiando módulos para a pasta portable..."
+    cp -r node_modules dist-portable/
+fi
 
 if [ ! -f "dist-portable/.env" ]; then
     if [ -f ".env" ]; then

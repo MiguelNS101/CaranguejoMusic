@@ -15,6 +15,7 @@ import {
   WodDiceRollResult,
   DiscordGuild
 } from '../types';
+import { safeFetchJson } from '../services/api';
 
 interface AudioContextType {
   // Playback
@@ -44,6 +45,10 @@ interface AudioContextType {
   skipNext: () => void;
   skipPrevious: () => void;
   
+  // Voice Channel Connection & Actions
+  disconnectVoiceChannel: () => Promise<{ success: boolean; error?: string }>;
+  connectVoiceChannel: (channelId?: string) => Promise<{ success: boolean; error?: string }>;
+
   // Soundboard
   playSoundboard: (item: SoundboardItem) => void;
   stopSoundboard: (itemId?: string) => void;
@@ -206,12 +211,43 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsLocalAudioEnabled(prev => !prev);
   };
 
+  // Voice Channel Connection & Disconnection Actions
+  const disconnectVoiceChannel = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await safeFetchJson('/api/bot/voice/disconnect', { method: 'POST' });
+      await refreshBotStatus();
+      if (res.data?.botStatus) {
+        setBotStatus(res.data.botStatus);
+      }
+      return { success: res.success, error: res.error };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Falha ao desconectar voz' };
+    }
+  };
+
+  const connectVoiceChannel = async (channelId?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await safeFetchJson('/api/bot/voice/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceChannelId: channelId })
+      });
+      await refreshBotStatus();
+      if (res.data?.botStatus) {
+        setBotStatus(res.data.botStatus);
+      }
+      return { success: res.success, error: res.error };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Falha ao conectar voz' };
+    }
+  };
+
   // Initial Data Fetch
   const refreshState = async () => {
     try {
-      const res = await fetch('/api/state');
-      if (res.ok) {
-        const data = await res.json();
+      const res = await safeFetchJson<any>('/api/state');
+      if (res.success && res.data) {
+        const data = res.data;
         setFolders(data.folders || []);
         setMusicTracks(data.musicTracks || []);
         setSoundboardItems(data.soundboardItems || []);
@@ -237,10 +273,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const refreshBotStatus = async () => {
     try {
-      const res = await fetch('/api/bot/status');
-      if (res.ok) {
-        const status = await res.json();
-        setBotStatus(status);
+      const res = await safeFetchJson<BotStatus>('/api/bot/status');
+      if (res.success && res.data) {
+        setBotStatus(res.data);
       }
     } catch (err) {
       console.error('Error fetching bot status:', err);
@@ -249,10 +284,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const refreshGuilds = async () => {
     try {
-      const res = await fetch('/api/bot/guilds');
-      if (res.ok) {
-        const list = await res.json();
-        setDiscordGuilds(list || []);
+      const res = await safeFetchJson<DiscordGuild[]>('/api/bot/guilds');
+      if (res.success && res.data) {
+        setDiscordGuilds(res.data || []);
       }
     } catch (err) {
       console.error('Error fetching guilds:', err);
@@ -786,12 +820,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const postNpcToDiscord = async (npcId: string, customChannelId?: string) => {
     try {
-      const res = await fetch('/api/discord/post-npc', {
+      const res = await safeFetchJson<{ success: boolean; error?: string }>('/api/discord/post-npc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ npcId, customChannelId })
       });
-      return await res.json();
+      return { success: res.success && (res.data?.success !== false), error: res.data?.error || res.error };
     } catch (e: any) {
       return { success: false, error: e.message };
     }
@@ -805,7 +839,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     customChannelId?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      const res = await fetch('/api/discord/announce-turn', {
+      const res = await safeFetchJson<{ success: boolean; error?: string }>('/api/discord/announce-turn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -816,7 +850,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           customChannelId
         })
       });
-      return await res.json();
+      return { success: res.success && (res.data?.success !== false), error: res.data?.error || res.error };
     } catch (e: any) {
       return { success: false, error: e.message };
     }
@@ -848,6 +882,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setLoopMode,
         skipNext,
         skipPrevious,
+        disconnectVoiceChannel,
+        connectVoiceChannel,
         playSoundboard,
         stopSoundboard,
         activeSfxIds,
