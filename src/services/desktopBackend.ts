@@ -210,28 +210,50 @@ export async function initDesktopBackend() {
   const nlPath = (window as any).NL_PATH || '.';
   addDesktopLog('info', `Pasta da aplicação: "${nlPath}"`);
 
-  // Format safe path for Windows cmd
+  // Clean path format for Windows
   const cleanPath = nlPath.replace(/\//g, '\\').replace(/\\$/, '');
-  
-  // Single, safe background command that launches ONLY the node server (never launches CaranguejoRPG.exe!)
-  const nodeServerCmd = `cmd.exe /c "cd /d "${cleanPath}" && if exist node.exe (start "CaranguejoRPG-Server" /b node.exe dist\\server.cjs) else (start "CaranguejoRPG-Server" /b node dist\\server.cjs)"`;
 
-  try {
-    addDesktopLog('info', 'Iniciando servidor local em segundo plano...');
-    if (typeof Neutralino !== 'undefined' && Neutralino.os && Neutralino.os.execCommand) {
-      await Neutralino.os.execCommand(nodeServerCmd, { background: true }).catch((e: any) => {
-        addDesktopLog('warn', `Aviso ao executar comando: ${e?.message}`);
-      });
-    } else {
-      addDesktopLog('warn', 'Neutralino.os indisponível no navegador web.');
+  // Commands to start backend node.exe server (handling paths with spaces & parentheses)
+  const commandsToTry = [
+    // 1. Direct quotes with node.exe
+    `"${cleanPath}\\node.exe" "${cleanPath}\\dist\\server.cjs"`,
+    // 2. Cmd /s /c with cd /d and set NODE_ENV=production
+    `cmd.exe /s /c "cd /d "${cleanPath}" && set NODE_ENV=production && if exist node.exe (start "" /b node.exe dist\\server.cjs) else (start "" /b node dist\\server.cjs)"`,
+    // 3. Fallback node
+    `node "${cleanPath}\\dist\\server.cjs"`
+  ];
+
+  if (typeof Neutralino !== 'undefined' && Neutralino.os) {
+    for (const cmd of commandsToTry) {
+      try {
+        if (Neutralino.os.execCommand) {
+          await Neutralino.os.execCommand(cmd, { background: true }).catch(() => null);
+        }
+        if (Neutralino.os.spawnProcess) {
+          await Neutralino.os.spawnProcess(cmd).catch(() => null);
+        }
+      } catch (err: any) {
+        addDesktopLog('warn', `Tentativa de inicialização: ${err?.message}`);
+      }
+
+      // Check if server is up
+      for (let i = 0; i < 3; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+        if (await checkBackendHealth()) {
+          isBackendStarting = false;
+          addDesktopLog('success', 'Motor conectado na porta 3000!');
+          window.dispatchEvent(new CustomEvent('desktop-backend-ready'));
+          return;
+        }
+      }
     }
-  } catch (err: any) {
-    addDesktopLog('error', `Erro ao iniciar processo do servidor: ${err?.message}`);
+  } else {
+    addDesktopLog('warn', 'Neutralino.os indisponível no navegador web.');
   }
 
-  // Poll for readiness
-  for (let i = 0; i < 10; i++) {
-    await new Promise((r) => setTimeout(r, 400));
+  // Wait cycle
+  for (let i = 0; i < 5; i++) {
+    await new Promise((r) => setTimeout(r, 500));
     if (await checkBackendHealth()) {
       isBackendStarting = false;
       addDesktopLog('success', 'Motor conectado na porta 3000!');

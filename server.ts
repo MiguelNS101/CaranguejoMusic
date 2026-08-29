@@ -48,31 +48,49 @@ async function startServer() {
   // API router
   app.use('/api', routes);
 
-  // Vite middleware for dev / static in production
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-        watch: {
-          ignored: [
-            '**/data/**',
-            '**/dist-portable/**',
-            '**/bin/**',
-            '**/.tmp/**',
-            '**/resources.neu',
-            '**/data/db.json'
-          ]
-        }
-      },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
+  // Determine if running in compiled production bundle or dev mode
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    Boolean((typeof __filename !== 'undefined' && __filename.endsWith('.cjs'))) ||
+    (!fs.existsSync(path.join(process.cwd(), 'src', 'App.tsx')) && fs.existsSync(path.join(process.cwd(), 'dist', 'index.html')));
+
+  if (!isProduction) {
+    try {
+      const vite = await createViteServer({
+        server: {
+          middlewareMode: true,
+          watch: {
+            ignored: [
+              '**/data/**',
+              '**/dist-portable/**',
+              '**/bin/**',
+              '**/.tmp/**',
+              '**/resources.neu',
+              '**/data/db.json'
+            ]
+          }
+        },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } catch (viteErr) {
+      console.warn('Vite dev middleware failed, falling back to static files:', viteErr);
+      const distPath = path.join(process.cwd(), 'dist');
+      if (fs.existsSync(distPath)) {
+        app.use(express.static(distPath));
+        app.get('*', (req, res) => {
+          res.sendFile(path.join(distPath, 'index.html'));
+        });
+      }
+    }
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
   }
 
   app.listen(PORT, '0.0.0.0', () => {
