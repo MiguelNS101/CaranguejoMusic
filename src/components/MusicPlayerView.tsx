@@ -39,6 +39,10 @@ export const MusicPlayerView: React.FC = () => {
     currentTime,
     duration,
     volume,
+    musicVolume,
+    setMusicVolume,
+    isMusicMuted,
+    toggleMusicMute,
     isMuted,
     isLocalAudioEnabled,
     toggleLocalAudio,
@@ -302,22 +306,34 @@ export const MusicPlayerView: React.FC = () => {
                 <SkipForward className="w-5 h-5" />
               </button>
 
-              <div className="flex items-center gap-1.5 ml-2">
+              <div className="flex items-center gap-1.5 ml-2 bg-[#141619] border border-[#2D3139] rounded-xl px-2.5 py-1">
                 <button
-                  onClick={toggleMute}
-                  className="text-[#9E9E9E] hover:text-[#FFFFFF]"
+                  onClick={toggleMusicMute}
+                  className="text-zinc-400 hover:text-white transition-colors"
+                  title={isMusicMuted ? 'Desmutar Trilha Sonora' : 'Mutar Trilha Sonora'}
                 >
-                  {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
+                  {isMusicMuted || musicVolume === 0 ? (
+                    <VolumeX className="w-4 h-4 text-rose-400" />
+                  ) : (
+                    <Volume2 className="w-4 h-4 text-amber-400" />
+                  )}
                 </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={isMuted ? 0 : volume}
-                  onChange={(e) => setVolume(parseFloat(e.target.value))}
-                  className="w-16 h-1 bg-[#2D3139] rounded appearance-none cursor-pointer accent-indigo-500"
-                />
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-zinc-400 font-semibold uppercase">Música</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={isMusicMuted ? 0 : musicVolume}
+                    onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
+                    className="w-16 sm:w-20 h-1 bg-zinc-800 rounded appearance-none cursor-pointer accent-amber-500"
+                    title={`Volume da Música: ${Math.round((isMusicMuted ? 0 : musicVolume) * 100)}%`}
+                  />
+                  <span className="text-[10px] font-mono text-amber-300 w-7 text-right">
+                    {Math.round((isMusicMuted ? 0 : musicVolume) * 100)}%
+                  </span>
+                </div>
               </div>
             </div>
 

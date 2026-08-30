@@ -19,19 +19,24 @@ import { safeFetchJson, apiFetch, resolveApiUrl } from '../services/api';
 import { ensureDesktopBackend } from '../services/desktopBackend';
 
 interface AudioContextType {
-  // Playback
+  // Playback & Mixing
   currentTrack: MusicTrack | null;
   playbackState: PlaybackState;
   currentTime: number;
   duration: number;
-  volume: number; // 0 to 1
-  isMuted: boolean;
+  volume: number; // Master Volume: 0 to 1
+  musicVolume: number; // Music Stream Volume: 0 to 1
+  sfxVolume: number; // SFX / Soundboard Volume: 0 to 1
+  isMuted: boolean; // Master Mute
+  isMusicMuted: boolean;
+  isSfxMuted: boolean;
+  effectiveMusicVolume: number;
   isLocalAudioEnabled: boolean; // Control whether browser tab plays sound or only Discord bot
   loopMode: LoopMode;
   queue: QueueItem[];
   
-  // Playback Actions
-  playTrack: (track: MusicTrack, immediate?: boolean) => void;
+  // Playback & Mixing Actions
+  playTrack: (track: MusicTrack, immediate?: boolean, startOffset?: number) => void;
   stopTrack: () => void;
   addToQueue: (track: MusicTrack) => void;
   removeFromQueue: (queueItemId: string) => void;
@@ -39,7 +44,12 @@ interface AudioContextType {
   togglePlayPause: () => void;
   seek: (seconds: number) => void;
   setVolume: (vol: number) => void;
+  setMusicVolume: (vol: number) => void;
+  setSfxVolume: (vol: number) => void;
   toggleMute: () => void;
+  toggleMusicMute: () => void;
+  toggleSfxMute: () => void;
+  setAudioMix: (master: number, music: number, sfx: number) => void;
   toggleLocalAudio: () => void;
   setIsLocalAudioEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   setLoopMode: (mode: LoopMode) => void;
@@ -118,17 +128,86 @@ interface AudioContextType {
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Audio Player State
+  // Audio Player & Mixing State
   const [currentTrack, setCurrentTrack] = useState<MusicTrack | null>(null);
   const [playbackState, setPlaybackState] = useState<PlaybackState>('idle');
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
-  const [volume, setVolumeState] = useState<number>(0.8);
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+
+  // Master Volume (0-1)
+  const [volume, setVolumeState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('caranguejo_master_vol');
+      if (saved !== null) {
+        const val = parseFloat(saved);
+        if (!isNaN(val)) return Math.max(0, Math.min(1, val));
+      }
+    } catch {}
+    return 0.8;
+  });
+
+  // Music Stream Volume (0-1)
+  const [musicVolume, setMusicVolumeState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('caranguejo_music_vol');
+      if (saved !== null) {
+        const val = parseFloat(saved);
+        if (!isNaN(val)) return Math.max(0, Math.min(1, val));
+      }
+    } catch {}
+    return 0.8;
+  });
+
+  // SFX / Soundboard Volume (0-1)
+  const [sfxVolume, setSfxVolumeState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('caranguejo_sfx_vol');
+      if (saved !== null) {
+        const val = parseFloat(saved);
+        if (!isNaN(val)) return Math.max(0, Math.min(1, val));
+      }
+    } catch {}
+    return 0.9;
+  });
+
+  const [isMuted, setIsMuted] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('caranguejo_master_muted') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [isMusicMuted, setIsMusicMuted] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('caranguejo_music_muted') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const [isSfxMuted, setIsSfxMuted] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('caranguejo_sfx_muted') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   const [isLocalAudioEnabled, setIsLocalAudioEnabled] = useState<boolean>(false);
   const [loopMode, setLoopMode] = useState<LoopMode>('queue');
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [activeSfxIds, setActiveSfxIds] = useState<string[]>([]);
+
+  // Calculated Effective Music Volume
+  const effectiveMusicVolume = (isMuted || isMusicMuted) ? 0 : Math.max(0, Math.min(1, volume * musicVolume));
+
+  // Helper for Calculated Effective SFX Volume
+  const getEffectiveSfxVolume = (itemVolumePercent: number = 90) => {
+    if (isMuted || isSfxMuted) return 0;
+    const baseSfx = (itemVolumePercent / 100);
+    return Math.max(0, Math.min(1, volume * sfxVolume * baseSfx));
+  };
 
   // Server Synced State
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -235,14 +314,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // Sync volume with audio element and manage local mute
+  // Sync volume with HTML5 audio element and manage local mute
   useEffect(() => {
     if (audioRef.current) {
       // Local browser playback is strictly enabled only when isLocalAudioEnabled is turned on
-      audioRef.current.muted = !isLocalAudioEnabled || isMuted;
-      audioRef.current.volume = isMuted ? 0 : volume;
+      audioRef.current.muted = !isLocalAudioEnabled || isMuted || isMusicMuted;
+      audioRef.current.volume = effectiveMusicVolume;
     }
-  }, [volume, isMuted, isLocalAudioEnabled]);
+  }, [effectiveMusicVolume, isLocalAudioEnabled, isMuted, isMusicMuted]);
 
   const toggleLocalAudio = () => {
     setIsLocalAudioEnabled(prev => !prev);
@@ -378,8 +457,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!isSameSrc) {
         audioRef.current.src = resolvedUrl;
       }
-      audioRef.current.muted = !isLocalAudioEnabled || isMuted;
-      audioRef.current.volume = isMuted ? 0 : volume;
+      audioRef.current.muted = !isLocalAudioEnabled || isMuted || isMusicMuted;
+      audioRef.current.volume = effectiveMusicVolume;
 
       if (startOffset > 0) {
         isSeekingRef.current = true;
@@ -413,7 +492,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         trackUrl: track.url,
-        volume: isMuted ? 0 : volume,
+        volume: effectiveMusicVolume,
         seekSeconds: startOffset > 0 ? startOffset : undefined
       })
     }).catch(e => console.warn('Discord voice play error:', e));
@@ -466,8 +545,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       if (playbackState === 'paused' && isCurrentLoaded) {
         if (audioRef.current) {
-          audioRef.current.muted = !isLocalAudioEnabled || isMuted;
-          audioRef.current.volume = isMuted ? 0 : volume;
+          audioRef.current.muted = !isLocalAudioEnabled || isMuted || isMusicMuted;
+          audioRef.current.volume = effectiveMusicVolume;
           audioRef.current.play().catch(e => {
             console.warn('Resume error, replaying track:', e);
             playTrack(trackToPlay, true, currentTime > 0 ? currentTime : 0);
@@ -480,7 +559,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             body: JSON.stringify({
               seconds: currentTime,
               trackUrl: trackToPlay.url,
-              volume: isMuted ? 0 : volume
+              volume: effectiveMusicVolume
             })
           }).catch(() => {});
         } else {
@@ -534,7 +613,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify({
           seconds: target,
           trackUrl: currentTrack.url,
-          volume: isMuted ? 0 : volume
+          volume: effectiveMusicVolume
         })
       }).catch(() => {});
     }
@@ -545,27 +624,130 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 1500);
   };
 
+  // Master Volume Setter
   const setVolume = (vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
     setVolumeState(clamped);
-    if (clamped > 0 && isMuted) setIsMuted(false);
+    try {
+      localStorage.setItem('caranguejo_master_vol', clamped.toString());
+    } catch {}
+
+    if (clamped > 0 && isMuted) {
+      setIsMuted(false);
+      try {
+        localStorage.setItem('caranguejo_master_muted', 'false');
+      } catch {}
+    }
+
+    const nextEffective = (isMuted || isMusicMuted) ? 0 : clamped * musicVolume;
     safeFetchJson('/api/bot/voice/volume', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ volume: isMuted ? 0 : clamped })
+      body: JSON.stringify({ volume: nextEffective })
     }).catch(() => {});
+  };
+
+  // Music Volume Setter
+  const setMusicVolume = (vol: number) => {
+    const clamped = Math.max(0, Math.min(1, vol));
+    setMusicVolumeState(clamped);
+    try {
+      localStorage.setItem('caranguejo_music_vol', clamped.toString());
+    } catch {}
+
+    if (clamped > 0 && isMusicMuted) {
+      setIsMusicMuted(false);
+      try {
+        localStorage.setItem('caranguejo_music_muted', 'false');
+      } catch {}
+    }
+
+    const nextEffective = (isMuted || isMusicMuted) ? 0 : volume * clamped;
+    safeFetchJson('/api/bot/voice/volume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ volume: nextEffective })
+    }).catch(() => {});
+  };
+
+  // SFX Volume Setter
+  const setSfxVolume = (vol: number) => {
+    const clamped = Math.max(0, Math.min(1, vol));
+    setSfxVolumeState(clamped);
+    try {
+      localStorage.setItem('caranguejo_sfx_vol', clamped.toString());
+    } catch {}
+
+    if (clamped > 0 && isSfxMuted) {
+      setIsSfxMuted(false);
+      try {
+        localStorage.setItem('caranguejo_sfx_muted', 'false');
+      } catch {}
+    }
   };
 
   const toggleMute = () => {
     setIsMuted(prev => {
       const next = !prev;
+      try {
+        localStorage.setItem('caranguejo_master_muted', next.toString());
+      } catch {}
+      const nextEffective = (next || isMusicMuted) ? 0 : volume * musicVolume;
       safeFetchJson('/api/bot/voice/volume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ volume: next ? 0 : volume })
+        body: JSON.stringify({ volume: nextEffective })
       }).catch(() => {});
       return next;
     });
+  };
+
+  const toggleMusicMute = () => {
+    setIsMusicMuted(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('caranguejo_music_muted', next.toString());
+      } catch {}
+      const nextEffective = (isMuted || next) ? 0 : volume * musicVolume;
+      safeFetchJson('/api/bot/voice/volume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ volume: nextEffective })
+      }).catch(() => {});
+      return next;
+    });
+  };
+
+  const toggleSfxMute = () => {
+    setIsSfxMuted(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('caranguejo_sfx_muted', next.toString());
+      } catch {}
+      return next;
+    });
+  };
+
+  // Convenience batch mix preset setter
+  const setAudioMix = (masterVal: number, musicVal: number, sfxVal: number) => {
+    const m = Math.max(0, Math.min(1, masterVal));
+    const mus = Math.max(0, Math.min(1, musicVal));
+    const sfx = Math.max(0, Math.min(1, sfxVal));
+    setVolumeState(m);
+    setMusicVolumeState(mus);
+    setSfxVolumeState(sfx);
+    try {
+      localStorage.setItem('caranguejo_master_vol', m.toString());
+      localStorage.setItem('caranguejo_music_vol', mus.toString());
+      localStorage.setItem('caranguejo_sfx_vol', sfx.toString());
+    } catch {}
+
+    const nextEffective = (isMuted || isMusicMuted) ? 0 : m * mus;
+    safeFetchJson('/api/bot/voice/volume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ volume: nextEffective })
+    }).catch(() => {});
   };
 
   const handleTrackEnded = () => {
@@ -613,15 +795,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Soundboard Audio Player
+  // Soundboard Audio Player with dedicated SFX volume mix
   const playSoundboard = (item: SoundboardItem) => {
+    const calcVol = getEffectiveSfxVolume(item.volume);
+
     // If local web preview is activated, play in browser
     if (isLocalAudioEnabled) {
       try {
         const resolvedUrl = resolveApiUrl(item.url);
         const sfxAudio = new Audio(resolvedUrl);
-        const sfxVol = ((item.volume ?? 90) / 100) * (isMuted ? 0 : volume);
-        sfxAudio.volume = Math.max(0, Math.min(1, sfxVol));
+        sfxAudio.volume = calcVol;
 
         setActiveSfxIds(prev => [...prev, item.id]);
 
@@ -651,13 +834,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }, (item.duration || 3) * 1000);
     }
 
-    // Stream SFX directly to Discord Voice Channel
+    // Stream SFX directly to Discord Voice Channel with SFX volume mix
     safeFetchJson('/api/bot/voice/sfx', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sfxUrl: item.url,
-        volume: ((item.volume ?? 90) / 100) * (isMuted ? 0 : volume)
+        volume: calcVol
       })
     }).catch(err => console.warn('SFX voice dispatch error:', err));
   };
@@ -1012,7 +1195,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentTime,
         duration,
         volume,
+        musicVolume,
+        sfxVolume,
         isMuted,
+        isMusicMuted,
+        isSfxMuted,
+        effectiveMusicVolume,
         isLocalAudioEnabled,
         loopMode,
         queue,
@@ -1024,7 +1212,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         togglePlayPause,
         seek,
         setVolume,
+        setMusicVolume,
+        setSfxVolume,
         toggleMute,
+        toggleMusicMute,
+        toggleSfxMute,
+        setAudioMix,
         toggleLocalAudio,
         setIsLocalAudioEnabled,
         setLoopMode,

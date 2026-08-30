@@ -55,6 +55,10 @@ export const SoundboardView: React.FC = () => {
     botStatus,
     isLocalAudioEnabled,
     toggleLocalAudio,
+    sfxVolume,
+    setSfxVolume,
+    isSfxMuted,
+    toggleSfxMute,
     volume,
     setVolume,
     isMuted,
@@ -258,6 +262,37 @@ export const SoundboardView: React.FC = () => {
             <Headphones className="w-3.5 h-3.5" />
             <span>{isLocalAudioEnabled ? 'Ouvindo no Navegador (Preview ON)' : 'Somente no Discord (Local OFF)'}</span>
           </button>
+
+          {/* SFX Volume Strip */}
+          <div className="flex items-center gap-2 bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-1.5 shadow-sm">
+            <button
+              onClick={toggleSfxMute}
+              className="text-zinc-400 hover:text-white transition-colors"
+              title={isSfxMuted ? 'Desmutar Efeitos Sonoros' : 'Mutar Efeitos Sonoros'}
+            >
+              {isSfxMuted || sfxVolume === 0 ? (
+                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
+              ) : (
+                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              )}
+            </button>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-zinc-400 font-semibold uppercase">SFX</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={isSfxMuted ? 0 : sfxVolume}
+                onChange={(e) => setSfxVolume(parseFloat(e.target.value))}
+                className="w-16 sm:w-20 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                title={`Volume dos Efeitos: ${Math.round((isSfxMuted ? 0 : sfxVolume) * 100)}%`}
+              />
+              <span className="text-[10px] font-mono text-emerald-300 w-7 text-right">
+                {Math.round((isSfxMuted ? 0 : sfxVolume) * 100)}%
+              </span>
+            </div>
+          </div>
 
           {/* Import Folder Button */}
           <button
