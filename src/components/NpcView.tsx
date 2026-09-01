@@ -18,7 +18,6 @@ import {
   Quote,
   FolderUp
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { useAudio } from '../context/AudioContext';
 import { NPC } from '../types';
 import { FolderImportModal } from './FolderImportModal';
@@ -90,7 +89,7 @@ export const NpcView: React.FC = () => {
     setTitle('');
     setDescription('');
     setSecretDmNotes('');
-    setImageUrl('https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80');
+    setImageUrl('');
     setFolderId(selectedFolderId !== 'all' ? selectedFolderId : '');
     setTags('');
     setAlignment('Neutro');
@@ -174,7 +173,6 @@ export const NpcView: React.FC = () => {
       });
       const data = await res.json();
       if (data.success) {
-        confetti({ particleCount: 40, spread: 70, origin: { y: 0.6 } });
         window.location.reload();
       }
     } catch (err) {
@@ -196,7 +194,7 @@ export const NpcView: React.FC = () => {
       title: title.trim() || undefined,
       description: finalDesc,
       secretDmNotes: secretDmNotes.trim() || undefined,
-      imageUrl: imageUrl.trim() || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+      imageUrl: imageUrl.trim() || '',
       folderId: folderId || undefined,
       tags: tagsArray,
       alignment: alignment.trim() || undefined,
@@ -223,7 +221,7 @@ export const NpcView: React.FC = () => {
     const res = await postNpcToDiscord(npc.id);
     setPostingNpcId(null);
     if (res.success) {
-      confetti({ particleCount: 35, spread: 60, origin: { y: 0.7 } });
+      // Posted successfully
     }
   };
 
@@ -355,13 +353,20 @@ export const NpcView: React.FC = () => {
                 <div>
                   {/* Portrait & Core Stats */}
                   <div className="flex items-start gap-3.5 mb-3">
-                    <div className="relative w-20 h-24 rounded-xl overflow-hidden bg-[#141619] border border-[#2D3139] shrink-0 shadow-md">
-                      <img
-                        src={npc.imageUrl}
-                        alt={npc.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        referrerPolicy="no-referrer"
-                      />
+                    <div className="relative w-20 h-24 rounded-xl overflow-hidden bg-[#141619] border border-[#2D3139] shrink-0 shadow-md flex items-center justify-center">
+                      {npc.imageUrl ? (
+                        <img
+                          src={npc.imageUrl}
+                          alt={npc.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-indigo-950/40 to-[#141619] text-indigo-400">
+                          <Users className="w-7 h-7 opacity-60 mb-1" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-300/70">NPC</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -500,13 +505,17 @@ export const NpcView: React.FC = () => {
                   Retrato / Imagem do Personagem
                 </label>
                 <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 rounded-xl bg-[#141619] border border-[#2D3139] overflow-hidden shrink-0">
-                    <img
-                      src={imageUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
+                  <div className="w-16 h-16 rounded-xl bg-[#141619] border border-[#2D3139] overflow-hidden shrink-0 flex items-center justify-center">
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <Users className="w-6 h-6 text-indigo-400/60" />
+                    )}
                   </div>
 
                   <div className="flex-1 space-y-1.5">

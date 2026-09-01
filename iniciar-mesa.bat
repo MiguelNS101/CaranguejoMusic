@@ -33,6 +33,11 @@ if %errorlevel% neq 0 (
 
 %NODE_CMD% scripts/start-dev.js
 
+:: Garantir encerramento mútuo do executável e servidor
+taskkill /F /IM CaranguejoRPG.exe >nul 2>&1
+taskkill /F /IM CaranguejoRPG-win_x64.exe >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq CaranguejoRPG-Server*" >nul 2>&1
+
 echo.
-echo Pressione qualquer tecla para encerrar...
+echo Aplicação finalizada. Pressione qualquer tecla para encerrar...
 pause > nul

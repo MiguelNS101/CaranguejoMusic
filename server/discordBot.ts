@@ -920,7 +920,11 @@ export class DiscordBotService {
     try {
       let resolvedPath = urlOrPath;
       let trackLabel = urlOrPath;
-      if (urlOrPath.startsWith('/media/music/')) {
+      if (urlOrPath.startsWith('/api/media/file?path=')) {
+        const rawParam = urlOrPath.split('path=')[1];
+        resolvedPath = decodeURIComponent(rawParam.split('&')[0]);
+        trackLabel = path.basename(resolvedPath);
+      } else if (urlOrPath.startsWith('/media/music/')) {
         const fileName = urlOrPath.replace('/media/music/', '');
         resolvedPath = path.join(process.cwd(), 'data', 'music', fileName);
         trackLabel = fileName;
@@ -932,6 +936,9 @@ export class DiscordBotService {
         const fileName = urlOrPath.replace('/media/uploads/', '');
         resolvedPath = path.join(process.cwd(), 'data', 'uploads', fileName);
         trackLabel = fileName;
+      } else if (path.isAbsolute(urlOrPath)) {
+        resolvedPath = urlOrPath;
+        trackLabel = path.basename(urlOrPath);
       }
 
       this.currentTrackName = trackLabel;

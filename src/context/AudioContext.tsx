@@ -60,6 +60,16 @@ interface AudioContextType {
   disconnectVoiceChannel: () => Promise<{ success: boolean; error?: string }>;
   connectVoiceChannel: (channelId?: string) => Promise<{ success: boolean; error?: string }>;
 
+  // Session Duration Timer (Persists across tab navigation and reloads)
+  sessionSeconds: number;
+  isSessionTimerRunning: boolean;
+  startSessionTimer: () => void;
+  pauseSessionTimer: () => void;
+  toggleSessionTimer: () => void;
+  resetSessionTimer: () => void;
+  addSessionSeconds: (seconds: number) => void;
+  formatDuration: (seconds: number) => string;
+
   // Soundboard
   playSoundboard: (item: SoundboardItem) => void;
   stopSoundboard: (itemId?: string) => void;
@@ -86,15 +96,18 @@ interface AudioContextType {
   setInitiativeList: React.Dispatch<React.SetStateAction<Array<{ id: string; name: string; initiative: number; hp?: number; maxHp?: number; isNpc: boolean }>>>;
   announceInitiativeTurn: (combatantName: string, initiative: number, isNpc: boolean, round?: number, customChannelId?: string) => Promise<{ success: boolean; error?: string }>;
   
-  // Session Saves
+  // Session Saves & Full Backup
   savedSessions: SessionSaveMeta[];
   saveCurrentSession: (name: string, description?: string) => Promise<void>;
   loadSavedSession: (id: string) => Promise<void>;
   deleteSavedSession: (id: string) => Promise<void>;
   importSessionFromFile: (file: File) => Promise<void>;
+  exportFullBackup: () => void;
+  importFullBackup: (file: File) => Promise<{ success: boolean; message: string }>;
   
-  // Folder / Bulk Import
+  // Folder / Bulk Import & Direct Path Scanning
   importFolderFiles: (files: FileList | File[], category: 'music' | 'sfx' | 'npc', folderId?: string) => Promise<{ count: number }>;
+  scanLocalFolderDirectly: (folderPath: string, category: 'music' | 'sfx' | 'npc', folderId?: string) => Promise<{ count: number; message: string }>;
   
   // World of Darkness (WoD) Dice
   wodRolls: WodDiceRollResult[];
@@ -232,6 +245,140 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
   const [discordGuilds, setDiscordGuilds] = useState<DiscordGuild[]>([]);
   const [sessionNotes, setSessionNotes] = useState<string>('');
+
+  // ==========================================
+  // SESSION DURATION TIMER (PERSISTENT STATE)
+  // ==========================================
+  const [sessionSeconds, setSessionSeconds] = useState<number>(0);
+  const [isSessionTimerRunning, setIsSessionTimerRunning] = useState<boolean>(false);
+  const sessionTimerRef = useRef<{
+    accumulatedSeconds: number;
+    isRunning: boolean;
+    startTimestamp: number | null;
+  }>({
+    accumulatedSeconds: 0,
+    isRunning: false,
+    startTimestamp: null
+  });
+
+  // Load session timer on initial mount
+  useEffect(() => {
+    try {
+      const savedTimerStr = localStorage.getItem('caranguejo_session_timer');
+      if (savedTimerStr) {
+        const parsed = JSON.parse(savedTimerStr);
+        let currentElapsed = parsed.accumulatedSeconds || 0;
+        if (parsed.isRunning && parsed.startTimestamp) {
+          const diff = Math.floor((Date.now() - parsed.startTimestamp) / 1000);
+          if (diff > 0) currentElapsed += diff;
+        }
+        sessionTimerRef.current = {
+          accumulatedSeconds: currentElapsed,
+          isRunning: !!parsed.isRunning,
+          startTimestamp: parsed.isRunning ? Date.now() : null
+        };
+        setSessionSeconds(currentElapsed);
+        setIsSessionTimerRunning(!!parsed.isRunning);
+      }
+    } catch {}
+  }, []);
+
+  const persistSessionTimer = (accumulated: number, isRunning: boolean, startTimestamp: number | null) => {
+    try {
+      localStorage.setItem('caranguejo_session_timer', JSON.stringify({
+        accumulatedSeconds: accumulated,
+        isRunning,
+        startTimestamp
+      }));
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (!isSessionTimerRunning) return;
+
+    const interval = setInterval(() => {
+      const { accumulatedSeconds, startTimestamp } = sessionTimerRef.current;
+      if (startTimestamp) {
+        const elapsed = accumulatedSeconds + Math.floor((Date.now() - startTimestamp) / 1000);
+        setSessionSeconds(elapsed);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isSessionTimerRunning]);
+
+  const startSessionTimer = () => {
+    if (isSessionTimerRunning) return;
+    const now = Date.now();
+    sessionTimerRef.current = {
+      accumulatedSeconds: sessionSeconds,
+      isRunning: true,
+      startTimestamp: now
+    };
+    setIsSessionTimerRunning(true);
+    persistSessionTimer(sessionSeconds, true, now);
+  };
+
+  const pauseSessionTimer = () => {
+    if (!isSessionTimerRunning) return;
+    const { accumulatedSeconds, startTimestamp } = sessionTimerRef.current;
+    let newAccumulated = accumulatedSeconds;
+    if (startTimestamp) {
+      newAccumulated += Math.floor((Date.now() - startTimestamp) / 1000);
+    }
+    sessionTimerRef.current = {
+      accumulatedSeconds: newAccumulated,
+      isRunning: false,
+      startTimestamp: null
+    };
+    setSessionSeconds(newAccumulated);
+    setIsSessionTimerRunning(false);
+    persistSessionTimer(newAccumulated, false, null);
+  };
+
+  const toggleSessionTimer = () => {
+    if (isSessionTimerRunning) {
+      pauseSessionTimer();
+    } else {
+      startSessionTimer();
+    }
+  };
+
+  const resetSessionTimer = () => {
+    sessionTimerRef.current = {
+      accumulatedSeconds: 0,
+      isRunning: false,
+      startTimestamp: null
+    };
+    setSessionSeconds(0);
+    setIsSessionTimerRunning(false);
+    persistSessionTimer(0, false, null);
+  };
+
+  const addSessionSeconds = (secs: number) => {
+    const newSecs = Math.max(0, sessionSeconds + secs);
+    const now = Date.now();
+    sessionTimerRef.current = {
+      accumulatedSeconds: newSecs,
+      isRunning: isSessionTimerRunning,
+      startTimestamp: isSessionTimerRunning ? now : null
+    };
+    setSessionSeconds(newSecs);
+    persistSessionTimer(newSecs, isSessionTimerRunning, isSessionTimerRunning ? now : null);
+  };
+
+  const formatDuration = (totalSecs: number) => {
+    if (isNaN(totalSecs) || totalSecs < 0) return '00:00';
+    const hrs = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = Math.floor(totalSecs % 60);
+
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    if (hrs > 0) {
+      return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+    }
+    return `${pad(mins)}:${pad(secs)}`;
+  };
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const sfxAudioMap = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -928,6 +1075,18 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // ==========================================
 
   const saveCurrentSession = async (name: string, description?: string) => {
+    let currentNoteTabs = undefined;
+    try {
+      const savedTabs = localStorage.getItem('caranguejo_persistent_note_tabs');
+      if (savedTabs) currentNoteTabs = JSON.parse(savedTabs);
+    } catch {}
+
+    let currentCustomTimers = undefined;
+    try {
+      const savedTimers = localStorage.getItem('caranguejo_custom_timers');
+      if (savedTimers) currentCustomTimers = JSON.parse(savedTimers);
+    } catch {}
+
     const clientSnapshot = {
       folders,
       musicTracks,
@@ -936,6 +1095,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       activeSoundboardLayoutId: activeLayoutId,
       npcs,
       sessionNotes,
+      noteTabs: currentNoteTabs,
+      customTimers: currentCustomTimers,
+      sessionSeconds,
       initiativeList,
       currentTrack,
       queue,
@@ -969,6 +1131,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setSessionNotes(data.state.sessionNotes || '');
       setInitiativeList(data.state.initiativeList || []);
       if (data.state.currentTrack) playTrack(data.state.currentTrack, false);
+
+      if (data.state.noteTabs) {
+        localStorage.setItem('caranguejo_persistent_note_tabs', JSON.stringify(data.state.noteTabs));
+      }
+      if (data.state.customTimers) {
+        localStorage.setItem('caranguejo_custom_timers', JSON.stringify(data.state.customTimers));
+      }
+      if (data.state.sessionSeconds !== undefined) {
+        setSessionSeconds(data.state.sessionSeconds);
+      }
     } else {
       throw new Error(res.error || 'Falha ao carregar arquivo de save.');
     }
@@ -994,6 +1166,51 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       throw new Error(res.error || 'Formato de arquivo de sessão inválido.');
     }
+  };
+
+  // Full System Export & Import
+  const exportFullBackup = () => {
+    window.location.href = '/api/export/full';
+  };
+
+  const importFullBackup = async (file: File): Promise<{ success: boolean; message: string }> => {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const res = await safeFetchJson<{ success: boolean; message: string; state?: any; savedSessions?: SessionSaveMeta[] }>('/api/import/full', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(parsed)
+    });
+
+    if (res.success && res.data) {
+      await refreshState();
+      if (res.data.state?.noteTabs) {
+        localStorage.setItem('caranguejo_persistent_note_tabs', JSON.stringify(res.data.state.noteTabs));
+      }
+      if (res.data.state?.customTimers) {
+        localStorage.setItem('caranguejo_custom_timers', JSON.stringify(res.data.state.customTimers));
+      }
+      if (res.data.savedSessions) {
+        setSavedSessions(res.data.savedSessions);
+      }
+      return { success: true, message: res.data.message || 'Backup restaurado com sucesso!' };
+    }
+    throw new Error(res.error || 'Erro ao importar backup completo.');
+  };
+
+  // Direct Path Scanner (No Duplication / Linking)
+  const scanLocalFolderDirectly = async (folderPath: string, category: 'music' | 'sfx' | 'npc', folderId?: string): Promise<{ count: number; message: string }> => {
+    const res = await safeFetchJson<{ success: boolean; count: number; message: string }>('/api/library/scan-folder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderPath, category, folderId })
+    });
+
+    if (res.success && res.data) {
+      await refreshState();
+      return { count: res.data.count, message: res.data.message };
+    }
+    throw new Error(res.error || 'Erro ao indexar pasta local por caminho.');
   };
 
   // ==========================================
@@ -1225,6 +1442,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         skipPrevious,
         disconnectVoiceChannel,
         connectVoiceChannel,
+        sessionSeconds,
+        isSessionTimerRunning,
+        startSessionTimer,
+        pauseSessionTimer,
+        toggleSessionTimer,
+        resetSessionTimer,
+        addSessionSeconds,
+        formatDuration,
         playSoundboard,
         stopSoundboard,
         activeSfxIds,
@@ -1252,7 +1477,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         loadSavedSession,
         deleteSavedSession,
         importSessionFromFile,
+        exportFullBackup,
+        importFullBackup,
         importFolderFiles,
+        scanLocalFolderDirectly,
         wodRolls,
         rollWodDiceAction,
         refreshState,

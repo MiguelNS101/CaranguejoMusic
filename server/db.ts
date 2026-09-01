@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { Folder, MusicTrack, SoundboardItem, NPC, BotConfig, SoundboardLayout, SessionSaveMeta, SessionSave } from '../src/types.js';
+import { Folder, MusicTrack, SoundboardItem, NPC, BotConfig, SoundboardLayout, SessionSaveMeta, SessionSave, MediaDirectoriesConfig, NoteTab, TimerItem } from '../src/types.js';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -19,11 +19,15 @@ export interface DatabaseSchema {
   npcs: NPC[];
   botConfig: BotConfig;
   sessionNotes: string;
+  noteTabs?: NoteTab[];
+  customTimers?: TimerItem[];
+  sessionSeconds?: number;
   initiativeList: Array<{ id: string; name: string; initiative: number; hp?: number; maxHp?: number; isNpc: boolean }>;
   currentTrack?: MusicTrack | null;
   queue?: any[];
   volume?: number;
   loopMode?: string;
+  mediaDirectories?: MediaDirectoriesConfig;
 }
 
 const DEFAULT_FOLDERS: Folder[] = [
@@ -367,6 +371,23 @@ export class JsonDatabase {
     this.saveData();
   }
 
+  public getMediaDirectories(): MediaDirectoriesConfig {
+    return this.data.mediaDirectories || {
+      musicDir: '',
+      sfxDir: '',
+      imagesDir: ''
+    };
+  }
+
+  public setMediaDirectories(dirs: Partial<MediaDirectoriesConfig>): MediaDirectoriesConfig {
+    this.data.mediaDirectories = {
+      ...this.getMediaDirectories(),
+      ...dirs
+    };
+    this.saveData();
+    return this.data.mediaDirectories;
+  }
+
   public getFullState(): DatabaseSchema {
     return this.data;
   }
@@ -381,7 +402,11 @@ export class JsonDatabase {
       soundboardLayouts: newState.soundboardLayouts || this.data.soundboardLayouts,
       npcs: newState.npcs || this.data.npcs,
       sessionNotes: newState.sessionNotes ?? this.data.sessionNotes,
+      noteTabs: newState.noteTabs !== undefined ? newState.noteTabs : this.data.noteTabs,
+      customTimers: newState.customTimers !== undefined ? newState.customTimers : this.data.customTimers,
+      sessionSeconds: newState.sessionSeconds !== undefined ? newState.sessionSeconds : this.data.sessionSeconds,
       initiativeList: newState.initiativeList || this.data.initiativeList,
+      mediaDirectories: newState.mediaDirectories || this.data.mediaDirectories
     };
     this.saveData();
     return this.data;
@@ -417,7 +442,7 @@ export class JsonDatabase {
             soundboardCount: parsed.state?.soundboardItems?.length || 0,
             npcCount: parsed.state?.npcs?.length || 0,
             folderCount: parsed.state?.folders?.length || 0,
-            hasNotes: !!parsed.state?.sessionNotes?.trim(),
+            hasNotes: !!parsed.state?.sessionNotes?.trim() || !!(parsed.state?.noteTabs && parsed.state.noteTabs.length > 0),
             queueCount: parsed.state?.queue?.length || 0
           }
         });
@@ -446,11 +471,15 @@ export class JsonDatabase {
       activeLayoutId: clientSnapshot?.activeSoundboardLayoutId || this.data.activeSoundboardLayoutId,
       npcs: clientSnapshot?.npcs || this.data.npcs,
       sessionNotes: clientSnapshot?.sessionNotes !== undefined ? clientSnapshot.sessionNotes : this.data.sessionNotes,
+      noteTabs: clientSnapshot?.noteTabs || this.data.noteTabs,
+      customTimers: clientSnapshot?.customTimers || this.data.customTimers,
+      sessionSeconds: clientSnapshot?.sessionSeconds !== undefined ? clientSnapshot.sessionSeconds : this.data.sessionSeconds,
       initiativeList: clientSnapshot?.initiativeList || this.data.initiativeList,
       currentTrack: clientSnapshot?.currentTrack || this.data.currentTrack || null,
       queue: clientSnapshot?.queue || this.data.queue || [],
       volume: clientSnapshot?.volume !== undefined ? clientSnapshot.volume : this.data.volume || 0.8,
-      loopMode: (clientSnapshot?.loopMode as any) || this.data.loopMode || 'queue'
+      loopMode: (clientSnapshot?.loopMode as any) || this.data.loopMode || 'queue',
+      mediaDirectories: clientSnapshot?.mediaDirectories || this.data.mediaDirectories
     };
 
     const sessionSave: SessionSave = {
@@ -487,11 +516,15 @@ export class JsonDatabase {
         activeSoundboardLayoutId: sessionSave.state.activeLayoutId,
         npcs: sessionSave.state.npcs,
         sessionNotes: sessionSave.state.sessionNotes,
+        noteTabs: sessionSave.state.noteTabs,
+        customTimers: sessionSave.state.customTimers,
+        sessionSeconds: sessionSave.state.sessionSeconds,
         initiativeList: sessionSave.state.initiativeList,
         currentTrack: sessionSave.state.currentTrack,
         queue: sessionSave.state.queue,
         volume: sessionSave.state.volume,
-        loopMode: sessionSave.state.loopMode
+        loopMode: sessionSave.state.loopMode,
+        mediaDirectories: sessionSave.state.mediaDirectories
       });
     }
 
@@ -532,11 +565,15 @@ export class JsonDatabase {
         activeLayoutId: sessionData.activeSoundboardLayoutId || 'layout-combat',
         npcs: sessionData.npcs || DEFAULT_NPCS,
         sessionNotes: sessionData.sessionNotes || '',
+        noteTabs: sessionData.noteTabs,
+        customTimers: sessionData.customTimers,
+        sessionSeconds: sessionData.sessionSeconds,
         initiativeList: sessionData.initiativeList || [],
         currentTrack: sessionData.currentTrack || null,
         queue: sessionData.queue || [],
         volume: sessionData.volume || 0.8,
-        loopMode: sessionData.loopMode || 'queue'
+        loopMode: sessionData.loopMode || 'queue',
+        mediaDirectories: sessionData.mediaDirectories
       }
     };
 

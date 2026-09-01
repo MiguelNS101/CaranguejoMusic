@@ -1,3 +1,9 @@
+export interface MediaDirectoriesConfig {
+  musicDir: string;
+  sfxDir: string;
+  imagesDir: string;
+}
+
 export interface Folder {
   id: string;
   name: string;
@@ -240,12 +246,87 @@ export interface SessionSave {
     activeLayoutId?: string;
     npcs: NPC[];
     sessionNotes: string;
+    noteTabs?: NoteTab[];
+    customTimers?: TimerItem[];
+    sessionSeconds?: number;
     initiativeList: Array<{ id: string; name: string; initiative: number; hp?: number; maxHp?: number; isNpc: boolean }>;
     currentTrack: MusicTrack | null;
     queue: QueueItem[];
     volume: number;
     loopMode: LoopMode;
+    mediaDirectories?: MediaDirectoriesConfig;
   };
+}
+
+export interface NoteTab {
+  id: string;
+  title: string;
+  emoji?: string;
+  content: string;
+  isDefault?: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type TimerType = 'countdown' | 'stopwatch';
+
+export type WidgetType =
+  | 'stats_summary'
+  | 'image_viewer'
+  | 'session_bar'
+  | 'now_playing'
+  | 'timers'
+  | 'notepad'
+  | 'dice_roller'
+  | 'initiative'
+  | 'soundboard'
+  | 'narrative'
+  | 'npc_spotlight'
+  | 'quick_rules'
+  | 'loot_generator'
+  | 'weather_clock'
+  | 'scratchpad'
+  | 'spacer';
+
+export type MasterWidgetId = string;
+
+export type WidgetWidth = 'quarter' | 'third' | 'half' | 'two_thirds' | 'three_quarters' | 'full' | number;
+export type WidgetHeight = 'auto' | 'sm' | 'md' | 'lg' | 'xl' | 'custom' | number;
+export type WidgetDensity = 'expanded' | 'compact' | 'minimized';
+
+export interface MasterWidgetConfig {
+  id: string; // Unique instance ID, e.g. 'stats_summary', 'notepad-1', 'notepad-2', 'custom-123'
+  type: WidgetType; // Underlying widget renderer type
+  title: string;
+  visible: boolean;
+  width?: WidgetWidth;
+  cols?: number; // 4 (1/3), 6 (1/2), 12 (1/1) columns on the virtual grid
+  colStart?: number; // 1 to 12 - explicit starting column in 2D grid
+  rowStart?: number; // 1, 2, 3... - explicit starting row in 2D grid
+  rowSpan?: number; // span rows in 2D grid
+  height?: WidgetHeight;
+  customHeight?: number; // In pixels
+  density: WidgetDensity;
+  startNewRow?: boolean; // Force starting on a new line/row in the grid
+  storageKey?: string; // Optional custom storage key for multiple instances
+  isRemovable?: boolean; // Can be deleted/removed from layout
+  customConfig?: Record<string, any>;
+}
+
+export interface TimerItem {
+  id: string;
+  title: string;
+  type: TimerType;
+  totalDurationSeconds: number; // For countdown (e.g. 600 for 10 min)
+  remainingSeconds: number; // For countdown
+  elapsedSeconds: number; // For stopwatch
+  isRunning: boolean;
+  lastUpdatedTimestamp: number;
+  category?: 'combat' | 'buff' | 'torch' | 'rest' | 'session' | 'custom';
+  color?: string;
+  alertOnComplete?: boolean;
+  isCompleted?: boolean;
+  createdAt: number;
 }
 
 export interface WodDiceWave {

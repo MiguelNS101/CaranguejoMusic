@@ -523,7 +523,7 @@ router.post('/npcs', (req: Request, res: Response) => {
     title,
     description,
     secretDmNotes,
-    imageUrl: imageUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+    imageUrl: imageUrl || '',
     folderId,
     tags: Array.isArray(tags) ? tags : [],
     alignment,
@@ -635,6 +635,254 @@ router.post('/initiative', (req: Request, res: Response) => {
 router.post('/playback/state', (req: Request, res: Response) => {
   db.setPlaybackPersistence(req.body);
   res.json({ success: true });
+});
+
+// ==========================================
+// FULL APPLICATION STATE EXPORT & IMPORT
+// ==========================================
+
+router.get('/export/full', (req: Request, res: Response) => {
+  try {
+    const fullState = db.getFullState();
+    const exportPayload = {
+      version: '2.0',
+      exportedAt: new Date().toISOString(),
+      appName: 'CaranguejoRPG',
+      state: fullState,
+      savedSessions: db.getSavedSessions()
+    };
+
+    const fileName = `caranguejo-rpg-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(exportPayload, null, 2));
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Falha ao exportar estado da aplicação.' });
+  }
+});
+
+router.post('/import/full', (req: Request, res: Response) => {
+  try {
+    const payload = req.body;
+    if (!payload || typeof payload !== 'object') {
+      return res.status(400).json({ error: 'Arquivo de backup inválido.' });
+    }
+
+    const stateToApply = payload.state || payload;
+    const replaced = db.replaceFullState(stateToApply);
+
+    if (Array.isArray(payload.savedSessions)) {
+      payload.savedSessions.forEach((save: any) => {
+        try {
+          db.importSession(save);
+        } catch {}
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Estado completo do aplicativo restaurado com sucesso!',
+      state: replaced,
+      savedSessions: db.getSavedSessions()
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Erro ao restaurar backup.' });
+  }
+});
+
+// MEDIA DIRECTORIES CONFIGURATION
+router.get('/config/media-dirs', (req: Request, res: Response) => {
+  res.json(db.getMediaDirectories());
+});
+
+router.post('/config/media-dirs', (req: Request, res: Response) => {
+  const updated = db.setMediaDirectories(req.body);
+  res.json({ success: true, mediaDirectories: updated });
+});
+
+// STREAM FILE BY ABSOLUTE / REFERENCE PATH (NO DUPLICATION)
+router.get('/media/file', (req: Request, res: Response) => {
+  const requestedPath = req.query.path as string;
+  if (!requestedPath) {
+    return res.status(400).json({ error: 'Parâmetro path é obrigatório.' });
+  }
+
+  // Support encoded paths or plain paths
+  const resolved = path.isAbsolute(requestedPath) ? requestedPath : path.resolve(process.cwd(), requestedPath);
+
+  if (!fs.existsSync(resolved)) {
+    return res.status(404).json({ error: `Arquivo não encontrado no caminho: ${resolved}` });
+  }
+
+  try {
+    const stat = fs.statSync(resolved);
+    if (!stat.isFile()) {
+      return res.status(400).json({ error: 'O caminho especificado não é um arquivo.' });
+    }
+    res.sendFile(resolved);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// SCAN LOCAL FOLDER DIRECTLY BY PATH (NO COPYING, JUST INDEXING)
+router.post('/library/scan-folder', (req: Request, res: Response) => {
+  const { folderPath, category, folderId } = req.body;
+  if (!folderPath || typeof folderPath !== 'string') {
+    return res.status(400).json({ error: 'Caminho da pasta é obrigatório.' });
+  }
+
+  const targetCategory = (category as 'music' | 'sfx' | 'npc') || 'music';
+  const targetFolderType = targetCategory === 'sfx' ? 'soundboard' : targetCategory;
+
+  const resolvedPath = path.isAbsolute(folderPath) ? folderPath : path.resolve(process.cwd(), folderPath);
+  if (!fs.existsSync(resolvedPath)) {
+    return res.status(404).json({ error: `Pasta não encontrada no sistema: ${resolvedPath}` });
+  }
+
+  try {
+    const stats = fs.statSync(resolvedPath);
+    if (!stats.isDirectory()) {
+      return res.status(400).json({ error: 'O caminho fornecido não é um diretório.' });
+    }
+
+    const audioExts = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.opus'];
+    const imageExts = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg'];
+    const targetExts = targetCategory === 'npc' ? imageExts : audioExts;
+
+    const filesInDir: Array<{ fileName: string; fullPath: string; subfolder?: string }> = [];
+
+    // Recursive scan helper
+    function scanDir(currentDir: string, relativeSubfolder: string = '') {
+      const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullEntryPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          // Avoid scanning node_modules, .git, etc.
+          if (!entry.name.startsWith('.') && entry.name !== 'node_modules') {
+            scanDir(fullEntryPath, relativeSubfolder ? `${relativeSubfolder}/${entry.name}` : entry.name);
+          }
+        } else if (entry.isFile()) {
+          const ext = path.extname(entry.name).toLowerCase();
+          if (targetExts.includes(ext)) {
+            filesInDir.push({
+              fileName: entry.name,
+              fullPath: fullEntryPath,
+              subfolder: relativeSubfolder
+            });
+          }
+        }
+      }
+    }
+
+    scanDir(resolvedPath);
+
+    if (filesInDir.length === 0) {
+      return res.json({
+        success: true,
+        count: 0,
+        message: 'Nenhum arquivo compatível encontrado na pasta especificada.',
+        items: []
+      });
+    }
+
+    const folderCache = new Map<string, Folder>();
+    const existingFolders = db.getFolders(targetFolderType);
+    existingFolders.forEach(f => folderCache.set(f.name.toLowerCase().trim(), f));
+
+    const newMusicTracks: MusicTrack[] = [];
+    const newSfxItems: SoundboardItem[] = [];
+    const newNpcs: NPC[] = [];
+
+    for (let i = 0; i < filesInDir.length; i++) {
+      const item = filesInDir[i];
+      const cleanTitle = formatFileNameToTitle(item.fileName);
+      const streamUrl = `/api/media/file?path=${encodeURIComponent(item.fullPath)}`;
+      let itemFolderId = folderId;
+      const autoTags: string[] = ['Local', 'Referência'];
+
+      if (item.subfolder) {
+        const parts = item.subfolder.split('/').filter(Boolean);
+        const subName = parts[parts.length - 1];
+        parts.forEach(p => { if (!autoTags.includes(p)) autoTags.push(p); });
+
+        const key = subName.toLowerCase().trim();
+        let matched = folderCache.get(key);
+        if (!matched) {
+          const colorIdx = (folderCache.size + Math.floor(Math.random() * 5)) % FOLDER_COLORS.length;
+          const newFolder: Folder = {
+            id: `f-${targetCategory[0]}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            name: subName,
+            type: targetFolderType,
+            color: FOLDER_COLORS[colorIdx],
+            icon: getFolderIcon(subName, targetCategory),
+            createdAt: Date.now()
+          };
+          db.addFolder(newFolder);
+          folderCache.set(key, newFolder);
+          matched = newFolder;
+        }
+        itemFolderId = matched.id;
+      }
+
+      if (targetCategory === 'music') {
+        const track: MusicTrack = {
+          id: `m-ref-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+          title: cleanTitle,
+          artist: item.subfolder || 'Pasta Local',
+          duration: 180,
+          url: streamUrl,
+          folderId: itemFolderId,
+          tags: autoTags,
+          isLocal: true,
+          createdAt: Date.now()
+        };
+        newMusicTracks.push(track);
+      } else if (targetCategory === 'sfx') {
+        const sfx: SoundboardItem = {
+          id: `sfx-ref-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+          name: cleanTitle,
+          emoji: '🔊',
+          color: '#6366f1',
+          url: streamUrl,
+          duration: 4,
+          folderId: itemFolderId,
+          tags: autoTags,
+          volume: 90,
+          isLocal: true,
+          createdAt: Date.now()
+        };
+        newSfxItems.push(sfx);
+      } else if (targetCategory === 'npc') {
+        const npc: NPC = {
+          id: `npc-ref-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+          name: cleanTitle,
+          title: item.subfolder || 'NPC / Criatura',
+          description: '',
+          imageUrl: streamUrl,
+          folderId: itemFolderId,
+          tags: autoTags.filter(t => t !== 'Local'),
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        newNpcs.push(npc);
+      }
+    }
+
+    if (newMusicTracks.length > 0) db.addMusicTracksBulk(newMusicTracks);
+    if (newSfxItems.length > 0) db.addSoundboardItemsBulk(newSfxItems);
+    if (newNpcs.length > 0) db.addNpcsBulk(newNpcs);
+
+    res.json({
+      success: true,
+      count: filesInDir.length,
+      category: targetCategory,
+      message: `${filesInDir.length} arquivos referenciados da pasta sem cópia de disco!`,
+      state: db.getFullState()
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Erro ao indexar pasta local.' });
+  }
 });
 
 // ==========================================
@@ -917,6 +1165,18 @@ NODE_ENV=production
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Erro ao salvar .env' });
   }
+});
+
+// Graceful System Shutdown - synchronizes closing between UI, .bat, and Node Server
+router.post('/system/shutdown', async (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Encerrando servidor CaranguejoRPG...' });
+  console.log('\n[i] Sinal de encerramento recebido da interface. Finalizando processo Node.js...');
+  setTimeout(async () => {
+    try {
+      await discordBot.stop();
+    } catch {}
+    process.exit(0);
+  }, 350);
 });
 
 export default router;

@@ -728,7 +728,7 @@ export const MusicPlayerView: React.FC = () => {
                 </label>
                 <input
                   type="text"
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="https://... ou caminho de arquivo local"
                   value={newCoverUrl}
                   onChange={(e) => setNewCoverUrl(e.target.value)}
                   className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70"

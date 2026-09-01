@@ -265,7 +265,24 @@ export async function initDesktopBackend() {
   isBackendStarting = false;
 }
 
-// Listen to Neutralino lifecycle
+// Request server shutdown on app close
+export function requestServerShutdown() {
+  try {
+    const endpoint = 'http://localhost:3000/api/system/shutdown';
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      navigator.sendBeacon(endpoint, new Blob(['{}'], { type: 'application/json' }));
+    } else {
+      fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+        keepalive: true
+      }).catch(() => {});
+    }
+  } catch {}
+}
+
+// Listen to Neutralino lifecycle & window closing
 try {
   if (typeof Neutralino !== 'undefined' && Neutralino.events?.on) {
     Neutralino.events.on('ready', () => {
@@ -273,9 +290,18 @@ try {
     });
 
     Neutralino.events.on('windowClose', async () => {
+      requestServerShutdown();
       try {
         await Neutralino.app.exit();
       } catch {}
+    });
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+      if (isDesktopEnvironment()) {
+        requestServerShutdown();
+      }
     });
   }
 } catch {}

@@ -30,15 +30,19 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({ isOpen
     saveCurrentSession,
     loadSavedSession,
     deleteSavedSession,
-    importSessionFromFile
+    importSessionFromFile,
+    exportFullBackup,
+    importFullBackup
   } = useAudio();
 
   const [sessionName, setSessionName] = useState('');
   const [sessionDescription, setSessionDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isImportingBackup, setIsImportingBackup] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'success' | 'error'; message?: string }>({ status: 'idle' });
   const fileImportRef = useRef<HTMLInputElement>(null);
+  const fullBackupImportRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -169,6 +173,70 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({ isOpen
         )}
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Full State Portability Card */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/40 via-[#1A1D21] to-purple-950/40 border border-indigo-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-400" />
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Backup Completo & Portabilidade
+                </h3>
+              </div>
+              <span className="text-[10px] text-indigo-300 font-medium bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                JSON Portável
+              </span>
+            </div>
+            <p className="text-[11px] text-[#A0A6B2] leading-relaxed">
+              Exporte todos os dados cadastrados (nomes, notas multiabas, temporizadores, layouts de som, NPCs e caminhos das pastas de música/imagem) em um único arquivo para transferir de PC ou manter backup.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={exportFullBackup}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 hover:border-indigo-400 text-xs font-semibold transition-all cursor-pointer shadow-sm"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exportar Estado Completo (.JSON)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fullBackupImportRef.current?.click()}
+                disabled={isImportingBackup}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#242830] hover:bg-[#2D3139] text-[#E0E0E0] border border-[#3D424D] text-xs font-semibold transition-all cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5 text-purple-400" />
+                {isImportingBackup ? 'Restaurando...' : 'Restaurar Backup Completo'}
+              </button>
+              <input
+                type="file"
+                ref={fullBackupImportRef}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (!window.confirm('Deseja restaurar este backup completo? Todos os dados atuais serão substituídos pelos do arquivo.')) {
+                    if (fullBackupImportRef.current) fullBackupImportRef.current.value = '';
+                    return;
+                  }
+                  setIsImportingBackup(true);
+                  setFeedback({ status: 'idle' });
+                  try {
+                    const res = await importFullBackup(file);
+                    setFeedback({ status: 'success', message: res.message });
+                    setTimeout(() => setFeedback({ status: 'idle' }), 3500);
+                  } catch (err: any) {
+                    setFeedback({ status: 'error', message: err?.message || 'Falha ao restaurar backup.' });
+                  } finally {
+                    setIsImportingBackup(false);
+                    if (fullBackupImportRef.current) fullBackupImportRef.current.value = '';
+                  }
+                }}
+                accept=".json,application/json"
+                className="hidden"
+              />
+            </div>
+          </div>
+
           {/* Quick Save Card */}
           <div className="p-5 rounded-2xl bg-[#1A1D21] border border-[#2D3139]">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">

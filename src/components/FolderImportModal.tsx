@@ -11,7 +11,9 @@ import {
   Image,
   FolderOpen,
   UploadCloud,
-  Check
+  Check,
+  Link,
+  HardDrive
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 
@@ -28,12 +30,14 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
   defaultCategory = 'music',
   defaultFolderId
 }) => {
-  const { folders, importFolderFiles } = useAudio();
+  const { folders, importFolderFiles, scanLocalFolderDirectly } = useAudio();
 
+  const [mode, setMode] = useState<'link_path' | 'browser_files'>('link_path');
+  const [folderPathInput, setFolderPathInput] = useState('');
   const [category, setCategory] = useState<'music' | 'sfx' | 'npc'>(defaultCategory);
   const [selectedFolderId, setSelectedFolderId] = useState<string>(defaultFolderId || '');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'success' | 'error'; message?: string }>({ status: 'idle' });
 
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -57,9 +61,9 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
     const filtered = files.filter((file: File) => {
       const name = file.name.toLowerCase();
       if (category === 'music' || category === 'sfx') {
-        return name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.ogg') || name.endsWith('.m4a') || name.endsWith('.flac');
+        return name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.ogg') || name.endsWith('.m4a') || name.endsWith('.flac') || name.endsWith('.opus') || name.endsWith('.aac');
       } else {
-        return name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp') || name.endsWith('.gif');
+        return name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp') || name.endsWith('.gif') || name.endsWith('.svg');
       }
     });
 
@@ -76,26 +80,41 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
 
   const handleImportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedFiles.length === 0) return;
 
-    setIsUploading(true);
+    setIsProcessing(true);
     setFeedback({ status: 'idle' });
 
     try {
-      const res = await importFolderFiles(selectedFiles, category, selectedFolderId || undefined);
-      setFeedback({
-        status: 'success',
-        message: `${res.count} arquivos importados com sucesso com nomes automáticos!`
-      });
-      setSelectedFiles([]);
+      if (mode === 'link_path') {
+        if (!folderPathInput.trim()) {
+          throw new Error('Por favor, informe o caminho absoluto da pasta no seu PC.');
+        }
+        const res = await scanLocalFolderDirectly(folderPathInput.trim(), category, selectedFolderId || undefined);
+        setFeedback({
+          status: 'success',
+          message: res.message || `${res.count} arquivos indexados por referência!`
+        });
+        setFolderPathInput('');
+      } else {
+        if (selectedFiles.length === 0) {
+          throw new Error('Selecione ao menos um arquivo ou pasta.');
+        }
+        const res = await importFolderFiles(selectedFiles, category, selectedFolderId || undefined);
+        setFeedback({
+          status: 'success',
+          message: `${res.count} arquivos adicionados com sucesso!`
+        });
+        setSelectedFiles([]);
+      }
+
       setTimeout(() => {
         setFeedback({ status: 'idle' });
         onClose();
-      }, 1200);
+      }, 1400);
     } catch (err: any) {
       setFeedback({ status: 'error', message: err?.message || 'Erro durante a importação.' });
     } finally {
-      setIsUploading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -110,10 +129,10 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-white font-rpg">
-                Importação em Lote de Pasta Inteira
+                Apontar / Importar Pasta de Mídia
               </h2>
               <p className="text-xs text-[#9E9E9E]">
-                Selecione uma pasta local inteira ou múltiplos arquivos. Os nomes serão extraídos e formatados automaticamente.
+                Referencie pastas do seu computador sem duplicar arquivos no disco ou faça upload em lote.
               </p>
             </div>
           </div>
@@ -123,6 +142,35 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
             className="p-1.5 text-[#9E9E9E] hover:text-white rounded-lg hover:bg-[#2D3139] transition-colors"
           >
             <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Mode Switcher Tabs */}
+        <div className="flex border-b border-[#2D3139] bg-[#141619] px-6 pt-3 gap-2">
+          <button
+            type="button"
+            onClick={() => setMode('link_path')}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+              mode === 'link_path'
+                ? 'border-indigo-500 text-indigo-400 bg-[#1A1D21] rounded-t-lg'
+                : 'border-transparent text-[#9E9E9E] hover:text-white'
+            }`}
+          >
+            <Link className="w-3.5 h-3.5" />
+            Apontar Pasta Local (Zero Duplicação)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMode('browser_files')}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold border-b-2 transition-all ${
+              mode === 'browser_files'
+                ? 'border-indigo-500 text-indigo-400 bg-[#1A1D21] rounded-t-lg'
+                : 'border-transparent text-[#9E9E9E] hover:text-white'
+            }`}
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+            Selecionador de Navegador
           </button>
         </div>
 
@@ -148,7 +196,7 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
           {/* Category Selector */}
           <div>
             <label className="block text-xs font-bold text-white uppercase tracking-wider mb-2">
-              1. Tipo de Conteúdo a Importar
+              1. Tipo de Mídia
             </label>
             <div className="grid grid-cols-3 gap-3">
               <button
@@ -195,14 +243,14 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
           {/* Folder Target */}
           <div>
             <label className="block text-xs font-bold text-white uppercase tracking-wider mb-2">
-              2. Organizar na Pasta / Categoria (Opcional)
+              2. Pasta / Categoria de Destino
             </label>
             <select
               value={selectedFolderId}
               onChange={(e) => setSelectedFolderId(e.target.value)}
               className="w-full bg-[#1A1D21] border border-[#2D3139] rounded-xl px-3.5 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500"
             >
-              <option value="">(Sem pasta / Raiz da Biblioteca)</option>
+              <option value="">(Automático / Criação por subpastas)</option>
               {relevantFolders.map((f) => (
                 <option key={f.id} value={f.id}>
                   📁 {f.name}
@@ -211,57 +259,79 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
             </select>
           </div>
 
-          {/* Directory Picker Buttons */}
-          <div>
-            <label className="block text-xs font-bold text-white uppercase tracking-wider mb-2">
-              3. Escolher Pasta Inteira do Computador
-            </label>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Folder Selector */}
-              <button
-                type="button"
-                onClick={() => folderInputRef.current?.click()}
-                className="p-5 rounded-2xl bg-[#1A1D21] border border-dashed border-[#2D3139] hover:border-indigo-500/70 hover:bg-[#1F2329] transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer"
-              >
-                <FolderOpen className="w-8 h-8 text-indigo-400 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-bold text-white">Selecionar Pasta Inteira</span>
-                <span className="text-[11px] text-[#9E9E9E]">Carrega todos os arquivos da pasta</span>
-              </button>
+          {/* Mode 1: Direct Path Link */}
+          {mode === 'link_path' && (
+            <div className="space-y-3 p-4 rounded-xl bg-[#1A1D21] border border-[#2D3139]">
+              <div className="flex items-center gap-2 text-xs font-bold text-indigo-300">
+                <HardDrive className="w-4 h-4" />
+                <span>Caminho Absoluto da Pasta no PC</span>
+              </div>
+              <p className="text-[11px] text-[#9E9E9E] leading-relaxed">
+                O programa irá apenas <strong>apontar diretamente para seus arquivos</strong> sem copiá-los, mantendo seu disco limpo e evitando duplicatas.
+              </p>
               <input
-                type="file"
-                ref={folderInputRef}
-                onChange={handleFilesSelected}
-                // @ts-ignore
-                webkitdirectory=""
-                directory=""
-                multiple
-                className="hidden"
-              />
-
-              {/* Multiple files selector */}
-              <button
-                type="button"
-                onClick={() => multipleFilesInputRef.current?.click()}
-                className="p-5 rounded-2xl bg-[#1A1D21] border border-dashed border-[#2D3139] hover:border-indigo-500/70 hover:bg-[#1F2329] transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer"
-              >
-                <UploadCloud className="w-8 h-8 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-bold text-white">Selecionar Vários Arquivos</span>
-                <span className="text-[11px] text-[#9E9E9E]">Escolha múltiplos áudios ou imagens</span>
-              </button>
-              <input
-                type="file"
-                ref={multipleFilesInputRef}
-                onChange={handleFilesSelected}
-                multiple
-                accept={category === 'npc' ? 'image/*' : 'audio/*'}
-                className="hidden"
+                type="text"
+                placeholder={navigator.userAgent.includes('Windows') ? "Ex: C:\\RPG\\Musicas\\Combate ou D:\\Sons" : "Ex: /home/usuario/Musicas/RPG"}
+                value={folderPathInput}
+                onChange={(e) => setFolderPathInput(e.target.value)}
+                className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-[#6E7681] font-mono focus:outline-none focus:border-indigo-500"
               />
             </div>
-          </div>
+          )}
 
-          {/* Files Preview */}
-          {selectedFiles.length > 0 && (
+          {/* Mode 2: Browser Directory Picker */}
+          {mode === 'browser_files' && (
+            <div>
+              <label className="block text-xs font-bold text-white uppercase tracking-wider mb-2">
+                3. Escolher Pasta ou Arquivos pelo Navegador
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Folder Selector */}
+                <button
+                  type="button"
+                  onClick={() => folderInputRef.current?.click()}
+                  className="p-5 rounded-2xl bg-[#1A1D21] border border-dashed border-[#2D3139] hover:border-indigo-500/70 hover:bg-[#1F2329] transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer"
+                >
+                  <FolderOpen className="w-8 h-8 text-indigo-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-bold text-white">Selecionar Pasta Inteira</span>
+                  <span className="text-[11px] text-[#9E9E9E]">Lê arquivos e subpastas</span>
+                </button>
+                <input
+                  type="file"
+                  ref={folderInputRef}
+                  onChange={handleFilesSelected}
+                  // @ts-ignore
+                  webkitdirectory=""
+                  directory=""
+                  multiple
+                  className="hidden"
+                />
+
+                {/* Multiple files selector */}
+                <button
+                  type="button"
+                  onClick={() => multipleFilesInputRef.current?.click()}
+                  className="p-5 rounded-2xl bg-[#1A1D21] border border-dashed border-[#2D3139] hover:border-indigo-500/70 hover:bg-[#1F2329] transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer"
+                >
+                  <UploadCloud className="w-8 h-8 text-amber-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs font-bold text-white">Selecionar Vários Arquivos</span>
+                  <span className="text-[11px] text-[#9E9E9E]">Escolha múltiplos áudios/imagens</span>
+                </button>
+                <input
+                  type="file"
+                  ref={multipleFilesInputRef}
+                  onChange={handleFilesSelected}
+                  multiple
+                  accept={category === 'npc' ? 'image/*' : 'audio/*'}
+                  className="hidden"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Files Preview for Browser Mode */}
+          {mode === 'browser_files' && selectedFiles.length > 0 && (
             <div className="p-4 rounded-xl bg-[#1A1D21] border border-[#2D3139] space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-2">
@@ -277,7 +347,7 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
                 </button>
               </div>
 
-              <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1">
+              <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
                 {selectedFiles.slice(0, 20).map((file, idx) => (
                   <div
                     key={idx}
@@ -318,11 +388,11 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
 
             <button
               type="submit"
-              disabled={isUploading || selectedFiles.length === 0}
+              disabled={isProcessing || (mode === 'link_path' ? !folderPathInput.trim() : selectedFiles.length === 0)}
               className="flex items-center gap-1.5 px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
             >
               <FolderUp className="w-4 h-4" />
-              {isUploading ? 'Importando...' : `Importar ${selectedFiles.length} Arquivos`}
+              {isProcessing ? 'Processando...' : mode === 'link_path' ? 'Indexar Pasta por Referência' : `Importar ${selectedFiles.length} Arquivos`}
             </button>
           </div>
         </form>
@@ -330,3 +400,4 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
     </div>
   );
 };
+

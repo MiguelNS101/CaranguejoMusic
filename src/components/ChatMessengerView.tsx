@@ -13,7 +13,6 @@ import {
   Dices,
   Bot
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { useAudio } from '../context/AudioContext';
 import { DiscordChannel, DiscordGuild } from '../types';
 import { safeFetchJson } from '../services/api';
@@ -134,7 +133,6 @@ export const ChatMessengerView: React.FC = () => {
         if (messageType === 'narrative' || messageType === 'plain') {
           setTextContent('');
         }
-        confetti({ particleCount: 25, spread: 50, origin: { y: 0.7 } });
         setTimeout(() => setFeedback({ status: 'idle' }), 3500);
       } else {
         setFeedback({ status: 'error', msg: res.data?.error || res.error || 'Falha ao enviar mensagem ao Discord.' });

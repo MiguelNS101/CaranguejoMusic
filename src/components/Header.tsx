@@ -15,7 +15,11 @@ import {
   Sliders,
   Headphones,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  Clock,
+  Play,
+  Pause,
+  RotateCcw
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { AudioMixerModal } from './AudioMixerModal';
@@ -48,7 +52,12 @@ export const Header: React.FC<HeaderProps> = ({
     currentTrack,
     playbackState,
     activeSfxIds,
-    isLocalAudioEnabled
+    isLocalAudioEnabled,
+    sessionSeconds,
+    isSessionTimerRunning,
+    toggleSessionTimer,
+    resetSessionTimer,
+    formatDuration
   } = useAudio();
 
   const [isMixerOpen, setIsMixerOpen] = useState(false);
@@ -193,8 +202,60 @@ export const Header: React.FC<HeaderProps> = ({
             </nav>
           </div>
 
-          {/* Right Controls: Audio Mixer + Discord Status */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Right Controls: Session Timer + Audio Mixer + Discord Status */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            {/* Session Duration Timer Widget in Header */}
+            <div
+              id="header-session-timer-widget"
+              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs transition-all shadow-sm ${
+                isSessionTimerRunning
+                  ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-100 shadow-indigo-600/10'
+                  : 'bg-[#181B20] border-[#282C34] text-zinc-300'
+              }`}
+              title="Duração da Sessão (Persistente)"
+            >
+              <div
+                onClick={() => setCurrentTab('master')}
+                className="flex items-center gap-1.5 cursor-pointer hover:text-white"
+                title="Clique para ir ao Escudo do Mestre"
+              >
+                <Clock className={`w-3.5 h-3.5 ${isSessionTimerRunning ? 'text-indigo-400 animate-pulse' : 'text-zinc-400'}`} />
+                <span className="font-mono font-bold tracking-wider text-white text-xs sm:text-sm">
+                  {formatDuration(sessionSeconds)}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1 pl-1 border-l border-zinc-700/60">
+                {/* Play / Pause Toggle Button */}
+                <button
+                  type="button"
+                  onClick={toggleSessionTimer}
+                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                    isSessionTimerRunning
+                      ? 'bg-amber-600/30 text-amber-300 hover:bg-amber-600/50'
+                      : 'bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50'
+                  }`}
+                  title={isSessionTimerRunning ? 'Pausar Duração da Sessão' : 'Iniciar Duração da Sessão'}
+                >
+                  {isSessionTimerRunning ? (
+                    <Pause className="w-3 h-3 fill-current" />
+                  ) : (
+                    <Play className="w-3 h-3 fill-current" />
+                  )}
+                </button>
+
+                {/* Reset Button */}
+                <button
+                  type="button"
+                  onClick={resetSessionTimer}
+                  className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors cursor-pointer"
+                  title="Zerar Tempo da Sessão"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+
             {/* Audio Mixer Studio Button */}
             <button
               id="btn-open-audio-mixer"
