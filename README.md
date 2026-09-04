@@ -43,23 +43,46 @@ Ele funciona tanto no **navegador**, quanto como um **aplicativo de desktop port
   * Rolador especializado de **Storyteller / World of Darkness (Vampiro a Máscara, Lobisomem, etc.)**: cálculo de sucessos na dificuldade alvo, falhas críticas (cancelamento no 1) e especialização no 10.
 * **Envio Rápido para o Discord:** Envie narrações, falas de NPCs e avisos diretamente para o canal de texto do Discord com embeds formatados.
 
-### 🎵 2. Player de Músicas & Trilha Sonora
+### 🌿 2. Player de Ambientação & Loops Contínuos (Novo!)
+* **Canal Independente de Áudio:** Toque som ambiente ao mesmo tempo que a trilha musical, sem que um corte o outro.
+* **Loops Imersivos:** Chuva torrencial, ventania na tundra, murmúrio de taverna, estalar de fogueira, ruínas assombradas e masmorras gotejantes.
+* **Volume Separado no Mixer:** Ajuste fino de volume para manter a chuva suave sem abafar a música ou as vozes na chamada.
+* **Pastas e Categorias Próprias:** Organize seus sons em `data/ambience/` e importe arquivos locais com 1 clique.
+
+### 🎵 3. Player de Músicas & Trilha Sonora
 * **Fila de Reprodução Inteligente:** Crie filas por bioma (Taverna, Combate Épico, Floresta Sombria, Dungeon, Exploração).
 * **Crossfade & Loops Contínuos:** Toque trilhas em loop contínuo sem interrupções bruscas.
 * **Upload Direto por Arraste (Drag & Drop):** Adicione arquivos `.mp3`, `.wav` e `.ogg` direto na janela.
 * **Controle de Volume no Discord:** Volume ajustável em tempo real que afeta o bot na chamada de voz.
 
-### ⚡ 3. Soundboard com Efeitos Instantâneos (SFX)
+### ⚔️ 4. Gerador de Encontros Aleatórios (Novo!)
+* **Parâmetros Paramétricos para o Mestre:** Defina o nível do grupo (1 a 20), o ambiente (floresta, masmorra, cidade, caverna, montanha, pântano, deserto, alto mar), a quantidade de inimigos (chefe solo, patrulha ou horda) e a dificuldade (fácil a mortal).
+* **Fichas e Estatísticas Rápidas:** PV sugerido, Classe de Armadura (CA), Nível de Desafio (CR), papel tático e habilidades marcantes.
+* **Perigos do Terreno & Complicações:** Armadilhas naturais, desmoronamentos, fumaça asfixiante e clima adverso.
+* **Objetivo & Motivação Tática:** Motivações verossímeis para os inimigos (emboscada, sequestro, defesa de covil).
+* **Envio Direto ao Discord:** 1 clique para postar o encontro formatado no chat dos jogadores ou do mestre.
+
+### 🎡 5. Roleta Customizável com Porcentagens (Novo!)
+* **Roda Visual Interativa:** Fatias desenhadas proporcionalmente aos pesos percentuais com animação suave de rotação e ponteiro superior.
+* **Porcentagens Customizáveis:** Adicione ou remova opções, altere nomes, cores e valores de peso (com botão de normalização para 100%).
+* **Predefinições Rápidas de RPG:**
+  * Destino do Herói (Sorte vs Desastre)
+  * Quem é o Alvo do Ataque? (Divisão entre classes)
+  * Clima da Viagem (Ensolarado a Tempestade)
+  * Tensão & Sanidade (Mente Firme a Frenesi)
+* **Envio do Resultado ao Discord:** Publica no canal de texto qual opção foi sorteada e a probabilidade de cada fatia.
+
+### ⚡ 6. Soundboard com Efeitos Instantâneos (SFX)
 * **Atalhos e Ícones Personalizados:** Organize sons de impacto, magias, monstros, ambientação e reações.
 * **Volume Individual por Efeito:** Regule o volume de cada som separadamente para não estourar os ouvidos dos jogadores.
-* **Reprodução Sobreposta:** Dispare múltiplos efeitos sonoros ao mesmo tempo por cima da música de fundo.
+* **Reprodução Sobreposta:** Dispare múltiplos efeitos sonoros ao mesmo tempo por cima da música de fundo e do ambiente.
 
-### 🧙 4. Galeria de NPCs & Retratos
+### 🧙 7. Galeria de NPCs & Retratos
 * **Fichas Rápidas:** Nome, Raça, Classe, Alinhamento, PV, CA, Atributos e notas de interpretação.
 * **Retratos e Imagens:** Upload de retratos dos personagens e monstros.
 * **Envio de Fala no Discord:** Clique em "Falar como NPC" para o bot postar no chat com o nome e avatar do NPC!
 
-### 💬 5. Chat & Mensageiro do Discord
+### 💬 8. Chat & Mensageiro do Discord
 * **Simulador de Embeds:** Veja em tempo real como sua mensagem aparecerá no servidor.
 * **Modos de Envio:**
   * 📜 *Narração em Itálico*
@@ -156,26 +179,28 @@ Para transmitir a música para o canal de voz do seu servidor e enviar mensagens
 3. Vá na aba **Bot** no menu lateral esquerdo.
 4. Clique em **"Add Bot"** (ou "Reset Token") e **copie o Token gerado**.
 
-### Passo 2: Ativar as Privileged Gateway Intents (Importante!)
-Na mesma aba **Bot**, role a página até **"Privileged Gateway Intents"** e **ative as 3 opções**:
-* ✅ **PRESENCE INTENT**
+### Passo 2: Ativar as Privileged Gateway Intents (Obrigatório!)
+Na mesma aba **Bot**, role a página até **"Privileged Gateway Intents"** e **ative as opções**:
+* ✅ **MESSAGE CONTENT INTENT** (Essencial para ler rolagens de dados e comandos `\caranguejo` e `\help` no chat)
 * ✅ **SERVER MEMBERS INTENT**
-* ✅ **MESSAGE CONTENT INTENT**
+* ✅ **PRESENCE INTENT**
 * *(Clique em "Save Changes" no final da página)*.
 
-### Passo 3: Convidar o Bot para seu Servidor
-1. Vá na aba **OAuth2** → **URL Generator**.
-2. Em **Scopes**, marque:
-   * ✅ `bot`
-   * ✅ `applications.commands`
-3. Em **Bot Permissions**, marque:
-   * ✅ `Send Messages`
-   * ✅ `Embed Links`
-   * ✅ `Attach Files`
-   * ✅ `Read Message History`
-   * ✅ `Connect` *(Voz)*
-   * ✅ `Speak` *(Voz)*
-4. Copie a URL gerada no final da página e cole no seu navegador para adicionar o bot no seu servidor.
+### Passo 3: Configurar Instalação de Guilda & Convidar o Bot
+Os usuários podem adicionar seu app a uma guilda, dando a ele permissões para realizar ações nessa guilda.
+
+No Discord Developer Portal, vá na aba **Installation** (ou **OAuth2** → **URL Generator**):
+1. **Escopos (Scopes):**
+   * ✅ `applications.commands` (Comandos de barra e interações)
+   * ✅ `bot` (Adiciona o bot à guilda)
+2. **Permissões (Bot Permissions):**
+   * ✅ `Conectar` (Connect — transmissão para canal de voz)
+   * ✅ `Enviar mensagens` (Send Messages — narrações e resultados de rolagens)
+   * ✅ `Usar comandos de barra` (Use Slash Commands / Application Commands)
+   * ✅ `Ver canais` (View Channels)
+   * ✅ `Ver histórico de mensagens` (Read Message History)
+   * ✅ `Inserir links` e `Anexar arquivos` (Embed Links & Attach Files — retratos de NPCs)
+3. Copie o link de instalação gerado e autorize o bot no seu servidor de RPG.
 
 ### Passo 4: Ativar o Modo Desenvolvedor no Discord (para pegar IDs)
 1. No seu Discord, abra as **Configurações de Usuário** (ícone de engrenagem) → **Avançado**.
@@ -189,7 +214,22 @@ Abra o **CaranguejoRPG**, clique no botão **"Discord"** no cabeçalho (ou edite
 * **ID do Canal de Voz:** Clique com botão direito no canal de voz onde todos jogam → *Copiar ID*.
 * **ID do Canal de Texto:** Clique com botão direito no canal de texto do chat → *Copiar ID*.
 
-Clique em **"Conectar Bot"**. O bot entrará na sala de voz na hora!
+Clique em **"Salvar & Conectar Bot"**. O bot entrará na sala de voz imediatamente!
+
+---
+
+## 🦀 Comandos de Chat no Discord
+
+Qualquer jogador ou mestre pode usar estes comandos diretamente no chat de texto do servidor:
+
+| Comando | Descrição | Exemplo |
+| :--- | :--- | :--- |
+| `\caranguejo` | Sorteia e posta uma **curiosidade biológica sobre caranguejos** acompanhada de um **gancho épico de campanha de RPG** | `\caranguejo` |
+| `\caranguejo [n]` | Exibe uma curiosidade específica pelo ID numérico | `\caranguejo 4` |
+| `\help` ou `\ajuda` | Mostra o **manual completo de comandos e regras** formatado em embed dourado | `\help` |
+| `\r [dados]` | Rola dados D10 do sistema Storyteller (sucessos no 7+, 10s explodem, 1s cancelam) | `\r 7d10 Furtividade` |
+| `\kr [dados]` | **Keen Roll** para Storyteller (críticos ativam no 9 e 10 e continuam explodindo) | `\kr 8d10 Tiro Certeiro` |
+| `!ping` | Testa se o bot e a mesa estão respondendo | `!ping` |
 
 ---
 

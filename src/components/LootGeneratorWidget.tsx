@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Dices,
@@ -7,100 +7,56 @@ import {
   Check,
   CheckCircle2,
   AlertCircle,
-  Gem,
-  Coins,
-  ShieldAlert,
-  Scroll,
   RotateCcw
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { safeFetchJson } from '../services/api';
-
-type LootTier = 'low' | 'medium' | 'high' | 'boss' | 'wod';
-
-interface LootItem {
-  name: string;
-  type: string;
-  value: string;
-  description: string;
-  icon: string;
-}
-
-const LOOT_TABLES: Record<LootTier, LootItem[]> = {
-  low: [
-    { name: 'Bolsa de Moedas de Prata', type: 'Moedas', value: '35 PP / 12 PO', description: 'Moedas gastas com inscrições do antigo reino.', icon: '💰' },
-    { name: 'Poção de Cura Simples', type: 'Consumível', value: '50 PO', description: 'Líquido vermelho brilhante que cura 2d4 + 2 pontos de vida.', icon: '🧪' },
-    { name: 'Adaga de Aço Élfico', type: 'Arma', value: '25 PO', description: 'Lâmina leve com empunhadura entalhada em madeira nobre.', icon: '🗡️' },
-    { name: 'Gema de Quartzo Fumê', type: 'Gema', value: '15 PO', description: 'Pedra translúcida que reluz levemente no escuro.', icon: '💎' },
-    { name: 'Pedaço de Pergaminho Misterioso', type: 'Pista', value: 'Inestimável', description: 'Fragmento contendo coordenadas cifradas de um túmulo esquecido.', icon: '📜' },
-    { name: 'Tocha de Fogo Perpétuo (Gasta)', type: 'Utilitário', value: '30 PO', description: 'Queima sem calor por mais 4 horas antes de se extinguir.', icon: '🔥' }
-  ],
-  medium: [
-    { name: 'Saco de Moedas de Ouro e Platina', type: 'Moedas', value: '250 PO + 15 PP', description: 'Moedas nobres seladas com cera real.', icon: '🪙' },
-    { name: 'Poção de Invisibilidade', type: 'Consumível', value: '180 PO', description: 'Líquido etéreo que concede invisibilidade por 1 hora.', icon: '🧪' },
-    { name: 'Anel de Proteção +1', type: 'Item Mágico', value: '400 PO', description: 'Concede +1 em CA e salvaguardas enquanto sintonizado.', icon: '💍' },
-    { name: 'Gema de Rubi Estelar', type: 'Gema', value: '200 PO', description: 'Rubi lapidado que brilha como uma brasa viva.', icon: '💎' },
-    { name: 'Capa da Sombra Sussurrante', type: 'Armadura/Veste', value: '350 PO', description: 'Vantagem em testes de Furtividade em escuridão ou penumbra.', icon: '🧥' },
-    { name: 'Varinha de Mísseis Mágicos', type: 'Varinha', value: '300 PO', description: 'Possui 7 cargas para disparar dardos de energia sem errar.', icon: '🪄' }
-  ],
-  high: [
-    { name: 'Baú de Riquezas da Guilda', type: 'Tesouro', value: '1.200 PO + 80 PP', description: 'Pilhas de lingotes de prata e moedas cunhadas.', icon: '👑' },
-    { name: 'Espada Longa Flamejante (+2)', type: 'Arma Mágica', value: '1.800 PO', description: 'Causa +2d6 de dano de fogo adicional a cada golpe.', icon: '⚔️' },
-    { name: 'Amuleto de Saúde (Constituição 19)', type: 'Item Mágico', value: '2.500 PO', description: 'Fixa o atributo Constituição do portador em 19.', icon: '📿' },
-    { name: 'Diamante Astral Lapidado', type: 'Gema Nobre', value: '1.000 PO', description: 'Reagente perfeito para rituais de ressurreição.', icon: '💎' },
-    { name: 'Pergaminho de Teletransporte', type: 'Pergaminho 7º Nível', value: '1.500 PO', description: 'Permite transportar o grupo instantaneamente a um círculo familiar.', icon: '📜' }
-  ],
-  boss: [
-    { name: 'Tesouro Imperial do Soberano Caído', type: 'Loot Lendário', value: '5.000 PO + 350 PP', description: 'Ouro maciço, coroas e cálices de platina com safiras.', icon: '🏰' },
-    { name: 'Lâmina Devoradora de Almas', type: 'Artefato Lendário', value: 'Inestimável', description: 'Lâmina que absorve a essência dos inimigos derrotados e regenera o portador.', icon: '🖤' },
-    { name: 'Orbe das Tempestades Elementais', type: 'Artefato', value: '4.500 PO', description: 'Controla o clima regional e invoca tempestades de relâmpagos.', icon: '🔮' },
-    { name: 'Tomo do Arcano Proibido', type: 'Livro Mágico', value: '3.000 PO', description: 'Aumenta permanentemente a Inteligência em +2 após 48 horas de estudo.', icon: '📖' }
-  ],
-  wod: [
-    { name: 'Frasco de Sangue de Ancião (Vitae)', type: 'Relíquia WoD', value: '3 Pontos de Sangue Especial', description: 'Sangue concentrado da 6ª geração que fortalece temporariamente Disciplinas.', icon: '🩸' },
-    { name: 'Ficha Policial Confidencial & Dossiê', type: 'Pista / Chantagem', value: '3 Pontos de Influência', description: 'Segredos comprometedores sobre o chefe de polícia e o prefeito.', icon: '📁' },
-    { name: 'Adaga de Prata Abençoada por Caçadores', type: 'Arma Ritual', value: 'Dano Agravado em Licantropos', description: 'Lâmina forjada com prata pura e runas da Inquisição.', icon: '🗡️' },
-    { name: 'Chave do Cofre Bancário Suíço', type: 'Recursos', value: 'Recursos Nível 4', description: 'Dá acesso a 100.000 dólares não rastreáveis e passaportes falsos.', icon: '🔑' },
-    { name: 'Fita K7 com Gravação da Camarilla', type: 'Pista WoD', value: 'Quebra de Máscara Potencial', description: 'Áudio vazado de um príncipe negociando com Anarquistas.', icon: '📼' }
-  ]
-};
+import { getLootPresets, LootTablePreset, LootItemDef } from '../utils/presetStore';
 
 export const LootGeneratorWidget: React.FC = () => {
-  const [tier, setTier] = useState<LootTier>('medium');
-  const [itemCount, setItemCount] = useState<number>(3);
-  const [generatedLoot, setGeneratedLoot] = useState<LootItem[]>(() => {
-    return [
-      LOOT_TABLES.medium[0],
-      LOOT_TABLES.medium[1],
-      LOOT_TABLES.medium[3]
-    ];
+  const [lootTables, setLootTables] = useState<LootTablePreset[]>(() => getLootPresets());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setLootTables(getLootPresets());
+    };
+    window.addEventListener('caranguejo_presets_updated', handleUpdate);
+    return () => window.removeEventListener('caranguejo_presets_updated', handleUpdate);
+  }, []);
+
+  const [selectedTierId, setSelectedTierId] = useState<string>(() => {
+    const presets = getLootPresets();
+    return presets[0]?.id || 'loot-medium';
   });
+
+  const [itemCount, setItemCount] = useState<number>(3);
+  const [generatedLoot, setGeneratedLoot] = useState<LootItemDef[]>(() => {
+    const presets = getLootPresets();
+    const current = presets.find(p => p.id === 'loot-medium') || presets[0];
+    return current ? current.items.slice(0, 3) : [];
+  });
+
   const [copied, setCopied] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'success' | 'error'; msg?: string }>({ status: 'idle' });
 
+  const activeTable = lootTables.find(t => t.id === selectedTierId) || lootTables[0];
+
   const handleGenerate = () => {
-    const table = LOOT_TABLES[tier];
-    const shuffled = [...table].sort(() => Math.random() - 0.5);
-    const selected = shuffled.slice(0, Math.min(itemCount, table.length));
+    if (!activeTable || !activeTable.items || activeTable.items.length === 0) {
+      setGeneratedLoot([]);
+      return;
+    }
+    const shuffled = [...activeTable.items].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, Math.min(itemCount, activeTable.items.length));
     setGeneratedLoot(selected);
   };
 
   const getLootText = () => {
-    const tierName =
-      tier === 'low'
-        ? 'Nível Baixo (Nv 1-4)'
-        : tier === 'medium'
-        ? 'Nível Médio (Nv 5-10)'
-        : tier === 'high'
-        ? 'Nível Alto (Nv 11-16)'
-        : tier === 'boss'
-        ? 'Tesouro de Chefe / Épico'
-        : 'Recompensa WoD / Vampiro';
-
-    let txt = `💰 **Tesouro Gerado [${tierName}]**\n\n`;
-    generatedLoot.forEach((item, i) => {
-      txt += `${item.icon} **${item.name}** (${item.type} • *${item.value}*)\n↳ ${item.description}\n\n`;
+    const tierTitle = activeTable ? activeTable.tierName : 'Tesouro';
+    let txt = `💰 **Tesouro Gerado [${tierTitle}]**\n\n`;
+    generatedLoot.forEach((item) => {
+      txt += `${item.icon || '🎁'} **${item.name}** (${item.type || 'Item'} • *${item.value || 'Normal'}*)\n↳ ${item.description}\n\n`;
     });
     return txt.trim();
   };
@@ -144,51 +100,24 @@ export const LootGeneratorWidget: React.FC = () => {
       {/* Tier Selector & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2D3139]/60 pb-2.5 shrink-0">
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          <button
-            type="button"
-            onClick={() => setTier('low')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-              tier === 'low' ? 'bg-amber-600 text-white' : 'bg-[#141619] text-[#9E9E9E] hover:text-white border border-[#2D3139]'
-            }`}
-          >
-            Nv 1-4
-          </button>
-          <button
-            type="button"
-            onClick={() => setTier('medium')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-              tier === 'medium' ? 'bg-indigo-600 text-white' : 'bg-[#141619] text-[#9E9E9E] hover:text-white border border-[#2D3139]'
-            }`}
-          >
-            Nv 5-10
-          </button>
-          <button
-            type="button"
-            onClick={() => setTier('high')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-              tier === 'high' ? 'bg-purple-600 text-white' : 'bg-[#141619] text-[#9E9E9E] hover:text-white border border-[#2D3139]'
-            }`}
-          >
-            Nv 11-16
-          </button>
-          <button
-            type="button"
-            onClick={() => setTier('boss')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-              tier === 'boss' ? 'bg-rose-600 text-white' : 'bg-[#141619] text-[#9E9E9E] hover:text-white border border-[#2D3139]'
-            }`}
-          >
-            👑 Chefe
-          </button>
-          <button
-            type="button"
-            onClick={() => setTier('wod')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-              tier === 'wod' ? 'bg-red-800 text-white' : 'bg-[#141619] text-[#9E9E9E] hover:text-white border border-[#2D3139]'
-            }`}
-          >
-            🩸 WoD
-          </button>
+          {lootTables.map((table) => {
+            const isSelected = table.id === selectedTierId;
+            return (
+              <button
+                key={table.id}
+                type="button"
+                onClick={() => setSelectedTierId(table.id)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-[#141619] text-[#9E9E9E] hover:text-white border border-[#2D3139]'
+                }`}
+                title={table.tierName}
+              >
+                {table.tierName}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-2">

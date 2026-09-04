@@ -13,14 +13,15 @@ import {
   UploadCloud,
   Check,
   Link,
-  HardDrive
+  HardDrive,
+  CloudRain
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 
 interface FolderImportModalProps {
   isOpen: boolean;
   onClose: () => void;
-  defaultCategory?: 'music' | 'sfx' | 'npc';
+  defaultCategory?: 'music' | 'ambience' | 'sfx' | 'npc';
   defaultFolderId?: string;
 }
 
@@ -34,7 +35,7 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
 
   const [mode, setMode] = useState<'link_path' | 'browser_files'>('link_path');
   const [folderPathInput, setFolderPathInput] = useState('');
-  const [category, setCategory] = useState<'music' | 'sfx' | 'npc'>(defaultCategory);
+  const [category, setCategory] = useState<'music' | 'ambience' | 'sfx' | 'npc'>(defaultCategory);
   const [selectedFolderId, setSelectedFolderId] = useState<string>(defaultFolderId || '');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -47,6 +48,7 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
 
   const relevantFolders = folders.filter(f => {
     if (category === 'music') return f.type === 'music';
+    if (category === 'ambience') return f.type === 'ambience' || f.type === 'music';
     if (category === 'sfx') return f.type === 'soundboard';
     if (category === 'npc') return f.type === 'npc';
     return true;
@@ -60,7 +62,7 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
     // Filter by category
     const filtered = files.filter((file: File) => {
       const name = file.name.toLowerCase();
-      if (category === 'music' || category === 'sfx') {
+      if (category === 'music' || category === 'ambience' || category === 'sfx') {
         return name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.ogg') || name.endsWith('.m4a') || name.endsWith('.flac') || name.endsWith('.opus') || name.endsWith('.aac');
       } else {
         return name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.webp') || name.endsWith('.gif') || name.endsWith('.svg');
@@ -198,7 +200,7 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
             <label className="block text-xs font-bold text-white uppercase tracking-wider mb-2">
               1. Tipo de Mídia
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <button
                 type="button"
                 onClick={() => { setCategory('music'); setSelectedFiles([]); }}
@@ -210,6 +212,19 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
               >
                 <Music className="w-5 h-5 text-indigo-400" />
                 Músicas & Trilhas
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setCategory('ambience'); setSelectedFiles([]); }}
+                className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all text-xs font-semibold ${
+                  category === 'ambience'
+                    ? 'bg-teal-600/20 border-teal-500 text-white shadow-md shadow-teal-600/20'
+                    : 'bg-[#1A1D21] border-[#2D3139] text-[#9E9E9E] hover:text-white hover:border-[#3D424D]'
+                }`}
+              >
+                <CloudRain className="w-5 h-5 text-teal-400" />
+                Ambientação Contínua
               </button>
 
               <button

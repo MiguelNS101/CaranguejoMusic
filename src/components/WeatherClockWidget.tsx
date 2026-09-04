@@ -17,6 +17,7 @@ import {
   Minus
 } from 'lucide-react';
 import { safeFetchJson } from '../services/api';
+import { getWeatherPresets, WeatherAtmospherePreset } from '../utils/presetStore';
 
 type WeatherType = 'clear' | 'fog' | 'rain' | 'storm' | 'snow' | 'blood_moon' | 'heatwave';
 type TimeOfDay = 'dawn' | 'noon' | 'afternoon' | 'dusk' | 'midnight' | 'deep_night';
@@ -54,15 +55,26 @@ interface WeatherClockWidgetProps {
 export const WeatherClockWidget: React.FC<WeatherClockWidgetProps> = ({
   storageKey = 'caranguejo_weather_clock_state'
 }) => {
-  const [weather, setWeather] = useState<WeatherType>(() => {
+  const [customPresets, setCustomPresets] = useState<WeatherAtmospherePreset[]>(() => getWeatherPresets());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setCustomPresets(getWeatherPresets());
+    };
+    window.addEventListener('caranguejo_presets_updated', handleUpdate);
+    return () => window.removeEventListener('caranguejo_presets_updated', handleUpdate);
+  }, []);
+
+  const [activeWeatherId, setActiveWeatherId] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (parsed.activeWeatherId) return parsed.activeWeatherId;
         if (parsed.weather) return parsed.weather;
       }
     } catch {}
-    return 'fog';
+    return customPresets[0]?.id || 'weather-clear-sun';
   });
 
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>(() => {
@@ -106,12 +118,27 @@ export const WeatherClockWidget: React.FC<WeatherClockWidgetProps> = ({
     try {
       localStorage.setItem(
         storageKey,
-        JSON.stringify({ weather, timeOfDay, campaignDay, customNote })
+        JSON.stringify({ activeWeatherId, timeOfDay, campaignDay, customNote })
       );
     } catch {}
-  }, [weather, timeOfDay, campaignDay, customNote, storageKey]);
+  }, [activeWeatherId, timeOfDay, campaignDay, customNote, storageKey]);
 
-  const currentW = WEATHER_PRESETS[weather];
+  const activeWeather = customPresets.find(p => p.id === activeWeatherId) ||
+    customPresets[0] || {
+      id: 'default',
+      name: 'Céu Limpo',
+      icon: '☀️',
+      effect: 'Visibilidade perfeita.',
+      discordEmoji: '☀️'
+    };
+
+  const currentW = {
+    icon: activeWeather.icon,
+    name: activeWeather.name,
+    effect: activeWeather.effect,
+    discordEmoji: activeWeather.discordEmoji || activeWeather.icon
+  };
+
   const currentT = TIME_NAMES[timeOfDay];
 
   const handleSendToDiscord = async () => {
@@ -204,15 +231,18 @@ export const WeatherClockWidget: React.FC<WeatherClockWidgetProps> = ({
 
       {/* Weather Selector Chips */}
       <div>
-        <span className="text-[10px] uppercase text-[#9E9E9E] font-bold block mb-2">Clima & Condição Atmosférica</span>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {Object.entries(WEATHER_PRESETS).map(([key, item]) => {
-            const isSelected = weather === key;
+        <span className="text-[10px] uppercase text-[#9E9E9E] font-bold block mb-2">Clima & Condição Atmosférica ({customPresets.length})</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+          {customPresets.map((item) => {
+            const isSelected = activeWeatherId === item.id;
             return (
               <button
-                key={key}
+                key={item.id}
                 type="button"
-                onClick={() => setWeather(key as WeatherType)}
+                onClick={() => {
+                  setActiveWeatherId(item.id);
+                  if (item.timeOfDay) setTimeOfDay(item.timeOfDay);
+                }}
                 className={`p-2 rounded-xl border flex items-center gap-2 text-left transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-indigo-600/30 border-indigo-500 text-white ring-1 ring-indigo-500 shadow-sm'

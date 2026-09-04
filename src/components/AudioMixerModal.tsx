@@ -12,7 +12,9 @@ import {
   RotateCcw,
   Zap,
   Volume1,
-  Mic
+  Mic,
+  Wind,
+  CloudRain
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 
@@ -27,12 +29,16 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
     setVolume,
     musicVolume,
     setMusicVolume,
+    ambienceVolume,
+    setAmbienceVolume,
     sfxVolume,
     setSfxVolume,
     isMuted,
     toggleMute,
     isMusicMuted,
     toggleMusicMute,
+    isAmbienceMuted,
+    toggleAmbienceMute,
     isSfxMuted,
     toggleSfxMute,
     effectiveMusicVolume,
@@ -41,6 +47,8 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
     toggleLocalAudio,
     currentTrack,
     playbackState,
+    currentAmbienceTrack,
+    ambiencePlaybackState,
     botStatus,
     activeSfxIds
   } = useAudio();
@@ -50,34 +58,38 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
   const presets = [
     {
       name: 'Equilibrado',
-      desc: 'Música ambiente e efeitos claros',
+      desc: 'Música, ambiente e efeitos claros',
       icon: '⚖️',
       master: 0.8,
       music: 0.7,
+      ambience: 0.75,
       sfx: 0.9
     },
     {
       name: 'Cinema & Ação',
-      desc: 'Imersão alta e efeitos estrondosos',
+      desc: 'Imersão alta, batidas e efeitos estrondosos',
       icon: '🎬',
       master: 1.0,
       music: 0.85,
+      ambience: 0.6,
       sfx: 1.0
     },
     {
       name: 'Foco na Voz / Mesa',
-      desc: 'Música suave para não atrapalhar os jogadores',
+      desc: 'Música suave para não atrapalhar a fala',
       icon: '🗣️',
       master: 0.7,
       music: 0.35,
+      ambience: 0.45,
       sfx: 0.7
     },
     {
       name: 'Sussurro / Mistério',
-      desc: 'Volume baixo para momentos de tensão',
+      desc: 'Ambiente de chuva/vento com trilha mínima',
       icon: '🤫',
-      master: 0.4,
-      music: 0.25,
+      master: 0.5,
+      music: 0.2,
+      ambience: 0.8,
       sfx: 0.4
     }
   ];
@@ -86,7 +98,7 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
       <div
         id="audio-mixer-modal"
-        className="bg-[#141619] border border-[#2D3139] rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-[#141619] border border-[#2D3139] rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
       >
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-[#2D3139] flex items-center justify-between bg-[#1A1D21]/80">
@@ -102,7 +114,7 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
                 </span>
               </h3>
               <p className="text-xs text-zinc-400">
-                Ajuste os canais de Música, Efeitos Sonoros e Áudio Local
+                Ajuste os canais de Música, Ambientação Contínua, SFX e Áudio Local
               </p>
             </div>
           </div>
@@ -160,10 +172,10 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
             </div>
           </div>
 
-          {/* Individual Channel Strips */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Individual Channel Strips (3 Separated Tracks: Music, Ambience, SFX) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
             {/* Music Channel */}
-            <div className="bg-[#1A1D21] border border-[#2D3139] rounded-xl p-4 space-y-3">
+            <div className="bg-[#1A1D21] border border-[#2D3139] rounded-xl p-3.5 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center">
@@ -171,7 +183,7 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-white">Trilha Sonora</h4>
-                    <p className="text-[10px] text-zinc-400">Músicas & Ambientes</p>
+                    <p className="text-[10px] text-zinc-400">Músicas & Batalhas</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -204,12 +216,58 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
 
               <div className="text-[11px] text-zinc-400 truncate flex items-center gap-1.5 pt-1 border-t border-zinc-800/80">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${playbackState === 'playing' ? 'bg-amber-400 animate-pulse' : 'bg-zinc-600'}`} />
-                <span className="truncate">{currentTrack ? currentTrack.title : 'Nenhuma música tocando'}</span>
+                <span className="truncate">{currentTrack ? currentTrack.title : 'Nenhuma música'}</span>
+              </div>
+            </div>
+
+            {/* Ambientation Channel */}
+            <div className="bg-[#1A1D21] border border-[#2D3139] rounded-xl p-3.5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center">
+                    <CloudRain className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-semibold text-white">Ambientação</h4>
+                    <p className="text-[10px] text-zinc-400">Chuva, Vento, Taverna</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={toggleAmbienceMute}
+                    className={`p-1 rounded-md border transition-all ${
+                      isAmbienceMuted
+                        ? 'bg-rose-950/40 text-rose-300 border-rose-500/30'
+                        : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:text-white'
+                    }`}
+                    title={isAmbienceMuted ? 'Desmutar Ambientação' : 'Mutar Ambientação'}
+                  >
+                    {isAmbienceMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                  <span className="text-[11px] font-mono font-bold text-teal-300 w-8 text-right">
+                    {Math.round((isAmbienceMuted ? 0 : ambienceVolume) * 100)}%
+                  </span>
+                </div>
+              </div>
+
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={isAmbienceMuted ? 0 : ambienceVolume}
+                onChange={(e) => setAmbienceVolume(parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-teal-500"
+              />
+
+              <div className="text-[11px] text-zinc-400 truncate flex items-center gap-1.5 pt-1 border-t border-zinc-800/80">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${ambiencePlaybackState === 'playing' ? 'bg-teal-400 animate-pulse' : 'bg-zinc-600'}`} />
+                <span className="truncate">{currentAmbienceTrack ? currentAmbienceTrack.title : 'Nenhum ambiente'}</span>
               </div>
             </div>
 
             {/* SFX Channel */}
-            <div className="bg-[#1A1D21] border border-[#2D3139] rounded-xl p-4 space-y-3">
+            <div className="bg-[#1A1D21] border border-[#2D3139] rounded-xl p-3.5 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center">
@@ -217,7 +275,7 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-white">Efeitos (SFX)</h4>
-                    <p className="text-[10px] text-zinc-400">Soundboard & Ataques</p>
+                    <p className="text-[10px] text-zinc-400">Soundboard & Golpes</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -250,7 +308,7 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
 
               <div className="text-[11px] text-zinc-400 truncate flex items-center gap-1.5 pt-1 border-t border-zinc-800/80">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${activeSfxIds.length > 0 ? 'bg-emerald-400 animate-ping' : 'bg-zinc-600'}`} />
-                <span>{activeSfxIds.length > 0 ? `${activeSfxIds.length} efeito(s) ativo(s)` : 'Aguardando gatilho'}</span>
+                <span>{activeSfxIds.length > 0 ? `${activeSfxIds.length} efeito(s) ativo(s)` : 'Aguardando som'}</span>
               </div>
             </div>
           </div>
@@ -259,19 +317,20 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
           <div className="space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
               <Zap className="w-3.5 h-3.5 text-amber-400" />
-              Presets de Balanço Rápido
+              Presets de Balanço Rápido da Mesa
             </h4>
             <div className="grid grid-cols-2 gap-2">
               {presets.map((p) => {
                 const isActive =
                   Math.abs(volume - p.master) < 0.05 &&
                   Math.abs(musicVolume - p.music) < 0.05 &&
+                  Math.abs(ambienceVolume - p.ambience) < 0.05 &&
                   Math.abs(sfxVolume - p.sfx) < 0.05;
 
                 return (
                   <button
                     key={p.name}
-                    onClick={() => setAudioMix(p.master, p.music, p.sfx)}
+                    onClick={() => setAudioMix(p.master, p.music, p.sfx, p.ambience)}
                     className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between ${
                       isActive
                         ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-200'
@@ -288,6 +347,8 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
                     <p className="text-[10px] text-zinc-400 mt-1 line-clamp-1">{p.desc}</p>
                     <div className="flex items-center gap-2 mt-2 text-[9px] font-mono text-zinc-400">
                       <span>Mús: {Math.round(p.music * 100)}%</span>
+                      <span>•</span>
+                      <span>Amb: {Math.round(p.ambience * 100)}%</span>
                       <span>•</span>
                       <span>SFX: {Math.round(p.sfx * 100)}%</span>
                     </div>

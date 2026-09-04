@@ -694,9 +694,81 @@ NODE_ENV=production
         {/* TAB 2: Step-by-step Guide */}
         {activeSubTab === 'guide' && (
           <div className="space-y-4 text-xs text-[#E0E0E0] leading-relaxed">
-            <div className="p-3 bg-[#141619] rounded-xl border border-[#2D3139] space-y-2">
+            {/* Guild Installation Alert & Instructions */}
+            <div className="p-4 bg-gradient-to-r from-indigo-950/40 via-[#1A1D21] to-[#141619] rounded-2xl border border-indigo-500/40 space-y-3 shadow-md">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-indigo-600/30 text-indigo-300 font-bold text-base">🛡️</span>
+                <div>
+                  <h4 className="font-bold text-white text-sm">
+                    Configuração de Instalação de Guilda (Guild Installation)
+                  </h4>
+                  <p className="text-[11px] text-zinc-400">
+                    Os usuários podem adicionar seu app a uma guilda, dando a ele permissões para realizar ações nessa guilda.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                {/* Escopos */}
+                <div className="p-3 bg-[#141619] rounded-xl border border-[#2D3139]">
+                  <h5 className="font-bold text-indigo-400 text-xs uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                    Escopos (Scopes)
+                  </h5>
+                  <p className="text-[11px] text-zinc-400 mb-2">
+                    No Developer Portal em <strong>Installation</strong> ou <strong>OAuth2 URL Generator</strong>, marque:
+                  </p>
+                  <ul className="space-y-1 text-xs font-mono">
+                    <li className="flex items-center gap-2 text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded border border-emerald-500/20">
+                      <span>✓</span>
+                      <span>applications.commands</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded border border-emerald-500/20">
+                      <span>✓</span>
+                      <span>bot</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Permissões */}
+                <div className="p-3 bg-[#141619] rounded-xl border border-[#2D3139]">
+                  <h5 className="font-bold text-amber-400 text-xs uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-400" />
+                    Permissões (Bot Permissions)
+                  </h5>
+                  <p className="text-[11px] text-zinc-400 mb-2">
+                    Selecione as seguintes permissões para voz, narrações e comandos:
+                  </p>
+                  <ul className="space-y-1 text-xs">
+                    <li className="flex items-center gap-2 text-white bg-zinc-900/60 px-2 py-0.5 rounded border border-zinc-800">
+                      <span className="text-indigo-400 font-bold">✓</span>
+                      <span><strong>Conectar</strong> (Connect)</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-white bg-zinc-900/60 px-2 py-0.5 rounded border border-zinc-800">
+                      <span className="text-indigo-400 font-bold">✓</span>
+                      <span><strong>Enviar mensagens</strong> (Send Messages)</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-white bg-zinc-900/60 px-2 py-0.5 rounded border border-zinc-800">
+                      <span className="text-indigo-400 font-bold">✓</span>
+                      <span><strong>Usar comandos de barra</strong> (Use Slash Commands)</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-white bg-zinc-900/60 px-2 py-0.5 rounded border border-zinc-800">
+                      <span className="text-indigo-400 font-bold">✓</span>
+                      <span><strong>Ver canais</strong> (View Channels)</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-white bg-zinc-900/60 px-2 py-0.5 rounded border border-zinc-800">
+                      <span className="text-indigo-400 font-bold">✓</span>
+                      <span><strong>Ver histórico de mensagens</strong> (Read Message History)</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Passo a Passo Completo */}
+            <div className="p-3.5 bg-[#141619] rounded-xl border border-[#2D3139] space-y-2.5">
               <h4 className="font-bold text-indigo-400 text-sm">
-                Como criar e configurar seu Bot do Discord em 3 passos:
+                Passo a Passo de Configuração no Discord Developer Portal:
               </h4>
               <ol className="list-decimal list-inside space-y-2 text-[#E0E0E0]">
                 <li>
@@ -705,24 +777,27 @@ NODE_ENV=production
                     href="https://discord.com/developers/applications"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-indigo-400 underline"
+                    className="text-indigo-400 underline font-semibold"
                   >
                     Discord Developer Portal
                   </a>{' '}
                   e clique em <strong>"New Application"</strong>.
                 </li>
                 <li>
-                  Vá na aba <strong>"Bot"</strong> no menu lateral, clique em <strong>"Reset Token"</strong> ou <strong>"Copy"</strong> para copiar o Token do bot.
+                  Vá na aba <strong>"Bot"</strong> no menu lateral, clique em <strong>"Reset Token"</strong> para obter seu Token secreto e cole no campo <strong>Token do Bot</strong>.
                 </li>
                 <li>
-                  <strong>Importante (Privileged Gateway Intents):</strong> Na mesma aba "Bot", role até a seção <strong>"Privileged Gateway Intents"</strong> e ATIVE:
+                  <strong>Privileged Gateway Intents (Obrigatório):</strong> Ainda na aba "Bot", role a página até a seção <strong>"Privileged Gateway Intents"</strong> e ATIVE:
                   <ul className="list-disc list-inside ml-4 mt-1 text-[#9E9E9E] space-y-0.5">
-                    <li><strong className="text-[#FFFFFF]">Message Content Intent</strong> (para responder mensagens no chat)</li>
+                    <li><strong className="text-[#FFFFFF]">Message Content Intent</strong> (essencial para ler comandos e rolagens de dados no chat)</li>
                     <li><strong className="text-[#FFFFFF]">Server Members Intent</strong></li>
                   </ul>
                 </li>
                 <li>
-                  Copie o <strong>Application ID</strong> na aba "General Information" e insira no campo Client ID deste painel para gerar seu link de convite.
+                  <strong>Instalação / Convite da Guilda:</strong> Vá na aba <strong>"Installation"</strong> (ou OAuth2), configure a <strong>Instalação de Guilda</strong> com os escopos <code className="text-indigo-300 font-mono text-[11px]">applications.commands</code> e <code className="text-indigo-300 font-mono text-[11px]">bot</code>, ative as permissões listadas acima e use o link gerado para colocar o bot no seu servidor de RPG.
+                </li>
+                <li>
+                  Copie o <strong>Application ID</strong> na aba "General Information" e insira no campo <strong>Client ID</strong> deste painel para gerar links automáticos com todas as permissões.
                 </li>
               </ol>
             </div>

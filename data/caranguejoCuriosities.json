@@ -1,0 +1,107 @@
+[
+  {
+    "id": 1,
+    "title": "A Grande Carcinização (A Evolução Quer Caranguejos!)",
+    "fact": "Na biologia evolutiva existe um fenômeno real chamado 'Carcinização' (Carcinisation). A natureza evoluiu crustáceos para a anatomia de caranguejos de forma totalmente independente em pelo menos 5 linhagens diferentes ao longo de centenas de milhões de anos! Parece que para a natureza, o corpo perfeito de sobrevivência é sempre... um caranguejo.",
+    "category": "Evolução & Biologia",
+    "rpg_hook": "Um feitiço arcano proibido de transmutação que lentamente converte aberrações e aventureiros em crustáceos blindados perfeitos."
+  },
+  {
+    "id": 2,
+    "title": "Caranguejo-dos-Coqueiros (O Titã Terrestre)",
+    "fact": "O Caranguejo-dos-coqueiros (Birgus latro) é o maior artrópode terrestre do planeta, podendo alcançar 1 metro de envergadura e pesar mais de 4 kg. Suas garras possuem uma força de compressão de mais de 3.000 Newtons — proporcionalmente superior à mordida de um leopardo ou leão — capazes de estilhaçar cocos secos facilmente.",
+    "category": "Recordistas do Reino Animal",
+    "rpg_hook": "Monstro clássico de nível baixo/médio em ilhas tropicais: se agarrarem a arma de um guerreiro com sucesso, partem o cabo de madeira em dois."
+  },
+  {
+    "id": 3,
+    "title": "Caranguejo-Aranha-Gigante-do-Japão (O Monstro Abissal)",
+    "fact": "Habitando as fossas oceânicas frias a até 600 metros de profundidade no Japão, o Caranguejo-aranha-gigante (Macrocheira kaempferi) tem a maior envergadura de pernas de qualquer artrópode: até 3,8 metros de ponta a ponta e expectativa de vida estimada em mais de 100 anos!",
+    "category": "Profundezas Abissais",
+    "rpg_hook": "Criatura colossal adormecida nas profundezas marítimas que serve de montaria para tritões ou guardião de templos submarinos esquecidos."
+  },
+  {
+    "id": 4,
+    "title": "Sangue Azul Que Salva Vidas",
+    "fact": "O caranguejo-ferradura (límulo) possui sangue de cor azul viva devido à presença de hemocianina à base de cobre (em vez de ferro). Seus amebócitos reagem instantaneamente coagulando em contato com endotoxinas bacterianas, sendo o composto padrão-ouro global (LAL) usado em laboratórios para testar a esterilidade de vacinas humanas e antibióticos.",
+    "category": "Medicina & Ciência",
+    "rpg_hook": "Um ingrediente alquímico lendário: o sangue azul de um crustáceo ancestral capaz de curar qualquer veneno ou praga mágica."
+  },
+  {
+    "id": 5,
+    "title": "A Dança da Troca de Conchas em Fila Indiana",
+    "fact": "Caranguejos-eremitas não produzem conchas próprias; eles precisam ocupar conchas vazias de gastrópodes. Quando uma concha maior surge na praia, eles não lutam imediatamente: eles formam uma fila indiana ordenada por tamanho decrescente, e quando o maior troca de concha, ocorre uma reação em cadeia sincronizada onde cada caranguejo entra na concha deixada pelo anterior!",
+    "category": "Comportamento Social",
+    "rpg_hook": "Um ritual pacífico entre criaturas selvagens que jogadores podem observar para decifrar a ordem de um enigma em ruínas de praia."
+  },
+  {
+    "id": 6,
+    "title": "Olhos em Periscópio com Visão 360°",
+    "fact": "Os olhos dos caranguejos ficam na ponta de pedúnculos móveis que funcionam como periscópios militares. Eles podem se mover em direções opostas de forma independente e enxergar em 360 graus, mesmo enquanto o corpo do caranguejo está totalmente enterrado sob a areia da praia.",
+    "category": "Anatomia & Sobrevivência",
+    "rpg_hook": "Imunidade a ataques de flanco e bônus de percepção passiva elevada (+5) contra emboscadas na areia ou lamaçal."
+  },
+  {
+    "id": 7,
+    "title": "O Caranguejo Boxeador (Armado com Anêmonas Vivas)",
+    "fact": "O Caranguejo Boxeador (Lybia tessellata) carrega anêmonas marinhas vivas e venenosas firmemente presas em cada uma de suas garras. Quando ameaçado, ele agita as anêmonas para a frente como luvas de boxe venenosas, aplicando ferrões urticantes nos predadores para se defender.",
+    "category": "Simbioses Incríveis",
+    "rpg_hook": "Um lacaio de bruxa aquática que desfere socos causando dano de impacto acrescido de dano de veneno ácido com paralisia temporária."
+  },
+  {
+    "id": 8,
+    "title": "O Caranguejo Yeti das Fontes Vulcânicas",
+    "fact": "Descoberto em 2005 em dorsais oceânicas a mais de 2.200 metros de profundidade próximo à Ilha de Páscoa, o Caranguejo Yeti (Kiwa hirsuta) possui garras e patas cobertas por densos filamentos semelhantes a pelos. Nesses pelos ele cultiva colônias de bactérias filamentosas que neutralizam compostos tóxicos de fontes hidrotermais e servem de alimento.",
+    "category": "Extremófilos",
+    "rpg_hook": "Habitantes imunes a calor e fogo vivendo na borda de vulcões ativos e caldeirões de magma elemental."
+  },
+  {
+    "id": 9,
+    "title": "Autotomia: Amputação Voluntária de Emergência",
+    "fact": "Se um caranguejo for capturado por uma de suas garras ou patas por um predador voraz, ele pode quebrar e soltar a própria pata voluntariamente através de uma contração muscular rápida (autotomia). Uma válvula especial fecha a artéria para evitar hemorragia, e um novo membro nasce e se regenera nas próximas mudas de exoesqueleto!",
+    "category": "Regeneração & Sobrevivência",
+    "rpg_hook": "O chefe monstro decepa a própria garra presa para fugir de uma armadilha, deixando a garra ainda se debatendo como distração."
+  },
+  {
+    "id": 10,
+    "title": "A Garra Gigante do Caranguejo-Violinista",
+    "fact": "Nos caranguejos-violinistas machos, uma das garras cresce até representar mais da metade de todo o peso corporal do animal. Ele a movimenta ritmicamente no ar como se estivesse tocando violino para espantar rivais e atrair fêmeas.",
+    "category": "Comunicação Animal",
+    "rpg_hook": "Monstro com uma garra titânica que concede cobertura total (+2 CA) de um lado e golpe de esmagamento com dano triplicado."
+  },
+  {
+    "id": 11,
+    "title": "Caranguejo Fantasma: O Velocista das Praias",
+    "fact": "O Caranguejo Fantasma (Ocypode) é um dos animais mais rápidos do planeta em proporção ao tamanho do corpo, atingindo velocidades de até 20 km/h (mais de 100 comprimentos de corpo por segundo)! Ele consegue mudar de direção em 360° instantaneamente sem desacelerar.",
+    "category": "Velocidade Extrema",
+    "rpg_hook": "Criaturas ágeis de deslocamento 50 pés com a ação *Disengage* (Desengajar) gratuita a cada turno."
+  },
+  {
+    "id": 12,
+    "title": "A Armadura de Quitina e Carbonato de Cálcio",
+    "fact": "O exoesqueleto dos caranguejos é uma obra-prima de engenharia biológica. Ele é composto por camadas entrelaçadas de nanofibras de quitina mineralizadas com carbonato de cálcio e proteínas flexíveis, formando uma blindagem compósita que cientistas militares estudam para projetar novos coletes balísticos.",
+    "category": "Biomimética & Armaduras",
+    "rpg_hook": "Armadura de placas feita com casca de caranguejo gigante: imune a ferrugem/ácido e não impõe desvantagem em testes de Furtividade na água."
+  },
+  {
+    "id": 13,
+    "title": "D&D Clássico: O Terrível Agarrão do Caranguejo Gigante",
+    "fact": "No RPG de mesa D&D 5e e OSR, o Caranguejo Gigante (Giant Crab) é notório por sua manobra automática: ao acertar com a garra, o alvo fica *Grappled* (Agarrado) sem teste de resistência inicial! Um grupo de aventureiros de nível 1 em praias ou mangues costuma ser arrastado para a água funda em segundos.",
+    "category": "História do RPG",
+    "rpg_hook": "Dois caranguejos gigantes tentando arrastar o mago do grupo para dentro da caverna submarina enquanto o combate se desenrola."
+  },
+  {
+    "id": 14,
+    "title": "Câncer: A Constelação e o Monstro Karkinos",
+    "fact": "Na mitologia grega, durante os Doze Trabalhos de Hércules, a deusa Hera enviou o caranguejo gigante Karkinos para beliscar o calcanhar de Hércules enquanto ele enfrentava a Hidra de Lerna. Em recompensa pela bravura do caranguejo contra o semideus, Hera o imortalizou nos céus como a constelação de Câncer.",
+    "category": "Mitologia & Folclore",
+    "rpg_hook": "Um artefato celestial com a insígnia da constelação que convoca a bênção de uma couraça impenetrável uma vez por descanso longo."
+  },
+  {
+    "id": 15,
+    "title": "Caranguejo da Ilha Christmas (A Grande Migração Vermelha)",
+    "fact": "Todos os anos, mais de 50 milhões de caranguejos-vermelhos realizam uma das migrações em massa mais impressionantes da Terra na Ilha Christmas, cobrindo estradas, penhascos e praias como um tapete escarlate vivo para depositar ovos no oceano.",
+    "category": "Fenômenos Naturais",
+    "rpg_hook": "A ilha inteira é tomada por uma onda viva escarlate durante a lua cheia, forçando o grupo a navegar em telhados e copas de árvores."
+  }
+]

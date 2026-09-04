@@ -30,8 +30,29 @@ import { spawn } from 'child_process';
 import { createRequire } from 'module';
 import ffmpegStatic from 'ffmpeg-static';
 import { db } from './db.js';
-import { BotStatus, DiscordGuild, DiscordMessagePayload, NPC, DiceRollResult, WodDiceRollResult, DiagnosticLog, VoiceDiagnostics } from '../src/types.js';
+import { BotStatus, DiscordGuild, DiscordMessagePayload, NPC, DiceRollResult, WodDiceRollResult, DiagnosticLog, VoiceDiagnostics, GeneratedEncounter } from '../src/types.js';
 import { rollWodDice, parseWodCommand } from './wodDice.js';
+
+function loadCaranguejoCuriosities(): Array<{ id: number; title: string; fact: string; category?: string; rpg_hook?: string }> {
+  try {
+    const filePath = path.join(process.cwd(), 'data', 'caranguejoCuriosities.json');
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (e) {
+    console.error('Error loading caranguejoCuriosities.json:', e);
+  }
+  return [
+    {
+      id: 1,
+      title: "A Grande Carcinização",
+      fact: "Na biologia evolutiva, crustáceos evoluíram independentemente para a anatomia de caranguejo pelo menos 5 vezes diferentes ao longo de centenas de milhões de anos! A natureza parece convergir sempre para caranguejos.",
+      category: "Evolução & Biologia",
+      rpg_hook: "Um feitiço arcano de transmutação proibido que lentamente converte criaturas em crustáceos blindados perfeitos."
+    }
+  ];
+}
 
 // Helper to safely require packages in both CommonJS bundled output and ESM
 function safeRequire(modulePath: string): any {
@@ -481,23 +502,32 @@ export class DiscordBotService {
         return;
       }
 
+      // Check for \caranguejo commands (\caranguejo, /caranguejo, !caranguejo)
+      if (
+        content === '\\caranguejo' || content === '!caranguejo' || content === '/caranguejo' ||
+        content.startsWith('\\caranguejo ') || content.startsWith('!caranguejo ') || content.startsWith('/caranguejo ')
+      ) {
+        const embed = this.getCrabCuriosityEmbed(content);
+        await message.reply({ embeds: [embed] });
+        return;
+      }
+
+      // Check for \help and \ajuda commands
+      if (
+        content === '\\help' || content === '!help' || content === '/help' ||
+        content === '\\ajuda' || content === '!ajuda' || content === '/ajuda' ||
+        content.startsWith('\\help ') || content.startsWith('!help ') || content.startsWith('/help ') ||
+        content.startsWith('\\ajuda ') || content.startsWith('!ajuda ') || content.startsWith('/ajuda ')
+      ) {
+        const helpEmbed = this.createComprehensiveHelpEmbed();
+        await message.reply({ embeds: [helpEmbed] });
+        return;
+      }
+
       // Other prefix commands
       const prefix = db.getBotConfig().prefix || '!';
       if (content.startsWith(prefix + 'ping')) {
-        await message.reply('🎲 **Escudo do Mestre Online!** Sistema de áudio, soundboard e dados WoD prontos.');
-      } else if (content.startsWith(prefix + 'ajuda') || content.startsWith(prefix + 'help')) {
-        const helpEmbed = new EmbedBuilder()
-          .setColor('#6366f1')
-          .setTitle('📖 Comandos do Escudo do Mestre')
-          .setDescription(
-            '**🎲 Rolagem Mundo das Trevas (D10):**\n' +
-            '`\\r 8d10` ou `\\r 8` - Rola 8 dados D10 (Sucesso 7+, Crítico no 10 que explode, 1s cancelam sucessos priorizando críticos)\n' +
-            '`\\kr 6d10` ou `\\kr 6` - Keen Roll (Acerto Crítico no 9 e 10 explodindo)\n' +
-            '`\\r 7d10 Esquiva` - Rola com motivo/ação anotada\n\n' +
-            '**🎵 Sons & NPCs:**\n' +
-            'Controlados diretamente pela interface web do mestre!'
-          );
-        await message.reply({ embeds: [helpEmbed] });
+        await message.reply('🎲 **Escudo do Mestre Online!** Sistema de áudio, ambientação, soundboard e dados WoD prontos.');
       }
     });
   }
@@ -595,6 +625,103 @@ export class DiscordBotService {
     ]);
 
     embed.setFooter({ text: 'Sistema de Dados • Mundo das Trevas (WoD)' });
+    return embed;
+  }
+
+  private getCrabCuriosityEmbed(content: string): EmbedBuilder {
+    const curiosities = loadCaranguejoCuriosities();
+    let selected = curiosities[0];
+
+    // Check if user requested a specific ID like \caranguejo 4
+    const parts = content.trim().split(/\s+/);
+    if (parts.length > 1) {
+      const requestedId = parseInt(parts[1], 10);
+      const found = curiosities.find(c => c.id === requestedId);
+      if (found) {
+        selected = found;
+      } else {
+        selected = curiosities[Math.floor(Math.random() * curiosities.length)];
+      }
+    } else {
+      selected = curiosities[Math.floor(Math.random() * curiosities.length)];
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor('#ea580c')
+      .setTitle(`🦀 Curiosidade Crustácea #${selected.id}: ${selected.title}`)
+      .setDescription(selected.fact)
+      .setTimestamp();
+
+    if (selected.category) {
+      embed.addFields({
+        name: '🔬 Categoria Científica',
+        value: selected.category,
+        inline: true
+      });
+    }
+
+    if (selected.rpg_hook) {
+      embed.addFields({
+        name: '⚔️ Gancho de Mesa (RPG Hook)',
+        value: `*${selected.rpg_hook}*`,
+        inline: false
+      });
+    }
+
+    embed.setFooter({
+      text: 'CaranguejoRPG • O Guardião da Mesa | Digite \\caranguejo para outra curiosidade ou \\help'
+    });
+
+    return embed;
+  }
+
+  private createComprehensiveHelpEmbed(): EmbedBuilder {
+    const embed = new EmbedBuilder()
+      .setColor('#6366f1')
+      .setTitle('🦀 CaranguejoRPG — Guia de Comandos & Funcionalidades')
+      .setDescription(
+        '**Bem-vindo ao CaranguejoRPG!** O assistente definitivo de mesa para o Mestre, integrando áudio contínuo, som ambiente, efeitos instantâneos (SFX), rolador de dados e ferramentas de sessão no Discord.'
+      )
+      .addFields([
+        {
+          name: '🎲 Rolagem Mundo das Trevas (D10 Storyteller)',
+          value:
+            '• `\\r 8d10` ou `\\r 8` — Rola 8d10 (Sucesso 7+, 10s explodem com novos dados, 1s cancelam sucessos priorizando críticos)\n' +
+            '• `\\kr 6d10` ou `\\kr 6` — **Keen Roll** (Críticos ativam no 9 e 10 e continuam explodindo)\n' +
+            '• `\\r 7d10 Esquiva` — Rola dados com anotação ou motivo da ação',
+          inline: false
+        },
+        {
+          name: '🦀 Curiosidades Crustáceas',
+          value:
+            '• `\\caranguejo` — Sorteia uma curiosidade real sobre caranguejos com gancho de campanha de RPG\n' +
+            '• `\\caranguejo [número]` — Mostra uma curiosidade específica (ex: `\\caranguejo 3`)',
+          inline: false
+        },
+        {
+          name: '📖 Informações do Bot',
+          value:
+            '• `\\help` ou `\\ajuda` — Exibe este manual completo de comandos\n' +
+            '• `!ping` — Verifica se a conexão com o bot está ativa',
+          inline: false
+        },
+        {
+          name: '🛡️ Funcionalidades do Painel Web do Mestre',
+          value:
+            '• **🎵 Músicas & 🌿 Ambientação:** Duas trilhas independentes no Mixer com volume individual e loop contínuo.\n' +
+            '• **🔊 Soundboard:** Disparo instantâneo de efeitos sonoros com teclas de atalho.\n' +
+            '• **⚔️ Gerador de Encontros:** Geração balanceada por nível, ambiente e quantidade com envio direto para o Discord.\n' +
+            '• **🎯 Roleta Customizável:** Sorteios aleatórios com porcentagens e fatias configuráveis enviados ao chat.\n' +
+            '• **🖼️ Envio de NPCs:** Divulgação anônima de artes conceituais para os jogadores.\n' +
+            '• **⏱️ Rastreador de Combate:** Gerenciamento de iniciativa com avisos de turnos no Discord.',
+          inline: false
+        }
+      ])
+      .setFooter({
+        text: 'CaranguejoRPG • Desenvolvido para Mestres Lendários'
+      })
+      .setTimestamp();
+
     return embed;
   }
 
@@ -1184,6 +1311,141 @@ export class DiscordBotService {
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message };
+    }
+  }
+
+  public async postEncounter(encounter: GeneratedEncounter, customChannelId?: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.client?.isReady()) {
+      return { success: false, error: 'O bot do Discord não está conectado. Conecte o bot para postar o encontro no chat.' };
+    }
+
+    const config = db.getBotConfig();
+    const targetChannelId = customChannelId || config.textChannelId;
+    if (!targetChannelId) {
+      return { success: false, error: 'Nenhum canal de texto selecionado nas configurações do Discord.' };
+    }
+
+    try {
+      const channel = await this.client.channels.fetch(targetChannelId);
+      if (!channel || !channel.isTextBased()) {
+        return { success: false, error: 'Canal de texto inválido.' };
+      }
+
+      const difficultyColors: Record<string, ColorResolvable> = {
+        facil: '#22c55e',
+        medio: '#eab308',
+        dificil: '#f97316',
+        mortal: '#ef4444'
+      };
+
+      const color = difficultyColors[encounter.difficulty] || '#ea580c';
+
+      const embed = new EmbedBuilder()
+        .setColor(color)
+        .setTitle(`⚔️ Encontro: ${encounter.title}`)
+        .setDescription(
+          `🌲 **Ambiente:** ${encounter.environmentName} | 🛡️ **Nível:** ${encounter.playerLevel} | ⚠️ **Dificuldade:** ${encounter.difficulty.toUpperCase()}\n\n` +
+          `*${encounter.settingDescription}*`
+        )
+        .setTimestamp();
+
+      if (encounter.enemies && encounter.enemies.length > 0) {
+        const enemiesSummary = encounter.enemies.map(e => 
+          `• **${e.count}x ${e.name}** (ND ${e.crOrLevel || '1'} | PV ${e.hp} | CA ${e.ac}) — *${e.tactics}*`
+        ).join('\n');
+
+        embed.addFields({
+          name: '👾 Inimigos & Ameaças',
+          value: enemiesSummary.slice(0, 1024),
+          inline: false
+        });
+      }
+
+      if (encounter.environmentalHazard) {
+        embed.addFields({
+          name: '🌪️ Perigo de Terreno / Obstáculo',
+          value: encounter.environmentalHazard.slice(0, 1024),
+          inline: false
+        });
+      }
+
+      if (encounter.tacticalTwist) {
+        embed.addFields({
+          name: '⚡ Reviravolta Tática',
+          value: encounter.tacticalTwist.slice(0, 1024),
+          inline: false
+        });
+      }
+
+      if (encounter.suggestedLoot) {
+        embed.addFields({
+          name: '💎 Recompensa / Espólio Sugerido',
+          value: encounter.suggestedLoot.slice(0, 1024),
+          inline: false
+        });
+      }
+
+      embed.setFooter({ text: 'CaranguejoRPG • Gerador de Encontros Aleatórios' });
+
+      await (channel as TextChannel).send({ embeds: [embed] });
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error posting encounter to Discord:', err);
+      return { success: false, error: err?.message || 'Falha ao enviar encontro ao Discord.' };
+    }
+  }
+
+  public async postRouletteResult(
+    result: { sliceLabel: string; percentage: number; color?: string; description?: string; presetName?: string; rollerName?: string },
+    customChannelId?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.client?.isReady()) {
+      return { success: false, error: 'O bot do Discord não está conectado. Conecte o bot para postar na roleta.' };
+    }
+
+    const config = db.getBotConfig();
+    const targetChannelId = customChannelId || config.textChannelId;
+    if (!targetChannelId) {
+      return { success: false, error: 'Nenhum canal de texto configurado.' };
+    }
+
+    try {
+      const channel = await this.client.channels.fetch(targetChannelId);
+      if (!channel || !channel.isTextBased()) {
+        return { success: false, error: 'Canal de texto inválido.' };
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor((result.color as ColorResolvable) || '#ec4899')
+        .setTitle(`🎯 Roleta do Destino: ${result.sliceLabel}`)
+        .setDescription(
+          `**Resultado Sorteado:** 🎲 **${result.sliceLabel}**\n` +
+          `**Probabilidade:** \`${result.percentage}%\`\n` +
+          (result.description ? `\n*${result.description}*` : '')
+        )
+        .setTimestamp();
+
+      if (result.presetName) {
+        embed.addFields({
+          name: '📜 Tabela / Roleta',
+          value: result.presetName,
+          inline: true
+        });
+      }
+
+      embed.addFields({
+        name: '👤 Girado por',
+        value: result.rollerName || 'Mestre da Mesa',
+        inline: true
+      });
+
+      embed.setFooter({ text: 'CaranguejoRPG • Roleta Customizável da Mesa' });
+
+      await (channel as TextChannel).send({ embeds: [embed] });
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error posting roulette result to Discord:', err);
+      return { success: false, error: err?.message || 'Falha ao postar resultado da roleta no Discord.' };
     }
   }
 }

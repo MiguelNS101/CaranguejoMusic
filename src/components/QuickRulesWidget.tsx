@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BookOpen,
   Send,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { safeFetchJson } from '../services/api';
+import { getConditionRulePresets, ConditionRulePreset } from '../utils/presetStore';
 
 interface ConditionRule {
   id: string;
@@ -128,13 +129,25 @@ const RULES_CATALOG: ConditionRule[] = [
 
 export const QuickRulesWidget: React.FC = () => {
   const { botStatus } = useAudio();
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'status' | 'wod' | 'difficulty'>('all');
+  const [rulesList, setRulesList] = useState<ConditionRulePreset[]>(() => getConditionRulePresets());
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'status' | 'wod' | 'difficulty' | 'action' | 'custom'>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeRuleId, setActiveRuleId] = useState<string>(RULES_CATALOG[0].id);
+  const [activeRuleId, setActiveRuleId] = useState<string>(() => rulesList[0]?.id || RULES_CATALOG[0].id);
   const [isSending, setIsSending] = useState(false);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'success' | 'error'; msg?: string }>({ status: 'idle' });
 
-  const filteredRules = RULES_CATALOG.filter(r => {
+  useEffect(() => {
+    const handleUpdate = () => {
+      const updated = getConditionRulePresets();
+      setRulesList(updated);
+    };
+    window.addEventListener('caranguejo_presets_updated', handleUpdate);
+    return () => window.removeEventListener('caranguejo_presets_updated', handleUpdate);
+  }, []);
+
+  const combinedRules = rulesList && rulesList.length > 0 ? rulesList : RULES_CATALOG;
+
+  const filteredRules = combinedRules.filter(r => {
     const matchesCat = selectedCategory === 'all' || r.category === selectedCategory;
     const matchesSearch =
       r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -143,7 +156,7 @@ export const QuickRulesWidget: React.FC = () => {
     return matchesCat && matchesSearch;
   });
 
-  const activeRule = RULES_CATALOG.find(r => r.id === activeRuleId) || filteredRules[0] || RULES_CATALOG[0];
+  const activeRule = combinedRules.find(r => r.id === activeRuleId) || filteredRules[0] || combinedRules[0];
 
   const handleSendToDiscord = async () => {
     if (!activeRule) return;
@@ -188,7 +201,7 @@ export const QuickRulesWidget: React.FC = () => {
                 : 'bg-[#141619] text-[#9E9E9E] hover:text-white border border-[#2D3139]'
             }`}
           >
-            Todas ({RULES_CATALOG.length})
+            Todas ({combinedRules.length})
           </button>
           <button
             type="button"
@@ -222,6 +235,17 @@ export const QuickRulesWidget: React.FC = () => {
             }`}
           >
             CDs & Cobertura
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedCategory('custom')}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+              selectedCategory === 'custom'
+                ? 'bg-purple-600 text-white'
+                : 'bg-[#141619] text-[#9E9E9E] hover:text-white border border-[#2D3139]'
+            }`}
+          >
+            Personalizadas
           </button>
         </div>
 

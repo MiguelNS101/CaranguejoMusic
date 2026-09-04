@@ -3,67 +3,64 @@ import {
   Play,
   Pause,
   Square,
-  SkipForward,
-  SkipBack,
   Repeat,
-  Shuffle,
   Volume2,
   VolumeX,
   Plus,
   Trash2,
-  ListPlus,
-  Music,
-  FolderOpen,
   Upload,
   Search,
-  Tag,
   Check,
-  Flame,
   Radio,
   Clock,
   Layers,
   FolderUp,
   Headphones,
-  PhoneOff
+  CloudRain,
+  PhoneOff,
+  SkipBack,
+  SkipForward,
+  Sparkles,
+  Wind,
+  Flame
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
-import { MusicTrack, LoopMode } from '../types';
+import { AmbienceTrack } from '../types';
 import { FolderImportModal } from './FolderImportModal';
 import { AudioScrubber } from './AudioScrubber';
 import { apiFetch, resolveApiUrl } from '../services/api';
 
-export const MusicPlayerView: React.FC = () => {
+const QUICK_ATMOSPHERE_PRESETS = [
+  { id: 'tavern', name: 'Taverna Movimentada', icon: '🍺', desc: 'Canecos, risadas, lareira e burburinho de aventureiros.', tags: ['taverna', 'social', 'cidade'] },
+  { id: 'rain', name: 'Chuva & Tempestade', icon: '🌧️', desc: 'Gotas no telhado, vento uivante e trovões distantes.', tags: ['chuva', 'tempestade', 'natureza'] },
+  { id: 'dungeon', name: 'Masmorra & Ecos', icon: '🗝️', desc: 'Gotas gotejando em pedra fria, correntes e escuridão.', tags: ['masmorra', 'caverna', 'tensão'] },
+  { id: 'forest', name: 'Floresta Élfica', icon: '🌲', desc: 'Folhas ao vento, pássaros cantando e calmaria mágica.', tags: ['floresta', 'natureza', 'viagem'] },
+  { id: 'campfire', name: 'Fogueira no Acampamento', icon: '🔥', desc: 'Gravetos estalando, grilos e brisa noturna tranquila.', tags: ['acampamento', 'descanso', 'noite'] },
+  { id: 'combat', name: 'Tensão & Sombra', icon: '⚔️', desc: 'Bumbo de guerra, zumbido sombrio e perigo iminente.', tags: ['combate', 'suspense', 'ameaça'] }
+];
+
+export const AmbiencePlayerView: React.FC = () => {
   const {
-    currentTrack,
-    playbackState,
-    currentTime,
-    duration,
-    volume,
-    musicVolume,
-    setMusicVolume,
-    isMusicMuted,
-    toggleMusicMute,
-    isMuted,
+    currentAmbienceTrack,
+    ambiencePlaybackState,
+    ambienceCurrentTime,
+    ambienceDuration,
+    ambienceVolume,
+    setAmbienceVolume,
+    isAmbienceMuted,
+    toggleAmbienceMute,
     isLocalAudioEnabled,
     toggleLocalAudio,
-    loopMode,
-    queue,
-    playTrack,
-    stopTrack,
-    addToQueue,
-    removeFromQueue,
-    clearQueue,
-    togglePlayPause,
-    seek,
-    setVolume,
-    toggleMute,
-    setLoopMode,
-    skipNext,
-    skipPrevious,
-    musicTracks,
+    ambienceLoopMode,
+    setAmbienceLoopMode,
+    playAmbienceTrack,
+    stopAmbienceTrack,
+    toggleAmbiencePlayPause,
+    seekAmbience,
+    ambienceTracks,
     folders,
-    createMusicTrack,
-    deleteMusicTrack,
+    createAmbienceTrack,
+    deleteAmbienceTrack,
     botStatus,
     disconnectVoiceChannel
   } = useAudio();
@@ -90,13 +87,12 @@ export const MusicPlayerView: React.FC = () => {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const musicFolders = folders.filter(f => f.type === 'music');
+  const ambienceFolders = folders.filter(f => f.type === 'ambience' || f.type === 'music');
 
-  const filteredTracks = musicTracks.filter(track => {
+  const filteredTracks = ambienceTracks.filter(track => {
     const matchesFolder = selectedFolderId === 'all' || track.folderId === selectedFolderId;
     const matchesSearch = searchQuery === '' ||
       track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (track.artist && track.artist.toLowerCase().includes(searchQuery.toLowerCase())) ||
       track.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesFolder && matchesSearch;
   });
@@ -110,19 +106,20 @@ export const MusicPlayerView: React.FC = () => {
     formData.append('file', file);
 
     try {
-      const res = await apiFetch('/api/upload?type=music', {
+      const res = await apiFetch('/api/upload?type=ambience', {
         method: 'POST',
         body: formData
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.url) {
         setNewUrl(data.url);
         if (!newTitle) {
-          setNewTitle(file.name.replace(/\.[^/.]+$/, ''));
+          const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ');
+          setNewTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
         }
       }
     } catch (err) {
-      console.error('File upload error:', err);
+      console.error('Upload failed:', err);
     } finally {
       setIsUploading(false);
     }
@@ -132,54 +129,73 @@ export const MusicPlayerView: React.FC = () => {
     e.preventDefault();
     if (!newTitle.trim() || !newUrl.trim()) return;
 
-    const tagsArray = newTags.split(',').map(t => t.trim()).filter(Boolean);
+    const tagsArray = newTags
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
 
-    await createMusicTrack({
+    await createAmbienceTrack({
       title: newTitle.trim(),
-      artist: newArtist.trim() || 'Mestre da Mesa',
       url: newUrl.trim(),
-      folderId: newFolderId || undefined,
+      folderId: newFolderId || (ambienceFolders.length > 0 ? ambienceFolders[0].id : undefined),
       tags: tagsArray,
-      isLocal: newUrl.startsWith('/media/'),
       coverUrl: newCoverUrl.trim() || undefined
     });
 
-    setIsAddModalOpen(false);
     setNewTitle('');
     setNewArtist('');
     setNewUrl('');
     setNewFolderId('');
     setNewTags('');
     setNewCoverUrl('');
+    setIsAddModalOpen(false);
   };
 
   const toggleLoop = () => {
-    if (loopMode === 'off') setLoopMode('queue');
-    else if (loopMode === 'queue') setLoopMode('track');
-    else setLoopMode('off');
+    if (ambienceLoopMode === 'none' || !ambienceLoopMode) {
+      setAmbienceLoopMode('track');
+    } else {
+      setAmbienceLoopMode('none');
+    }
   };
+
+  const skipNext = () => {
+    if (filteredTracks.length === 0) return;
+    const currentIndex = filteredTracks.findIndex(t => t.id === currentAmbienceTrack?.id);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % filteredTracks.length;
+    playAmbienceTrack(filteredTracks[nextIndex]);
+  };
+
+  const skipPrevious = () => {
+    if (filteredTracks.length === 0) return;
+    const currentIndex = filteredTracks.findIndex(t => t.id === currentAmbienceTrack?.id);
+    const prevIndex = currentIndex <= 0 ? filteredTracks.length - 1 : currentIndex - 1;
+    playAmbienceTrack(filteredTracks[prevIndex]);
+  };
+
+  const isPlaying = ambiencePlaybackState === 'playing';
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
-      {/* Top Banner Player */}
+      {/* Top Banner Player (Harmonized with MusicPlayerView) */}
       <div className="bg-[#1A1D21] border border-[#2D3139] rounded-3xl p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Cover & Main Details */}
           <div className="flex items-center gap-5 w-full md:w-auto">
             <div className="relative w-24 h-24 rounded-2xl overflow-hidden bg-[#141619] shrink-0 border border-[#2D3139] shadow-lg">
-              {currentTrack?.coverUrl ? (
+              {currentAmbienceTrack?.coverUrl ? (
                 <img
-                  src={currentTrack.coverUrl}
-                  alt={currentTrack.title}
+                  src={resolveApiUrl(currentAmbienceTrack.coverUrl)}
+                  alt={currentAmbienceTrack.title}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-[#141619] text-indigo-400">
-                  <Flame className="w-8 h-8" />
+                  <CloudRain className={`w-8 h-8 ${isPlaying ? 'animate-pulse' : ''}`} />
                 </div>
               )}
-              {playbackState === 'playing' && (
+              {isPlaying && (
                 <div className="absolute inset-0 bg-indigo-500/10 backdrop-blur-[1px] flex items-center justify-center">
                   <span className="w-3 h-3 rounded-full bg-indigo-400 animate-ping" />
                 </div>
@@ -189,7 +205,7 @@ export const MusicPlayerView: React.FC = () => {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/15 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
-                  {playbackState === 'playing' ? 'Reproduzindo' : playbackState === 'paused' ? 'Pausado' : 'Parado'}
+                  {isPlaying ? 'Ambiente Ativo' : ambiencePlaybackState === 'paused' ? 'Pausado' : 'Parado'}
                 </span>
                 {botStatus.isOnline ? (
                   <span className="text-[10px] text-emerald-400 bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
@@ -205,7 +221,7 @@ export const MusicPlayerView: React.FC = () => {
                 )}
 
                 {/* Disconnect Voice Channel Button */}
-                {botStatus.connectedVoiceChannel && (
+                {botStatus.connectedVoiceChannel && disconnectVoiceChannel && (
                   <button
                     type="button"
                     onClick={() => disconnectVoiceChannel()}
@@ -234,15 +250,15 @@ export const MusicPlayerView: React.FC = () => {
               </div>
 
               <h2 className="text-xl font-extrabold text-[#FFFFFF] truncate font-rpg tracking-wide">
-                {currentTrack?.title || 'Selecione uma faixa para iniciar'}
+                {currentAmbienceTrack?.title || 'Selecione um ambiente para imersão'}
               </h2>
               <p className="text-sm text-[#9E9E9E] truncate">
-                {currentTrack?.artist || 'Bardos & Trilha de RPG'}
+                Atmosfera & Imersão da Mesa
               </p>
 
-              {currentTrack?.tags && currentTrack.tags.length > 0 && (
+              {currentAmbienceTrack?.tags && currentAmbienceTrack.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {currentTrack.tags.map((tag, i) => (
+                  {currentAmbienceTrack.tags.map((tag, i) => (
                     <span key={i} className="text-[10px] bg-[#141619] text-[#E0E0E0] border border-[#2D3139] px-2 py-0.5 rounded-md">
                       #{tag}
                     </span>
@@ -258,31 +274,32 @@ export const MusicPlayerView: React.FC = () => {
               <button
                 onClick={toggleLoop}
                 className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                  loopMode !== 'off'
+                  ambienceLoopMode === 'track'
                     ? 'text-indigo-400 bg-indigo-500/15 border border-indigo-500/30'
                     : 'text-[#9E9E9E] hover:text-[#FFFFFF]'
                 }`}
-                title={`Modo de Repetição: ${loopMode === 'track' ? 'Música Atual' : loopMode === 'queue' ? 'Fila Completa' : 'Desligado'}`}
+                title={`Loop Contínuo de Ambiente: ${ambienceLoopMode === 'track' ? 'Ativo (Recomendado para BG)' : 'Desligado'}`}
               >
                 <Repeat className="w-4 h-4" />
-                {loopMode === 'track' && <span className="text-[8px] absolute font-bold font-mono">1</span>}
+                {ambienceLoopMode === 'track' && <span className="text-[8px] absolute font-bold font-mono">∞</span>}
               </button>
 
               <button
                 onClick={skipPrevious}
                 className="p-2.5 text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B] rounded-xl transition-colors cursor-pointer"
-                title="Música Anterior"
+                title="Ambiente Anterior"
               >
                 <SkipBack className="w-5 h-5" />
               </button>
 
               <button
-                id="music-play-btn"
-                onClick={togglePlayPause}
-                className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                title={playbackState === 'playing' ? 'Pausar / Parar Música' : 'Tocar Música'}
+                id="ambience-play-btn"
+                onClick={toggleAmbiencePlayPause}
+                disabled={!currentAmbienceTrack && ambienceTracks.length === 0}
+                className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-600/30 hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-40"
+                title={isPlaying ? 'Pausar Ambiente' : 'Tocar Ambiente'}
               >
-                {playbackState === 'playing' ? (
+                {isPlaying ? (
                   <Pause className="w-6 h-6 fill-current" />
                 ) : (
                   <Play className="w-6 h-6 fill-current translate-x-0.5" />
@@ -291,9 +308,9 @@ export const MusicPlayerView: React.FC = () => {
 
               {/* Stop Button */}
               <button
-                onClick={stopTrack}
+                onClick={stopAmbienceTrack}
                 className="p-2.5 text-[#9E9E9E] hover:text-rose-400 hover:bg-[#22262B] rounded-xl transition-colors cursor-pointer"
-                title="Parar Música (Discord e Local)"
+                title="Parar Som de Ambiente"
               >
                 <Square className="w-5 h-5" />
               </button>
@@ -301,37 +318,38 @@ export const MusicPlayerView: React.FC = () => {
               <button
                 onClick={skipNext}
                 className="p-2.5 text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B] rounded-xl transition-colors cursor-pointer"
-                title="Próxima Música"
+                title="Próximo Ambiente"
               >
                 <SkipForward className="w-5 h-5" />
               </button>
 
+              {/* Ambience Volume Controller */}
               <div className="flex items-center gap-1.5 ml-2 bg-[#141619] border border-[#2D3139] rounded-xl px-2.5 py-1">
                 <button
-                  onClick={toggleMusicMute}
+                  onClick={toggleAmbienceMute}
                   className="text-zinc-400 hover:text-white transition-colors"
-                  title={isMusicMuted ? 'Desmutar Trilha Sonora' : 'Mutar Trilha Sonora'}
+                  title={isAmbienceMuted ? 'Desmutar Ambientação' : 'Mutar Ambientação'}
                 >
-                  {isMusicMuted || musicVolume === 0 ? (
+                  {isAmbienceMuted || ambienceVolume === 0 ? (
                     <VolumeX className="w-4 h-4 text-rose-400" />
                   ) : (
-                    <Volume2 className="w-4 h-4 text-amber-400" />
+                    <Volume2 className="w-4 h-4 text-sky-400" />
                   )}
                 </button>
                 <div className="flex items-center gap-1">
-                  <span className="text-[10px] text-zinc-400 font-semibold uppercase">Música</span>
+                  <span className="text-[10px] text-zinc-400 font-semibold uppercase">Ambiente</span>
                   <input
                     type="range"
                     min="0"
                     max="1"
                     step="0.01"
-                    value={isMusicMuted ? 0 : musicVolume}
-                    onChange={(e) => setMusicVolume(parseFloat(e.target.value))}
-                    className="w-16 sm:w-20 h-1 bg-zinc-800 rounded appearance-none cursor-pointer accent-amber-500"
-                    title={`Volume da Música: ${Math.round((isMusicMuted ? 0 : musicVolume) * 100)}%`}
+                    value={isAmbienceMuted ? 0 : ambienceVolume}
+                    onChange={(e) => setAmbienceVolume(parseFloat(e.target.value))}
+                    className="w-16 sm:w-20 h-1 bg-zinc-800 rounded appearance-none cursor-pointer accent-sky-500"
+                    title={`Volume da Ambientação: ${Math.round((isAmbienceMuted ? 0 : ambienceVolume) * 100)}%`}
                   />
-                  <span className="text-[10px] font-mono text-amber-300 w-7 text-right">
-                    {Math.round((isMusicMuted ? 0 : musicVolume) * 100)}%
+                  <span className="text-[10px] font-mono text-sky-300 w-7 text-right">
+                    {Math.round((isAmbienceMuted ? 0 : ambienceVolume) * 100)}%
                   </span>
                 </div>
               </div>
@@ -340,10 +358,10 @@ export const MusicPlayerView: React.FC = () => {
             {/* Seek Bar */}
             <div className="w-full">
               <AudioScrubber
-                currentTime={currentTime}
-                duration={duration}
-                fallbackDuration={currentTrack?.duration}
-                onSeek={seek}
+                currentTime={ambienceCurrentTime}
+                duration={ambienceDuration}
+                fallbackDuration={currentAmbienceTrack?.duration}
+                onSeek={seekAmbience}
                 formatTime={formatTime}
                 size="md"
               />
@@ -352,12 +370,10 @@ export const MusicPlayerView: React.FC = () => {
         </div>
       </div>
 
-      {/* Track Library & Queue Side-by-Side */}
+      {/* Main Track Library & Preset Manager Side-by-Side (Matching MusicPlayerView) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
         {/* Left Column: Track Browser & Folders (8 cols) */}
         <div className="lg:col-span-8 space-y-4">
-          
           {/* Action Header & Search */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* Search */}
@@ -365,7 +381,7 @@ export const MusicPlayerView: React.FC = () => {
               <Search className="w-4 h-4 text-[#9E9E9E] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Buscar música, artista, tag..."
+                placeholder="Buscar ambiente, chuva, caverna, tag..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-[#1A1D21] border border-[#2D3139] rounded-xl pl-9 pr-3 py-2 text-xs text-[#E0E0E0] placeholder:text-[#6E7681] focus:outline-none focus:border-indigo-500/70 transition-colors"
@@ -382,14 +398,14 @@ export const MusicPlayerView: React.FC = () => {
                 Importar Pasta
               </button>
 
-              {/* Add Track Button */}
+              {/* Add Ambience Track Button */}
               <button
-                id="btn-add-music"
+                id="btn-add-ambience"
                 onClick={() => setIsAddModalOpen(true)}
                 className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                Adicionar Música
+                Adicionar Ambiente
               </button>
             </div>
           </div>
@@ -404,11 +420,11 @@ export const MusicPlayerView: React.FC = () => {
                   : 'bg-[#1A1D21] text-[#9E9E9E] border-[#2D3139] hover:border-[#363B44] hover:text-[#FFFFFF]'
               }`}
             >
-              Todas as Músicas ({musicTracks.length})
+              Todos os Ambientes ({ambienceTracks.length})
             </button>
 
-            {musicFolders.map(folder => {
-              const count = musicTracks.filter(m => m.folderId === folder.id).length;
+            {ambienceFolders.map(folder => {
+              const count = ambienceTracks.filter(m => m.folderId === folder.id).length;
               const isSelected = selectedFolderId === folder.id;
               return (
                 <button
@@ -422,7 +438,7 @@ export const MusicPlayerView: React.FC = () => {
                 >
                   <span
                     className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: folder.color || '#6366f1' }}
+                    style={{ backgroundColor: folder.color || '#38bdf8' }}
                   />
                   {folder.name} ({count})
                 </button>
@@ -440,12 +456,12 @@ export const MusicPlayerView: React.FC = () => {
             <div className="divide-y divide-[#2D3139]/60">
               {filteredTracks.length === 0 ? (
                 <div className="p-8 text-center text-[#9E9E9E] text-xs">
-                  Nenhuma música encontrada nesta pasta ou busca.
+                  Nenhum som de ambiente encontrado nesta pasta ou busca.
                 </div>
               ) : (
                 filteredTracks.map((track) => {
-                  const isCurrent = currentTrack?.id === track.id;
-                  const isPlayingThis = isCurrent && playbackState === 'playing';
+                  const isCurrent = currentAmbienceTrack?.id === track.id;
+                  const isPlayingThis = isCurrent && isPlaying;
 
                   return (
                     <div
@@ -457,7 +473,7 @@ export const MusicPlayerView: React.FC = () => {
                       {/* Track Index & Cover */}
                       <div className="flex items-center gap-3 min-w-0">
                         <button
-                          onClick={() => playTrack(track, true)}
+                          onClick={() => playAmbienceTrack(track)}
                           className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border transition-all ${
                             isCurrent
                               ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
@@ -476,7 +492,7 @@ export const MusicPlayerView: React.FC = () => {
                             {track.title}
                           </h4>
                           <p className="text-[11px] text-[#9E9E9E] truncate">
-                            {track.artist}
+                            Atmosfera Contínua
                           </p>
                         </div>
                       </div>
@@ -489,22 +505,20 @@ export const MusicPlayerView: React.FC = () => {
                           </span>
                         ))}
 
-                        <span className="text-xs font-mono text-[#9E9E9E] w-12 text-right">
-                          {formatTime(track.duration)}
-                        </span>
+                        {track.duration && track.duration > 0 ? (
+                          <span className="text-xs font-mono text-[#9E9E9E] w-12 text-right">
+                            {formatTime(track.duration)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-sky-400 bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-800/40">
+                            Loop ∞
+                          </span>
+                        )}
 
                         <button
-                          onClick={() => addToQueue(track)}
-                          className="p-1.5 text-[#9E9E9E] hover:text-indigo-300 hover:bg-[#141619] rounded-lg transition-colors"
-                          title="Adicionar à Fila"
-                        >
-                          <ListPlus className="w-4 h-4" />
-                        </button>
-
-                        <button
-                          onClick={() => deleteMusicTrack(track.id)}
-                          className="p-1.5 text-[#9E9E9E] hover:text-rose-400 hover:bg-[#141619] rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                          title="Remover Música"
+                          onClick={() => deleteAmbienceTrack(track.id)}
+                          className="p-1.5 text-[#9E9E9E] hover:text-rose-400 hover:bg-[#141619] rounded-lg transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                          title="Remover Som de Ambiente"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -517,100 +531,104 @@ export const MusicPlayerView: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Queue Manager (4 cols) */}
+        {/* Right Column: Atmosphere Presets & Ambient Panel (4 cols) */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 shadow-lg flex flex-col h-full min-h-[400px]">
             <div className="flex items-center justify-between pb-3 border-b border-[#2D3139]">
               <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-400" />
+                <Layers className="w-4 h-4 text-sky-400" />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-[#FFFFFF] font-rpg">
-                  Fila de Reprodução
+                  Cenários & Presets Rápidos
                 </h3>
               </div>
-              {queue.length > 0 && (
-                <button
-                  onClick={clearQueue}
-                  className="text-xs text-rose-400 hover:text-rose-300 font-medium"
-                >
-                  Limpar Fila
-                </button>
-              )}
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-950/40 text-sky-300 border border-sky-500/30">
+                Atalhos
+              </span>
             </div>
 
-            {/* Queue List */}
+            {/* Presets List */}
             <div className="flex-1 overflow-y-auto space-y-2 py-3 pr-1">
-              {queue.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-center text-[#9E9E9E] text-xs">
-                  <Music className="w-8 h-8 mb-2 opacity-30" />
-                  <p>A fila de músicas está vazia.</p>
-                  <p className="text-[11px] text-[#6E7681] mt-1">
-                    Clique em "+ Fila" em qualquer música ao lado para enfileirar.
-                  </p>
-                </div>
-              ) : (
-                queue.map((item, idx) => (
+              {QUICK_ATMOSPHERE_PRESETS.map((preset) => {
+                // Find if an existing track matches any tag or title
+                const matchingTrack = ambienceTracks.find(t => 
+                  t.title.toLowerCase().includes(preset.tags[0]) || 
+                  (t.tags && t.tags.some(tag => preset.tags.includes(tag.toLowerCase())))
+                );
+
+                return (
                   <div
-                    key={item.id}
+                    key={preset.id}
                     className="p-2.5 rounded-xl bg-[#141619] border border-[#2D3139] flex items-center justify-between gap-2 hover:border-[#363B44] transition-colors"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-5 text-center text-xs font-mono text-[#9E9E9E] font-bold">
-                        {idx + 1}
+                      <span className="text-base select-none shrink-0">
+                        {preset.icon}
                       </span>
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-[#E0E0E0] truncate">
-                          {item.track.title}
+                          {preset.name}
                         </p>
                         <p className="text-[10px] text-[#9E9E9E] truncate">
-                          {item.track.artist}
+                          {preset.desc}
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => {
-                          playTrack(item.track, true);
-                          removeFromQueue(item.id);
-                        }}
-                        className="p-1 text-[#9E9E9E] hover:text-indigo-400"
-                        title="Tocar Agora"
-                      >
-                        <Play className="w-3.5 h-3.5 fill-current" />
-                      </button>
-                      <button
-                        onClick={() => removeFromQueue(item.id)}
-                        className="p-1 text-[#9E9E9E] hover:text-rose-400"
-                        title="Remover da Fila"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {matchingTrack ? (
+                        <button
+                          onClick={() => playAmbienceTrack(matchingTrack)}
+                          className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                            currentAmbienceTrack?.id === matchingTrack.id && isPlaying
+                              ? 'bg-amber-500 text-zinc-950'
+                              : 'text-[#9E9E9E] hover:text-sky-300 hover:bg-[#22262B]'
+                          }`}
+                          title="Tocar este cenário sonoro agora"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSearchQuery(preset.tags[0]);
+                          }}
+                          className="text-[10px] px-2 py-1 rounded bg-[#22262B] text-zinc-400 hover:text-sky-300 hover:border-sky-500/40 border border-transparent transition-all cursor-pointer"
+                          title="Filtrar faixas com este tema"
+                        >
+                          Filtrar
+                        </button>
+                      )}
                     </div>
                   </div>
-                ))
-              )}
+                );
+              })}
             </div>
 
-            {/* Queue Footer */}
+            {/* Presets Footer Info */}
             <div className="pt-3 border-t border-[#2D3139] flex items-center justify-between text-xs text-[#9E9E9E]">
-              <span>{queue.length} faixas aguardando</span>
-              <span className="font-mono">
-                Total: {formatTime(queue.reduce((acc, curr) => acc + curr.track.duration, 0))}
+              <span className="flex items-center gap-1">
+                <Wind className="w-3.5 h-3.5 text-sky-400" />
+                Loop Contínuo
+              </span>
+              <span className="font-mono text-sky-300">
+                {ambienceTracks.length} faixas na biblioteca
               </span>
             </div>
           </div>
         </div>
-
       </div>
 
-      {/* Add Track Modal */}
+      {/* Add Ambience Track Modal (Harmonized with MusicPlayerView's Add Modal) */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#2D3139] pb-3">
-              <h3 className="text-base font-bold text-[#FFFFFF] font-rpg">
-                Adicionar Nova Música / Áudio
-              </h3>
+              <div className="flex items-center gap-2">
+                <CloudRain className="w-5 h-5 text-sky-400" />
+                <h3 className="text-base font-bold text-[#FFFFFF] font-rpg">
+                  Adicionar Som de Ambientação
+                </h3>
+              </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
                 className="text-[#9E9E9E] hover:text-[#FFFFFF]"
@@ -619,15 +637,15 @@ export const MusicPlayerView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateTrack} className="space-y-3.5">
-              {/* File Upload Option */}
+            <form onSubmit={handleCreateTrack} className="space-y-4">
+              {/* File Upload Box */}
               <div>
                 <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                  1. Enviar Arquivo Local (.mp3, .wav, .ogg)
+                  1. Enviar Arquivo de Áudio Local
                 </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-[#2D3139] hover:border-indigo-500/70 rounded-xl p-4 text-center cursor-pointer bg-[#141619] transition-colors"
+                  className="border-2 border-dashed border-[#2D3139] hover:border-sky-500/60 rounded-xl p-4 text-center cursor-pointer bg-[#141619] transition-colors"
                 >
                   <input
                     type="file"
@@ -636,102 +654,102 @@ export const MusicPlayerView: React.FC = () => {
                     accept="audio/*"
                     className="hidden"
                   />
-                  <Upload className="w-6 h-6 text-[#9E9E9E] mx-auto mb-1" />
-                  <p className="text-xs text-[#E0E0E0] font-medium">
-                    {isUploading ? 'Enviando arquivo...' : 'Clique para selecionar arquivo de áudio do seu computador'}
-                  </p>
-                  <p className="text-[10px] text-[#9E9E9E] mt-0.5">
-                    Salva diretamente na pasta local persistente de músicas
-                  </p>
+                  {isUploading ? (
+                    <div className="flex items-center justify-center gap-2 text-xs font-bold text-sky-400">
+                      <span className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                      Enviando arquivo de áudio...
+                    </div>
+                  ) : newUrl.startsWith('/media/') ? (
+                    <div className="flex items-center justify-center gap-2 text-xs font-bold text-emerald-400">
+                      <Check className="w-4 h-4" />
+                      Áudio carregado: {newUrl}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Upload className="w-6 h-6 text-[#9E9E9E] mx-auto" />
+                      <p className="text-xs text-[#E0E0E0] font-medium">
+                        Clique para selecionar um arquivo de áudio
+                      </p>
+                      <p className="text-[10px] text-[#9E9E9E]">
+                        MP3, WAV, OGG, FLAC, WEBM
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Or Direct URL */}
+              {/* Title & URL */}
               <div>
                 <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                  2. Ou digite a URL / Caminho do Áudio
+                  Nome do Som / Ambiente *
                 </label>
                 <input
                   type="text"
-                  placeholder="https://... ou /media/music/faixa.mp3"
-                  value={newUrl}
-                  onChange={(e) => setNewUrl(e.target.value)}
-                  className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70 font-mono"
                   required
+                  placeholder="Ex: Tempestade Noturna com Trovões"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-sky-500/70"
                 />
               </div>
 
-              {/* Title & Artist */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                    Título da Faixa *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Tema da Taverna"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                    Artista / Compositor
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Bardos de Valfenda"
-                    value={newArtist}
-                    onChange={(e) => setNewArtist(e.target.value)}
-                    className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
+                  URL do Áudio ou Caminho *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="https://... ou /media/..."
+                  value={newUrl}
+                  onChange={(e) => setNewUrl(e.target.value)}
+                  className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-sky-500/70"
+                />
               </div>
 
               {/* Folder & Tags */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                    Pasta de Organização
+                    Pasta de Ambientação
                   </label>
                   <select
                     value={newFolderId}
                     onChange={(e) => setNewFolderId(e.target.value)}
-                    className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70"
+                    className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-sky-500/70"
                   >
                     <option value="">Sem Pasta (Geral)</option>
-                    {musicFolders.map(f => (
+                    {ambienceFolders.map(f => (
                       <option key={f.id} value={f.id}>{f.name}</option>
                     ))}
                   </select>
                 </div>
+
                 <div>
                   <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
                     Tags (separadas por vírgula)
                   </label>
                   <input
                     type="text"
-                    placeholder="Combate, Dragão, Chefe"
+                    placeholder="chuva, vento, caverna"
                     value={newTags}
                     onChange={(e) => setNewTags(e.target.value)}
-                    className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70"
+                    className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-sky-500/70"
                   />
                 </div>
               </div>
 
-              {/* Cover Image URL */}
+              {/* Cover URL */}
               <div>
                 <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
                   URL da Capa / Imagem (Opcional)
                 </label>
                 <input
                   type="text"
-                  placeholder="https://... ou caminho de arquivo local"
+                  placeholder="https://exemplo.com/imagem.jpg"
                   value={newCoverUrl}
                   onChange={(e) => setNewCoverUrl(e.target.value)}
-                  className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-indigo-500/70"
+                  className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-sky-500/70"
                 />
               </div>
 
@@ -746,21 +764,21 @@ export const MusicPlayerView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isUploading}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 cursor-pointer"
                 >
-                  Salvar Música
+                  Salvar Ambiente
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
       {/* Folder Batch Import Modal */}
       <FolderImportModal
         isOpen={isFolderImportOpen}
         onClose={() => setIsFolderImportOpen(false)}
-        defaultCategory="music"
+        defaultCategory="ambience"
       />
     </div>
   );

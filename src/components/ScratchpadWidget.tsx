@@ -20,7 +20,7 @@ interface ScratchpadWidgetProps {
 
 export const ScratchpadWidget: React.FC<ScratchpadWidgetProps> = ({
   storageKey = 'caranguejo_scratchpad_notes',
-  defaultText = '## Rascunho Rápido da Rodada\n- HP do Guarda: 18/25\n- Senha do cofre: "SANGUE_E_CINZAS"\n- Pista entregue pelo taverneiro.',
+  defaultText = '',
   placeholder = 'Escreva notas temporárias, HP de monstros, lembretes ou senhas...'
 }) => {
   const [content, setContent] = useState<string>(() => {

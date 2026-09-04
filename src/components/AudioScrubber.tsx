@@ -5,10 +5,20 @@ interface AudioScrubberProps {
   duration: number;
   fallbackDuration?: number;
   onSeek: (seconds: number) => void;
-  formatTime: (seconds: number) => string;
+  formatTime?: (seconds: number) => string;
   size?: 'sm' | 'md';
   className?: string;
+  disabled?: boolean;
+  color?: 'indigo' | 'teal' | 'emerald' | 'amber' | string;
+  showTimeLabels?: boolean;
 }
+
+const defaultFormatTime = (secs: number): string => {
+  if (!secs || isNaN(secs) || secs < 0) return '0:00';
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+};
 
 export const AudioScrubber: React.FC<AudioScrubberProps> = ({
   currentTime,
@@ -17,11 +27,17 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
   onSeek,
   formatTime,
   size = 'md',
-  className = ''
+  className = '',
+  disabled = false,
+  color = 'indigo',
+  showTimeLabels = true
 }) => {
+  const safeFormatTime = typeof formatTime === 'function' ? formatTime : defaultFormatTime;
+
   // Use duration if valid, otherwise fallback
   const rawDuration = duration > 0 ? duration : (fallbackDuration > 0 ? fallbackDuration : 0);
   const effectiveDuration = Math.max(0, isFinite(rawDuration) ? rawDuration : 0);
+  const isActuallyDisabled = disabled || effectiveDuration <= 0;
 
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubValue, setScrubValue] = useState<number>(0);
@@ -83,6 +99,22 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
     setHoverTime(null);
   };
 
+  const gradientClass = color === 'teal'
+    ? 'from-teal-600 via-teal-500 to-teal-400'
+    : color === 'emerald'
+    ? 'from-emerald-600 via-emerald-500 to-emerald-400'
+    : color === 'amber'
+    ? 'from-amber-600 via-amber-500 to-amber-400'
+    : 'from-indigo-600 via-indigo-500 to-indigo-400';
+
+  const knobBorderClass = color === 'teal'
+    ? 'border-teal-500 ring-teal-400/50'
+    : color === 'emerald'
+    ? 'border-emerald-500 ring-emerald-400/50'
+    : color === 'amber'
+    ? 'border-amber-500 ring-amber-400/50'
+    : 'border-indigo-500 ring-indigo-400/50';
+
   return (
     <div
       className={`w-full flex items-center gap-2 font-mono ${size === 'sm' ? 'text-[11px]' : 'text-xs'} text-[#9E9E9E] ${className}`}
@@ -90,9 +122,11 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
       onMouseLeave={handleMouseLeave}
     >
       {/* Current Elapsed Time */}
-      <span className={size === 'sm' ? 'w-9 text-right font-medium text-[#B0B8C4]' : 'w-10 text-right font-medium text-[#B0B8C4]'}>
-        {formatTime(displayTime)}
-      </span>
+      {showTimeLabels && (
+        <span className={size === 'sm' ? 'w-9 text-right font-medium text-[#B0B8C4]' : 'w-10 text-right font-medium text-[#B0B8C4]'}>
+          {safeFormatTime(displayTime)}
+        </span>
+      )}
 
       {/* Interactive Progress Track Container */}
       <div ref={trackRef} className="relative flex-1 py-2 group select-none flex items-center">
@@ -102,7 +136,7 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
             className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded bg-[#141619] border border-[#3D424D] text-[10px] font-mono text-[#E0E0E0] shadow-md pointer-events-none z-20 whitespace-nowrap"
             style={{ left: `${hoverPos}%` }}
           >
-            {formatTime(hoverTime)}
+            {safeFormatTime(hoverTime)}
           </div>
         )}
 
@@ -110,15 +144,15 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
         <div className={`w-full ${size === 'sm' ? 'h-1.5' : 'h-2'} bg-[#22262B] group-hover:bg-[#282D34] rounded-full overflow-hidden transition-colors border border-[#2D3139] pointer-events-none`}>
           {/* Filled Progress Gradient Bar */}
           <div
-            className="h-full bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-400 rounded-full transition-all duration-75"
+            className={`h-full bg-gradient-to-r ${gradientClass} rounded-full transition-all duration-75`}
             style={{ width: `${progressPercent}%` }}
           />
         </div>
 
         {/* Playhead Knob */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white border-2 border-indigo-500 shadow-md pointer-events-none transition-transform duration-75 z-10 ${
-            isScrubbing ? 'scale-125 ring-2 ring-indigo-400/50' : 'scale-0 group-hover:scale-100'
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white border-2 shadow-md pointer-events-none transition-transform duration-75 z-10 ${knobBorderClass} ${
+            isScrubbing ? 'scale-125 ring-2' : 'scale-0 group-hover:scale-100'
           }`}
           style={{ left: `${progressPercent}%` }}
         />
@@ -129,7 +163,7 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
           min="0"
           max={effectiveDuration > 0 ? effectiveDuration : 100}
           step="0.1"
-          disabled={effectiveDuration <= 0}
+          disabled={isActuallyDisabled}
           value={displayTime}
           onChange={handleRangeChange}
           onMouseDown={() => setIsScrubbing(true)}
@@ -143,9 +177,11 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
       </div>
 
       {/* Total Duration */}
-      <span className={size === 'sm' ? 'w-9 text-left font-medium' : 'w-10 text-left font-medium'}>
-        {formatTime(effectiveDuration)}
-      </span>
+      {showTimeLabels && (
+        <span className={size === 'sm' ? 'w-9 text-left font-medium' : 'w-10 text-left font-medium'}>
+          {safeFormatTime(effectiveDuration)}
+        </span>
+      )}
     </div>
   );
 };

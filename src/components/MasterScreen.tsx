@@ -88,6 +88,8 @@ import { QuickRulesWidget } from './QuickRulesWidget';
 import { LootGeneratorWidget } from './LootGeneratorWidget';
 import { WeatherClockWidget } from './WeatherClockWidget';
 import { ScratchpadWidget } from './ScratchpadWidget';
+import { EncounterGeneratorWidget } from './EncounterGeneratorWidget';
+import { CustomRouletteWidget } from './CustomRouletteWidget';
 
 interface MasterScreenProps {
   onOpenMusicTab: () => void;
@@ -290,6 +292,30 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     description: 'Gerenciamento de saves, backup JSON e status de sincronização da crônica.',
     allowMultiple: false,
     tags: ['backup', 'salvar', 'sessão', 'arquivo']
+  },
+  {
+    type: 'encounter_generator',
+    name: 'Gerador de Encontros Aleatórios',
+    category: 'tools',
+    icon: '⚔️',
+    defaultTitle: 'Gerador de Encontros & NPCs',
+    defaultWidth: 'half',
+    defaultDensity: 'expanded',
+    description: 'Parâmetros por nível, ambiente (floresta, masmorra, cidade) e inimigos, com envio ao Discord.',
+    allowMultiple: true,
+    tags: ['encontros', 'monstros', 'combate', 'npcs', 'aleatório']
+  },
+  {
+    type: 'custom_roulette',
+    name: 'Roleta Customizável (Porcentagens)',
+    category: 'tools',
+    icon: '🎡',
+    defaultTitle: 'Roleta Customizável do Mestre',
+    defaultWidth: 'half',
+    defaultDensity: 'expanded',
+    description: 'Sorteios de eventos, clima, alvos e destinos com porcentagens configuráveis e envio no chat.',
+    allowMultiple: true,
+    tags: ['roleta', 'sorteio', 'probabilidade', 'porcentagem', 'discord']
   }
 ];
 
@@ -496,12 +522,22 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
   const [postingNpcId, setPostingNpcId] = useState<string | null>(null);
 
   // Initiative Tracker State
-  const [initiativeList, setInitiativeList] = useState<Array<{ id: string; name: string; init: number; hp: number; maxHp: number; isNpc: boolean }>>([
-    { id: 'init-1', name: 'Guerreiro (Thoran)', init: 19, hp: 45, maxHp: 45, isNpc: false },
-    { id: 'init-2', name: 'Lorde Malakor', init: 16, hp: 145, maxHp: 145, isNpc: true },
-    { id: 'init-3', name: 'Maga (Lyra)', init: 14, hp: 28, maxHp: 28, isNpc: false },
-    { id: 'init-4', name: 'Goblin Espião', init: 11, hp: 12, maxHp: 12, isNpc: true },
-  ]);
+  const [initiativeList, setInitiativeList] = useState<Array<{ id: string; name: string; init: number; hp: number; maxHp: number; isNpc: boolean }>>(() => {
+    try {
+      const saved = localStorage.getItem('caranguejo_initiative_list');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('caranguejo_initiative_list', JSON.stringify(initiativeList));
+    } catch {}
+  }, [initiativeList]);
   const [activeTurnIdx, setActiveTurnIdx] = useState<number>(0);
   const [newCombatantName, setNewCombatantName] = useState('');
   const [newCombatantInit, setNewCombatantInit] = useState('');
@@ -1907,18 +1943,23 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
 
                 {/* Combatants List */}
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                  {initiativeList.map((item, idx) => {
-                    const isActive = idx === activeTurnIdx;
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => setActiveTurnIdx(idx)}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all cursor-pointer ${
-                          isActive
-                            ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500 shadow-md'
-                            : 'bg-[#141619] border-[#2D3139] hover:border-[#3D424E]'
-                        }`}
-                      >
+                  {initiativeList.length === 0 ? (
+                    <div className="p-4 text-center rounded-xl bg-[#141619] border border-dashed border-[#2D3139] text-[#9E9E9E] text-xs">
+                      Nenhum combatente na iniciativa. Adicione jogadores ou monstros abaixo para iniciar a rodada.
+                    </div>
+                  ) : (
+                    initiativeList.map((item, idx) => {
+                      const isActive = idx === activeTurnIdx;
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => setActiveTurnIdx(idx)}
+                          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500 shadow-md'
+                              : 'bg-[#141619] border-[#2D3139] hover:border-[#3D424E]'
+                          }`}
+                        >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono font-bold text-xs ${
                             isActive ? 'bg-indigo-600 text-white' : 'bg-[#22262B] text-[#9E9E9E]'
@@ -1971,7 +2012,8 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                         </div>
                       </div>
                     );
-                  })}
+                  })
+                )}
                 </div>
 
                 {/* Add Combatant Form */}
@@ -2347,6 +2389,52 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
               </div>
             ) : (
               <ScratchpadWidget storageKey={widget.storageKey} />
+            )}
+          </div>
+        );
+
+      case 'encounter_generator':
+        return (
+          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 md:p-5 shadow-lg space-y-3">
+            <div className="flex items-center justify-between border-b border-[#2D3139]/60 pb-2">
+              <div className="flex items-center gap-2">
+                <Swords className="w-4 h-4 text-red-400" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-[#FFFFFF] font-rpg">
+                  {widget.title || 'Gerador de Encontros Aleatórios'}
+                </h2>
+              </div>
+              {!isModal && renderWidgetHeaderControls(widget)}
+            </div>
+
+            {isMinimized ? (
+              <div className="text-xs text-[#9E9E9E] italic">
+                Gerador de encontros recolhido.
+              </div>
+            ) : (
+              <EncounterGeneratorWidget />
+            )}
+          </div>
+        );
+
+      case 'custom_roulette':
+        return (
+          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 md:p-5 shadow-lg space-y-3">
+            <div className="flex items-center justify-between border-b border-[#2D3139]/60 pb-2">
+              <div className="flex items-center gap-2">
+                <Dices className="w-4 h-4 text-amber-400" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-[#FFFFFF] font-rpg">
+                  {widget.title || 'Roleta Customizável'}
+                </h2>
+              </div>
+              {!isModal && renderWidgetHeaderControls(widget)}
+            </div>
+
+            {isMinimized ? (
+              <div className="text-xs text-[#9E9E9E] italic">
+                Roleta de probabilidades recolhida.
+              </div>
+            ) : (
+              <CustomRouletteWidget />
             )}
           </div>
         );
@@ -2789,7 +2877,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                   )}
 
                   {/* Widget Card Body with strict overflow containment */}
-                  <div className="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden flex flex-col [&>div]:h-full [&>div]:flex [&>div]:flex-col [&>div>div:last-child]:flex-1 [&>div>div:last-child]:overflow-y-auto [&>div>div:last-child]:custom-scrollbar">
+                  <div className="flex-1 min-h-0 min-w-0 max-w-full overflow-hidden flex flex-col widget-card [&>div]:h-full [&>div]:flex [&>div]:flex-col [&>div>div:last-child]:flex-1 [&>div>div:last-child]:overflow-y-auto [&>div>div:last-child]:custom-scrollbar">
                     {renderWidgetContent(widget)}
                   </div>
 

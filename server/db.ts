@@ -1,18 +1,22 @@
 import fs from 'fs';
 import path from 'path';
-import { Folder, MusicTrack, SoundboardItem, NPC, BotConfig, SoundboardLayout, SessionSaveMeta, SessionSave, MediaDirectoriesConfig, NoteTab, TimerItem } from '../src/types.js';
+import { Folder, MusicTrack, AmbienceTrack, SoundboardItem, NPC, BotConfig, SoundboardLayout, SessionSaveMeta, SessionSave, MediaDirectoriesConfig, NoteTab, TimerItem } from '../src/types.js';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SAVES_DIR = path.join(DATA_DIR, 'saves');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const MUSIC_DIR = path.join(DATA_DIR, 'music');
+const AMBIENCE_DIR = path.join(DATA_DIR, 'ambience');
 const SFX_DIR = path.join(DATA_DIR, 'sfx');
 const NPCS_DIR = path.join(DATA_DIR, 'npcs');
+
+export { DATA_DIR, SAVES_DIR, UPLOADS_DIR, MUSIC_DIR, AMBIENCE_DIR, SFX_DIR, NPCS_DIR };
 
 export interface DatabaseSchema {
   folders: Folder[];
   musicTracks: MusicTrack[];
+  ambienceTracks?: AmbienceTrack[];
   soundboardItems: SoundboardItem[];
   soundboardLayouts: SoundboardLayout[];
   activeSoundboardLayoutId?: string;
@@ -50,9 +54,17 @@ const DEFAULT_FOLDERS: Folder[] = [
   { id: 'f-n-villains', name: 'Vilões & Chefes', type: 'npc', color: '#ef4444', icon: 'Skull', createdAt: Date.now() },
   { id: 'f-n-citizens', name: 'Cidadãos & Comerciantes', type: 'npc', color: '#f59e0b', icon: 'Store', createdAt: Date.now() },
   { id: 'f-n-monsters', name: 'Monstros & Feras', type: 'npc', color: '#8b5cf6', icon: 'Bug', createdAt: Date.now() },
+
+  // Ambience Folders
+  { id: 'f-a-rain', name: 'Chuva & Tempestades', type: 'ambience', color: '#0ea5e9', icon: 'CloudRain', createdAt: Date.now() },
+  { id: 'f-a-tavern', name: 'Tavernas & Vilas', type: 'ambience', color: '#f59e0b', icon: 'Beer', createdAt: Date.now() },
+  { id: 'f-a-dungeon', name: 'Masmorras & Cavernas', type: 'ambience', color: '#8b5cf6', icon: 'Compass', createdAt: Date.now() },
+  { id: 'f-a-nature', name: 'Florestas & Ermos', type: 'ambience', color: '#10b981', icon: 'Trees', createdAt: Date.now() },
+  { id: 'f-a-horror', name: 'Terror & Sobrenatural', type: 'ambience', color: '#e11d48', icon: 'Ghost', createdAt: Date.now() }
 ];
 
 const DEFAULT_MUSIC_TRACKS: MusicTrack[] = [];
+const DEFAULT_AMBIENCE_TRACKS: AmbienceTrack[] = [];
 
 const DEFAULT_SFX: SoundboardItem[] = [];
 
@@ -91,7 +103,7 @@ export class JsonDatabase {
   }
 
   private ensureDirectories() {
-    const dirs = [DATA_DIR, SAVES_DIR, UPLOADS_DIR, MUSIC_DIR, SFX_DIR, NPCS_DIR];
+    const dirs = [DATA_DIR, SAVES_DIR, UPLOADS_DIR, MUSIC_DIR, AMBIENCE_DIR, SFX_DIR, NPCS_DIR];
     for (const dir of dirs) {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -107,6 +119,7 @@ export class JsonDatabase {
         return {
           folders: parsed.folders || DEFAULT_FOLDERS,
           musicTracks: parsed.musicTracks || DEFAULT_MUSIC_TRACKS,
+          ambienceTracks: parsed.ambienceTracks || DEFAULT_AMBIENCE_TRACKS,
           soundboardItems: parsed.soundboardItems || DEFAULT_SFX,
           soundboardLayouts: parsed.soundboardLayouts || DEFAULT_SOUNDBOARD_LAYOUTS,
           activeSoundboardLayoutId: parsed.activeSoundboardLayoutId || 'layout-combat',
@@ -127,6 +140,7 @@ export class JsonDatabase {
     const defaultData: DatabaseSchema = {
       folders: DEFAULT_FOLDERS,
       musicTracks: DEFAULT_MUSIC_TRACKS,
+      ambienceTracks: DEFAULT_AMBIENCE_TRACKS,
       soundboardItems: DEFAULT_SFX,
       soundboardLayouts: DEFAULT_SOUNDBOARD_LAYOUTS,
       activeSoundboardLayoutId: 'layout-combat',
@@ -154,7 +168,7 @@ export class JsonDatabase {
   }
 
   // Getters & Setters
-  public getFolders(type?: 'music' | 'soundboard' | 'npc'): Folder[] {
+  public getFolders(type?: 'music' | 'soundboard' | 'npc' | 'ambience'): Folder[] {
     if (!type) return this.data.folders;
     return this.data.folders.filter(f => f.type === type);
   }
@@ -178,6 +192,9 @@ export class JsonDatabase {
     this.data.folders = this.data.folders.filter(f => f.id !== id);
     // Unassign folderId from items
     this.data.musicTracks.forEach(m => { if (m.folderId === id) delete m.folderId; });
+    if (this.data.ambienceTracks) {
+      this.data.ambienceTracks.forEach(a => { if (a.folderId === id) delete a.folderId; });
+    }
     this.data.soundboardItems.forEach(s => { if (s.folderId === id) delete s.folderId; });
     this.data.npcs.forEach(n => { if (n.folderId === id) delete n.folderId; });
     this.saveData();
@@ -214,6 +231,42 @@ export class JsonDatabase {
     this.data.musicTracks = this.data.musicTracks.filter(m => m.id !== id);
     this.saveData();
     return this.data.musicTracks.length < prevLen;
+  }
+
+  // Ambience Tracks
+  public getAmbienceTracks(): AmbienceTrack[] {
+    return this.data.ambienceTracks || [];
+  }
+
+  public addAmbienceTrack(track: AmbienceTrack): AmbienceTrack {
+    if (!this.data.ambienceTracks) this.data.ambienceTracks = [];
+    this.data.ambienceTracks.unshift(track);
+    this.saveData();
+    return track;
+  }
+
+  public addAmbienceTracksBulk(tracks: AmbienceTrack[]): AmbienceTrack[] {
+    if (!this.data.ambienceTracks) this.data.ambienceTracks = [];
+    this.data.ambienceTracks = [...tracks, ...this.data.ambienceTracks];
+    this.saveData();
+    return tracks;
+  }
+
+  public updateAmbienceTrack(id: string, updates: Partial<AmbienceTrack>): AmbienceTrack | null {
+    if (!this.data.ambienceTracks) this.data.ambienceTracks = [];
+    const idx = this.data.ambienceTracks.findIndex(m => m.id === id);
+    if (idx === -1) return null;
+    this.data.ambienceTracks[idx] = { ...this.data.ambienceTracks[idx], ...updates };
+    this.saveData();
+    return this.data.ambienceTracks[idx];
+  }
+
+  public deleteAmbienceTrack(id: string): boolean {
+    if (!this.data.ambienceTracks) return false;
+    const prevLen = this.data.ambienceTracks.length;
+    this.data.ambienceTracks = this.data.ambienceTracks.filter(m => m.id !== id);
+    this.saveData();
+    return this.data.ambienceTracks.length < prevLen;
   }
 
   // Soundboard Items
@@ -398,6 +451,7 @@ export class JsonDatabase {
       ...newState,
       folders: newState.folders || this.data.folders,
       musicTracks: newState.musicTracks || this.data.musicTracks,
+      ambienceTracks: newState.ambienceTracks || this.data.ambienceTracks || [],
       soundboardItems: newState.soundboardItems || this.data.soundboardItems,
       soundboardLayouts: newState.soundboardLayouts || this.data.soundboardLayouts,
       npcs: newState.npcs || this.data.npcs,
@@ -583,4 +637,3 @@ export class JsonDatabase {
 }
 
 export const db = new JsonDatabase();
-export { DATA_DIR, SAVES_DIR, UPLOADS_DIR, MUSIC_DIR, SFX_DIR, NPCS_DIR };

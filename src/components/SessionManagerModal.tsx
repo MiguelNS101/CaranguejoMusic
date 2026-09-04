@@ -18,6 +18,7 @@ import {
   HardDrive
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import { exportAllPresetsJson, importPresetsFromJson } from '../utils/presetStore';
 
 interface SessionManagerModalProps {
   isOpen: boolean;
@@ -45,6 +46,153 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({ isOpen
   const fullBackupImportRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  const handleComprehensiveExport = async () => {
+    try {
+      // 1. Fetch server state
+      let serverData: any = {};
+      try {
+        const res = await fetch('/api/state');
+        if (res.ok) serverData = await res.json();
+      } catch {}
+
+      // 2. Fetch server saved sessions
+      let serverSessions: any[] = [];
+      try {
+        const res = await fetch('/api/sessions');
+        if (res.ok) serverSessions = await res.json();
+      } catch {}
+
+      // 3. Collect presets
+      let allPresets: any = {};
+      try {
+        allPresets = JSON.parse(exportAllPresetsJson()).presets;
+      } catch {}
+
+      // 4. Collect themes, CSS, folders & client configs
+      const themeId = localStorage.getItem('caranguejo_active_theme_id') || 'theme-midnight-indigo';
+      const customCss = localStorage.getItem('caranguejo_custom_css_rules') || '';
+      const themeOverrides = localStorage.getItem('caranguejo_active_theme_overrides') || '{}';
+      const customThemes = localStorage.getItem('caranguejo_custom_themes_list') || '[]';
+      const persistentNoteTabs = localStorage.getItem('caranguejo_persistent_note_tabs') || '[]';
+      const customTimers = localStorage.getItem('caranguejo_custom_timers') || '[]';
+      const scannedFolderPaths = localStorage.getItem('caranguejo_scanned_folder_paths') || '[]';
+
+      const comprehensiveBackup = {
+        app: 'CaranguejoRPG',
+        version: '3.5',
+        exportedAt: new Date().toISOString(),
+        timestamp: Date.now(),
+        description: 'Backup completo do sistema, configurações, temas, caminhos de pastas e predefinições.',
+        serverState: serverData,
+        savedSessions: serverSessions,
+        presets: allPresets,
+        themes: {
+          activeThemeId: themeId,
+          customCss,
+          overrides: JSON.parse(themeOverrides),
+          customThemes: JSON.parse(customThemes)
+        },
+        clientSettings: {
+          noteTabs: JSON.parse(persistentNoteTabs),
+          customTimers: JSON.parse(customTimers),
+          scannedFolderPaths: JSON.parse(scannedFolderPaths)
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(comprehensiveBackup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `caranguejo-rpg-save-completo-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setFeedback({ status: 'success', message: 'Backup completo (configurações, temas, presets e caminhos) exportado com sucesso!' });
+      setTimeout(() => setFeedback({ status: 'idle' }), 3500);
+    } catch (err: any) {
+      setFeedback({ status: 'error', message: err?.message || 'Falha ao exportar backup completo.' });
+    }
+  };
+
+  const handleComprehensiveImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm('Deseja restaurar este save completo? Todas as configurações, temas, presets e estado da mesa serão atualizados.')) {
+      if (fullBackupImportRef.current) fullBackupImportRef.current.value = '';
+      return;
+    }
+
+    setIsImportingBackup(true);
+    setFeedback({ status: 'idle' });
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // 1. Restore backend server state if present
+      const backendPayload = data.serverState || data.state || (data.folders ? data : null);
+      if (backendPayload) {
+        try {
+          await importFullBackup(file);
+        } catch (err) {
+          console.warn('Backend restore note:', err);
+        }
+      }
+
+      // 2. Restore all presets (loot, encounters, roulette, timers, notes)
+      if (data.presets) {
+        importPresetsFromJson(JSON.stringify({ presets: data.presets }));
+      }
+
+      // 3. Restore theme & CSS styling
+      if (data.themes) {
+        if (data.themes.activeThemeId) {
+          localStorage.setItem('caranguejo_active_theme_id', data.themes.activeThemeId);
+        }
+        if (typeof data.themes.customCss === 'string') {
+          localStorage.setItem('caranguejo_custom_css_rules', data.themes.customCss);
+        }
+        if (data.themes.overrides) {
+          localStorage.setItem('caranguejo_active_theme_overrides', JSON.stringify(data.themes.overrides));
+        }
+        if (data.themes.customThemes) {
+          localStorage.setItem('caranguejo_custom_themes_list', JSON.stringify(data.themes.customThemes));
+        }
+      }
+
+      // 4. Restore client settings
+      if (data.clientSettings) {
+        if (data.clientSettings.noteTabs) {
+          localStorage.setItem('caranguejo_persistent_note_tabs', JSON.stringify(data.clientSettings.noteTabs));
+        }
+        if (data.clientSettings.customTimers) {
+          localStorage.setItem('caranguejo_custom_timers', JSON.stringify(data.clientSettings.customTimers));
+        }
+        if (data.clientSettings.scannedFolderPaths) {
+          localStorage.setItem('caranguejo_scanned_folder_paths', JSON.stringify(data.clientSettings.scannedFolderPaths));
+        }
+      }
+
+      // Dispatch global notification events
+      window.dispatchEvent(new CustomEvent('caranguejo_presets_updated'));
+      window.dispatchEvent(new CustomEvent('caranguejo_theme_updated'));
+
+      setFeedback({ status: 'success', message: 'Save e configurações completas restaurados com sucesso!' });
+      setTimeout(() => {
+        setFeedback({ status: 'idle' });
+        window.location.reload();
+      }, 1400);
+    } catch (err: any) {
+      setFeedback({ status: 'error', message: err?.message || 'Arquivo de backup inválido.' });
+    } finally {
+      setIsImportingBackup(false);
+      if (fullBackupImportRef.current) fullBackupImportRef.current.value = '';
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,8 +340,9 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({ isOpen
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <button
                 type="button"
-                onClick={exportFullBackup}
+                onClick={handleComprehensiveExport}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 hover:border-indigo-400 text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                title="Exporta todas as configurações, temas, caminhos de pastas, presets JSON e estado da mesa"
               >
                 <Download className="w-3.5 h-3.5" />
                 Exportar Estado Completo (.JSON)
@@ -204,6 +353,7 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({ isOpen
                 onClick={() => fullBackupImportRef.current?.click()}
                 disabled={isImportingBackup}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#242830] hover:bg-[#2D3139] text-[#E0E0E0] border border-[#3D424D] text-xs font-semibold transition-all cursor-pointer"
+                title="Restaura save completo de qualquer versão com todas as configurações"
               >
                 <Upload className="w-3.5 h-3.5 text-purple-400" />
                 {isImportingBackup ? 'Restaurando...' : 'Restaurar Backup Completo'}
@@ -211,26 +361,7 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({ isOpen
               <input
                 type="file"
                 ref={fullBackupImportRef}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  if (!window.confirm('Deseja restaurar este backup completo? Todos os dados atuais serão substituídos pelos do arquivo.')) {
-                    if (fullBackupImportRef.current) fullBackupImportRef.current.value = '';
-                    return;
-                  }
-                  setIsImportingBackup(true);
-                  setFeedback({ status: 'idle' });
-                  try {
-                    const res = await importFullBackup(file);
-                    setFeedback({ status: 'success', message: res.message });
-                    setTimeout(() => setFeedback({ status: 'idle' }), 3500);
-                  } catch (err: any) {
-                    setFeedback({ status: 'error', message: err?.message || 'Falha ao restaurar backup.' });
-                  } finally {
-                    setIsImportingBackup(false);
-                    if (fullBackupImportRef.current) fullBackupImportRef.current.value = '';
-                  }
-                }}
+                onChange={handleComprehensiveImport}
                 accept=".json,application/json"
                 className="hidden"
               />

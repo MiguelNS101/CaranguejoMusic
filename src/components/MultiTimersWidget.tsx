@@ -21,20 +21,22 @@ import {
 import { TimerItem, TimerType } from '../types';
 import { useAudio } from '../context/AudioContext';
 import { playTimerCompletionChime, playSubtleTick } from '../utils/audioAlert';
+import { getTimerPresets, TimerPreset } from '../utils/presetStore';
 
 interface MultiTimersWidgetProps {
   compact?: boolean;
 }
 
-const PRESET_TIMERS: Array<{ title: string; type: TimerType; minutes: number; category: TimerItem['category']; color: string; icon: string }> = [
-  { title: 'Tocha / Luz', type: 'countdown', minutes: 60, category: 'torch', color: '#f59e0b', icon: '🔥' },
-  { title: 'Magia / Concentração', type: 'countdown', minutes: 1, category: 'buff', color: '#8b5cf6', icon: '✨' },
-  { title: 'Descanso Curto (5e)', type: 'countdown', minutes: 60, category: 'rest', color: '#10b981', icon: '⛺' },
-  { title: 'Veneno / Turno', type: 'countdown', minutes: 0.5, category: 'combat', color: '#ec4899', icon: '☠️' },
-  { title: 'Exploração da Masmorra', type: 'stopwatch', minutes: 0, category: 'session', color: '#3b82f6', icon: '🧭' },
-];
-
 export const MultiTimersWidget: React.FC<MultiTimersWidgetProps> = ({ compact = false }) => {
+  const [presetTimers, setPresetTimers] = useState<TimerPreset[]>(() => getTimerPresets());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setPresetTimers(getTimerPresets());
+    };
+    window.addEventListener('caranguejo_presets_updated', handleUpdate);
+    return () => window.removeEventListener('caranguejo_presets_updated', handleUpdate);
+  }, []);
   const {
     sessionSeconds,
     isSessionTimerRunning,
@@ -264,7 +266,7 @@ export const MultiTimersWidget: React.FC<MultiTimersWidgetProps> = ({ compact = 
     setIsCreateModalOpen(false);
   };
 
-  const addPreset = (preset: typeof PRESET_TIMERS[0]) => {
+  const addPreset = (preset: TimerPreset) => {
     playSubtleTick();
     const totalSecs = Math.max(10, Math.round(preset.minutes * 60));
     const newTimer: TimerItem = {
@@ -392,9 +394,9 @@ export const MultiTimersWidget: React.FC<MultiTimersWidgetProps> = ({ compact = 
           Adicionar Temporizador Rápido de RPG:
         </span>
         <div className="flex flex-wrap gap-1.5">
-          {PRESET_TIMERS.map((p, idx) => (
+          {(presetTimers || []).map((p, idx) => (
             <button
-              key={idx}
+              key={p.id || idx}
               type="button"
               onClick={() => addPreset(p)}
               className="px-2.5 py-1 rounded-xl bg-[#141619] hover:bg-indigo-950/40 text-xs text-[#D0D4DC] hover:text-indigo-200 border border-[#2D3139] hover:border-indigo-500/40 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
@@ -519,7 +521,7 @@ export const MultiTimersWidget: React.FC<MultiTimersWidgetProps> = ({ compact = 
             Nenhum temporizador ativo. Clique em &quot;Novo Temporizador&quot; ou use um dos botões rápidos acima!
           </div>
         ) : (
-          timers.map(timer => {
+          (timers || []).map(timer => {
             const isCountdown = timer.type === 'countdown';
             const displayTime = isCountdown ? timer.remainingSeconds : timer.elapsedSeconds;
             const progressPercent = isCountdown

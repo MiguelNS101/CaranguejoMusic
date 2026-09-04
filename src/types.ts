@@ -7,7 +7,7 @@ export interface MediaDirectoriesConfig {
 export interface Folder {
   id: string;
   name: string;
-  type: 'music' | 'soundboard' | 'npc';
+  type: 'music' | 'soundboard' | 'npc' | 'ambience';
   color?: string;
   icon?: string;
   parentFolderId?: string;
@@ -18,6 +18,20 @@ export interface MusicTrack {
   id: string;
   title: string;
   artist?: string;
+  duration: number; // in seconds
+  url: string; // local file path or stream url
+  folderId?: string;
+  tags: string[];
+  isLocal: boolean;
+  coverUrl?: string;
+  createdAt: number;
+}
+
+export interface AmbienceTrack {
+  id: string;
+  title: string;
+  category?: string; // e.g. "Chuva & Tempestade", "Taverna & Cidade", "Masmorra & Ecos", "Natureza & Ermos", "Terror & Sombrio"
+  environment?: string;
   duration: number; // in seconds
   url: string; // local file path or stream url
   folderId?: string;
@@ -68,6 +82,7 @@ export interface NPC {
   ac?: number;
   cr?: string;
   quote?: string;
+  isGeneralImage?: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -286,6 +301,8 @@ export type WidgetType =
   | 'loot_generator'
   | 'weather_clock'
   | 'scratchpad'
+  | 'encounter_generator'
+  | 'custom_roulette'
   | 'spacer';
 
 export type MasterWidgetId = string;
@@ -353,4 +370,66 @@ export interface WodDiceRollResult {
   rollerName?: string;
   timestamp: number;
 }
+
+// Encounter Generator Types
+export type EnvironmentType =
+  | 'forest'
+  | 'dungeon'
+  | 'city'
+  | 'mountain'
+  | 'swamp'
+  | 'desert'
+  | 'aquatic'
+  | 'sewer'
+  | 'planar';
+
+export type EnemyCountStyle = 'solo' | 'pair' | 'squad' | 'horde' | 'ambush';
+
+export type EncounterDifficulty = 'easy' | 'medium' | 'hard' | 'deadly';
+
+export interface EncounterEnemy {
+  name: string;
+  count: number;
+  crOrLevel: string;
+  hp: number;
+  ac: number;
+  tactics: string;
+  specialAbility?: string;
+}
+
+export interface GeneratedEncounter {
+  id: string;
+  title: string;
+  playerLevel: number;
+  environment: EnvironmentType;
+  environmentName: string;
+  enemyStyle: EnemyCountStyle;
+  difficulty: EncounterDifficulty;
+  settingDescription: string;
+  enemies: EncounterEnemy[];
+  environmentalHazard: string;
+  tacticalTwist: string;
+  suggestedLoot: string;
+  timestamp: number;
+}
+
+// Custom Roulette Types
+export interface RouletteSlice {
+  id: string;
+  label: string;
+  percentage: number; // calculated percentage chance 0 - 100
+  weight: number; // raw weight for probability
+  color: string;
+  description?: string;
+  icon?: string;
+}
+
+export interface RoulettePreset {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  slices: Omit<RouletteSlice, 'id'>[];
+}
+
 

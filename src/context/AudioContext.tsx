@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   MusicTrack,
+  AmbienceTrack,
   QueueItem,
   SoundboardItem,
   PlaybackState,
@@ -19,7 +20,7 @@ import { safeFetchJson, apiFetch, resolveApiUrl } from '../services/api';
 import { ensureDesktopBackend } from '../services/desktopBackend';
 
 interface AudioContextType {
-  // Playback & Mixing
+  // Playback & Mixing (Music)
   currentTrack: MusicTrack | null;
   playbackState: PlaybackState;
   currentTime: number;
@@ -34,8 +35,19 @@ interface AudioContextType {
   isLocalAudioEnabled: boolean; // Control whether browser tab plays sound or only Discord bot
   loopMode: LoopMode;
   queue: QueueItem[];
+
+  // Ambience Playback & Mixing
+  currentAmbienceTrack: AmbienceTrack | null;
+  ambiencePlaybackState: PlaybackState;
+  ambienceCurrentTime: number;
+  ambienceDuration: number;
+  ambienceVolume: number; // Ambience Volume: 0 to 1
+  isAmbienceMuted: boolean;
+  effectiveAmbienceVolume: number;
+  ambienceLoopMode: LoopMode;
+  ambienceTracks: AmbienceTrack[];
   
-  // Playback & Mixing Actions
+  // Playback & Mixing Actions (Music)
   playTrack: (track: MusicTrack, immediate?: boolean, startOffset?: number) => void;
   stopTrack: () => void;
   addToQueue: (track: MusicTrack) => void;
@@ -49,12 +61,24 @@ interface AudioContextType {
   toggleMute: () => void;
   toggleMusicMute: () => void;
   toggleSfxMute: () => void;
-  setAudioMix: (master: number, music: number, sfx: number) => void;
+  setAudioMix: (master: number, music: number, sfx: number, ambience?: number) => void;
   toggleLocalAudio: () => void;
   setIsLocalAudioEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   setLoopMode: (mode: LoopMode) => void;
   skipNext: () => void;
   skipPrevious: () => void;
+
+  // Ambience Actions
+  playAmbienceTrack: (track: AmbienceTrack, immediate?: boolean, startOffset?: number) => void;
+  stopAmbienceTrack: () => void;
+  toggleAmbiencePlayPause: () => void;
+  seekAmbience: (seconds: number) => void;
+  setAmbienceVolume: (vol: number) => void;
+  toggleAmbienceMute: () => void;
+  setAmbienceLoopMode: (mode: LoopMode) => void;
+  createAmbienceTrack: (track: Partial<AmbienceTrack>) => Promise<AmbienceTrack>;
+  updateAmbienceTrack: (id: string, updates: Partial<AmbienceTrack>) => Promise<AmbienceTrack>;
+  deleteAmbienceTrack: (id: string) => Promise<void>;
   
   // Voice Channel Connection & Actions
   disconnectVoiceChannel: () => Promise<{ success: boolean; error?: string }>;
@@ -106,8 +130,8 @@ interface AudioContextType {
   importFullBackup: (file: File) => Promise<{ success: boolean; message: string }>;
   
   // Folder / Bulk Import & Direct Path Scanning
-  importFolderFiles: (files: FileList | File[], category: 'music' | 'sfx' | 'npc', folderId?: string) => Promise<{ count: number }>;
-  scanLocalFolderDirectly: (folderPath: string, category: 'music' | 'sfx' | 'npc', folderId?: string) => Promise<{ count: number; message: string }>;
+  importFolderFiles: (files: FileList | File[], category: 'music' | 'ambience' | 'sfx' | 'npc', folderId?: string) => Promise<{ count: number }>;
+  scanLocalFolderDirectly: (folderPath: string, category: 'music' | 'ambience' | 'sfx' | 'npc', folderId?: string) => Promise<{ count: number; message: string }>;
   
   // World of Darkness (WoD) Dice
   wodRolls: WodDiceRollResult[];
@@ -212,8 +236,39 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [activeSfxIds, setActiveSfxIds] = useState<string[]>([]);
 
+  // Ambience Audio Player & Mixing State
+  const [currentAmbienceTrack, setCurrentAmbienceTrack] = useState<AmbienceTrack | null>(null);
+  const [ambiencePlaybackState, setAmbiencePlaybackState] = useState<PlaybackState>('idle');
+  const [ambienceCurrentTime, setAmbienceCurrentTime] = useState<number>(0);
+  const [ambienceDuration, setAmbienceDuration] = useState<number>(0);
+  const [ambienceLoopMode, setAmbienceLoopMode] = useState<LoopMode>('loop');
+  const [ambienceTracks, setAmbienceTracks] = useState<AmbienceTrack[]>([]);
+
+  // Ambience Stream Volume (0-1)
+  const [ambienceVolume, setAmbienceVolumeState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('caranguejo_ambience_vol');
+      if (saved !== null) {
+        const val = parseFloat(saved);
+        if (!isNaN(val)) return Math.max(0, Math.min(1, val));
+      }
+    } catch {}
+    return 0.75;
+  });
+
+  const [isAmbienceMuted, setIsAmbienceMuted] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('caranguejo_ambience_muted') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   // Calculated Effective Music Volume
   const effectiveMusicVolume = (isMuted || isMusicMuted) ? 0 : Math.max(0, Math.min(1, volume * musicVolume));
+
+  // Calculated Effective Ambience Volume
+  const effectiveAmbienceVolume = (isMuted || isAmbienceMuted) ? 0 : Math.max(0, Math.min(1, volume * ambienceVolume));
 
   // Helper for Calculated Effective SFX Volume
   const getEffectiveSfxVolume = (itemVolumePercent: number = 90) => {
@@ -381,11 +436,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ambienceAudioRef = useRef<HTMLAudioElement | null>(null);
   const sfxAudioMap = useRef<Map<string, HTMLAudioElement>>(new Map());
   const lastSeekTimestampRef = useRef<number>(0);
   const isSeekingRef = useRef<boolean>(false);
+  const lastAmbienceSeekTimestampRef = useRef<number>(0);
+  const isAmbienceSeekingRef = useRef<boolean>(false);
 
-  // Initialize HTML5 Audio Element for web player
+  // Initialize HTML5 Audio Element for web player (Music)
   useEffect(() => {
     const audio = new Audio();
     audio.preload = 'auto';
@@ -461,14 +519,86 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  // Sync volume with HTML5 audio element and manage local mute
+  // Initialize HTML5 Audio Element for web player (Continuous Ambience)
+  useEffect(() => {
+    const ambAudio = new Audio();
+    ambAudio.preload = 'auto';
+    ambAudio.loop = true; // Ambience tracks default to continuous loop
+    ambienceAudioRef.current = ambAudio;
+
+    const handleAmbTimeUpdate = () => {
+      if (ambAudio.seeking) return;
+      if (isAmbienceSeekingRef.current) return;
+      if (Date.now() - lastAmbienceSeekTimestampRef.current < 1000) return;
+      if (!isNaN(ambAudio.currentTime) && isFinite(ambAudio.currentTime)) {
+        setAmbienceCurrentTime(ambAudio.currentTime);
+      }
+      if (!isNaN(ambAudio.duration) && isFinite(ambAudio.duration) && ambAudio.duration > 0) {
+        setAmbienceDuration(ambAudio.duration);
+      }
+    };
+
+    const handleAmbSeeked = () => {
+      isAmbienceSeekingRef.current = false;
+      if (!isNaN(ambAudio.currentTime) && isFinite(ambAudio.currentTime)) {
+        setAmbienceCurrentTime(ambAudio.currentTime);
+      }
+    };
+
+    const handleAmbEnded = () => {
+      if (ambienceLoopMode === 'track' || ambienceLoopMode === 'queue' || ambienceLoopMode === 'loop') {
+        ambAudio.currentTime = 0;
+        ambAudio.play().catch(() => {});
+      } else {
+        setAmbiencePlaybackState('idle');
+        setAmbienceCurrentTime(0);
+      }
+    };
+
+    const handleAmbPlay = () => setAmbiencePlaybackState('playing');
+    const handleAmbPause = () => setAmbiencePlaybackState('paused');
+    const handleAmbWaiting = () => setAmbiencePlaybackState('buffering');
+    const handleAmbLoadedMetadata = () => {
+      if (!isNaN(ambAudio.duration) && isFinite(ambAudio.duration) && ambAudio.duration > 0) {
+        setAmbienceDuration(ambAudio.duration);
+      }
+    };
+
+    ambAudio.addEventListener('timeupdate', handleAmbTimeUpdate);
+    ambAudio.addEventListener('seeked', handleAmbSeeked);
+    ambAudio.addEventListener('loadedmetadata', handleAmbLoadedMetadata);
+    ambAudio.addEventListener('ended', handleAmbEnded);
+    ambAudio.addEventListener('play', handleAmbPlay);
+    ambAudio.addEventListener('pause', handleAmbPause);
+    ambAudio.addEventListener('waiting', handleAmbWaiting);
+
+    return () => {
+      ambAudio.pause();
+      ambAudio.removeEventListener('timeupdate', handleAmbTimeUpdate);
+      ambAudio.removeEventListener('seeked', handleAmbSeeked);
+      ambAudio.removeEventListener('loadedmetadata', handleAmbLoadedMetadata);
+      ambAudio.removeEventListener('ended', handleAmbEnded);
+      ambAudio.removeEventListener('play', handleAmbPlay);
+      ambAudio.removeEventListener('pause', handleAmbPause);
+      ambAudio.removeEventListener('waiting', handleAmbWaiting);
+    };
+  }, [ambienceLoopMode]);
+
+  // Sync volume with HTML5 audio element and manage local mute (Music)
   useEffect(() => {
     if (audioRef.current) {
-      // Local browser playback is strictly enabled only when isLocalAudioEnabled is turned on
       audioRef.current.muted = !isLocalAudioEnabled || isMuted || isMusicMuted;
       audioRef.current.volume = effectiveMusicVolume;
     }
   }, [effectiveMusicVolume, isLocalAudioEnabled, isMuted, isMusicMuted]);
+
+  // Sync volume with HTML5 audio element and manage local mute (Ambience)
+  useEffect(() => {
+    if (ambienceAudioRef.current) {
+      ambienceAudioRef.current.muted = !isLocalAudioEnabled || isMuted || isAmbienceMuted;
+      ambienceAudioRef.current.volume = effectiveAmbienceVolume;
+    }
+  }, [effectiveAmbienceVolume, isLocalAudioEnabled, isMuted, isAmbienceMuted]);
 
   const toggleLocalAudio = () => {
     setIsLocalAudioEnabled(prev => !prev);
@@ -513,6 +643,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const data = res.data;
         setFolders(data.folders || []);
         setMusicTracks(data.musicTracks || []);
+        setAmbienceTracks(data.ambienceTracks || []);
         setSoundboardItems(data.soundboardItems || []);
         setSoundboardLayouts(data.soundboardLayouts || []);
         if (data.activeSoundboardLayoutId) setActiveLayoutIdState(data.activeSoundboardLayoutId);
@@ -530,6 +661,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setDuration(first.duration || 180);
           if (audioRef.current && !audioRef.current.src) {
             audioRef.current.src = first.url;
+          }
+        }
+
+        if (!currentAmbienceTrack && data.ambienceTracks?.length > 0) {
+          const firstAmb = data.ambienceTracks[0];
+          setCurrentAmbienceTrack(firstAmb);
+          setAmbienceDuration(firstAmb.duration || 180);
+          if (ambienceAudioRef.current && !ambienceAudioRef.current.src) {
+            ambienceAudioRef.current.src = firstAmb.url;
           }
         }
       }
@@ -771,6 +911,135 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 1500);
   };
 
+  // Ambience Playback Engine
+  const playAmbienceTrack = (track: AmbienceTrack, immediate: boolean = true, startOffset: number = 0) => {
+    if (currentAmbienceTrack?.id === track.id && ambiencePlaybackState === 'playing' && startOffset === 0) {
+      toggleAmbiencePlayPause();
+      return;
+    }
+
+    setCurrentAmbienceTrack(track);
+    if (track.duration && !isNaN(track.duration) && track.duration > 0) {
+      setAmbienceDuration(track.duration);
+    }
+    setAmbienceCurrentTime(startOffset);
+
+    if (ambienceAudioRef.current) {
+      const resolvedUrl = resolveApiUrl(track.url);
+      const isSameSrc = ambienceAudioRef.current.src && (ambienceAudioRef.current.src === resolvedUrl || ambienceAudioRef.current.src.endsWith(track.url));
+      if (!isSameSrc) {
+        ambienceAudioRef.current.src = resolvedUrl;
+      }
+      ambienceAudioRef.current.muted = !isLocalAudioEnabled || isMuted || isAmbienceMuted;
+      ambienceAudioRef.current.volume = effectiveAmbienceVolume;
+      ambienceAudioRef.current.loop = (ambienceLoopMode === 'track' || ambienceLoopMode === 'queue' || ambienceLoopMode === 'loop');
+
+      if (startOffset > 0) {
+        isAmbienceSeekingRef.current = true;
+        lastAmbienceSeekTimestampRef.current = Date.now();
+        const applySeek = () => {
+          try {
+            if (ambienceAudioRef.current) ambienceAudioRef.current.currentTime = startOffset;
+          } catch (e) {
+            console.warn('Ambience seek offset error:', e);
+          } finally {
+            setTimeout(() => { isAmbienceSeekingRef.current = false; }, 800);
+          }
+        };
+        if (ambienceAudioRef.current.readyState >= 1) {
+          applySeek();
+        } else {
+          ambienceAudioRef.current.addEventListener('loadedmetadata', applySeek, { once: true });
+        }
+      } else if (!isSameSrc) {
+        ambienceAudioRef.current.currentTime = 0;
+      }
+
+      if (immediate) {
+        ambienceAudioRef.current.play().catch(e => console.warn('Ambience autoplay handled:', e));
+      }
+    }
+
+    if (immediate) {
+      setAmbiencePlaybackState('playing');
+    }
+  };
+
+  const stopAmbienceTrack = () => {
+    if (ambienceAudioRef.current) {
+      ambienceAudioRef.current.pause();
+      ambienceAudioRef.current.currentTime = 0;
+    }
+    setAmbiencePlaybackState('idle');
+    setAmbienceCurrentTime(0);
+  };
+
+  const toggleAmbiencePlayPause = () => {
+    if (ambiencePlaybackState === 'playing') {
+      if (ambienceAudioRef.current) {
+        ambienceAudioRef.current.pause();
+      }
+      setAmbiencePlaybackState('paused');
+    } else {
+      const trackToPlay = currentAmbienceTrack || (ambienceTracks.length > 0 ? ambienceTracks[0] : null);
+      if (!trackToPlay) return;
+
+      const resolvedUrl = resolveApiUrl(trackToPlay.url);
+      const isCurrentLoaded = ambienceAudioRef.current?.src && (ambienceAudioRef.current.src === resolvedUrl || ambienceAudioRef.current.src.endsWith(trackToPlay.url));
+
+      if (ambiencePlaybackState === 'paused' && isCurrentLoaded) {
+        if (ambienceAudioRef.current) {
+          ambienceAudioRef.current.muted = !isLocalAudioEnabled || isMuted || isAmbienceMuted;
+          ambienceAudioRef.current.volume = effectiveAmbienceVolume;
+          ambienceAudioRef.current.play().catch(e => {
+            console.warn('Resume ambience error:', e);
+            playAmbienceTrack(trackToPlay, true, ambienceCurrentTime > 0 ? ambienceCurrentTime : 0);
+          });
+        }
+        setAmbiencePlaybackState('playing');
+      } else {
+        playAmbienceTrack(trackToPlay, true, 0);
+      }
+    }
+  };
+
+  const seekAmbience = (seconds: number) => {
+    const rawDuration = ambienceDuration > 0 ? ambienceDuration : (ambienceAudioRef.current?.duration || (currentAmbienceTrack?.duration || 0));
+    const target = rawDuration > 0 ? Math.max(0, Math.min(rawDuration, seconds)) : Math.max(0, seconds);
+
+    isAmbienceSeekingRef.current = true;
+    lastAmbienceSeekTimestampRef.current = Date.now();
+    setAmbienceCurrentTime(target);
+
+    if (ambienceAudioRef.current && currentAmbienceTrack) {
+      const resolvedUrl = resolveApiUrl(currentAmbienceTrack.url);
+      const isLoaded = ambienceAudioRef.current.src && (ambienceAudioRef.current.src === resolvedUrl || ambienceAudioRef.current.src.endsWith(currentAmbienceTrack.url));
+      if (!isLoaded) {
+        ambienceAudioRef.current.src = resolvedUrl;
+      }
+      try {
+        if (ambienceAudioRef.current.readyState >= 1) {
+          ambienceAudioRef.current.currentTime = target;
+        } else {
+          const onMeta = () => {
+            if (ambienceAudioRef.current) {
+              try {
+                ambienceAudioRef.current.currentTime = target;
+              } catch {}
+            }
+          };
+          ambienceAudioRef.current.addEventListener('loadedmetadata', onMeta, { once: true });
+        }
+      } catch (e) {
+        console.warn('Ambience audio seek warning:', e);
+      }
+    }
+
+    setTimeout(() => {
+      isAmbienceSeekingRef.current = false;
+    }, 1000);
+  };
+
   // Master Volume Setter
   const setVolume = (vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
@@ -833,6 +1102,22 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Ambience Volume Setter
+  const setAmbienceVolume = (vol: number) => {
+    const clamped = Math.max(0, Math.min(1, vol));
+    setAmbienceVolumeState(clamped);
+    try {
+      localStorage.setItem('caranguejo_ambience_vol', clamped.toString());
+    } catch {}
+
+    if (clamped > 0 && isAmbienceMuted) {
+      setIsAmbienceMuted(false);
+      try {
+        localStorage.setItem('caranguejo_ambience_muted', 'false');
+      } catch {}
+    }
+  };
+
   const toggleMute = () => {
     setIsMuted(prev => {
       const next = !prev;
@@ -865,6 +1150,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const toggleAmbienceMute = () => {
+    setIsAmbienceMuted(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('caranguejo_ambience_muted', next.toString());
+      } catch {}
+      return next;
+    });
+  };
+
   const toggleSfxMute = () => {
     setIsSfxMuted(prev => {
       const next = !prev;
@@ -876,7 +1171,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Convenience batch mix preset setter
-  const setAudioMix = (masterVal: number, musicVal: number, sfxVal: number) => {
+  const setAudioMix = (masterVal: number, musicVal: number, sfxVal: number, ambienceVal?: number) => {
     const m = Math.max(0, Math.min(1, masterVal));
     const mus = Math.max(0, Math.min(1, musicVal));
     const sfx = Math.max(0, Math.min(1, sfxVal));
@@ -888,6 +1183,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       localStorage.setItem('caranguejo_music_vol', mus.toString());
       localStorage.setItem('caranguejo_sfx_vol', sfx.toString());
     } catch {}
+
+    if (ambienceVal !== undefined) {
+      const amb = Math.max(0, Math.min(1, ambienceVal));
+      setAmbienceVolumeState(amb);
+      try {
+        localStorage.setItem('caranguejo_ambience_vol', amb.toString());
+      } catch {}
+    }
 
     const nextEffective = (isMuted || isMusicMuted) ? 0 : m * mus;
     safeFetchJson('/api/bot/voice/volume', {
@@ -1199,7 +1502,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Direct Path Scanner (No Duplication / Linking)
-  const scanLocalFolderDirectly = async (folderPath: string, category: 'music' | 'sfx' | 'npc', folderId?: string): Promise<{ count: number; message: string }> => {
+  const scanLocalFolderDirectly = async (folderPath: string, category: 'music' | 'ambience' | 'sfx' | 'npc', folderId?: string): Promise<{ count: number; message: string }> => {
     const res = await safeFetchJson<{ success: boolean; count: number; message: string }>('/api/library/scan-folder', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1219,7 +1522,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const importFolderFiles = async (
     files: FileList | File[],
-    category: 'music' | 'sfx' | 'npc',
+    category: 'music' | 'ambience' | 'sfx' | 'npc',
     folderId?: string
   ): Promise<{ count: number }> => {
     const formData = new FormData();
@@ -1323,6 +1626,40 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setMusicTracks(prev => prev.filter(t => t.id !== id));
   };
 
+  const createAmbienceTrack = async (track: Partial<AmbienceTrack>): Promise<AmbienceTrack> => {
+    const res = await safeFetchJson<AmbienceTrack>('/api/ambience', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(track)
+    });
+    const created = res.data || (track as AmbienceTrack);
+    setAmbienceTracks(prev => [created, ...prev]);
+    return created;
+  };
+
+  const updateAmbienceTrack = async (id: string, updates: Partial<AmbienceTrack>): Promise<AmbienceTrack> => {
+    const res = await safeFetchJson<AmbienceTrack>(`/api/ambience/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    const updated = res.data || ({ ...updates, id } as AmbienceTrack);
+    setAmbienceTracks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    if (currentAmbienceTrack?.id === id) {
+      setCurrentAmbienceTrack(prev => prev ? { ...prev, ...updates } : null);
+    }
+    return updated;
+  };
+
+  const deleteAmbienceTrack = async (id: string) => {
+    await safeFetchJson(`/api/ambience/${id}`, { method: 'DELETE' });
+    setAmbienceTracks(prev => prev.filter(t => t.id !== id));
+    if (currentAmbienceTrack?.id === id) {
+      stopAmbienceTrack();
+      setCurrentAmbienceTrack(null);
+    }
+  };
+
   const createSoundboardItem = async (item: Partial<SoundboardItem>): Promise<SoundboardItem> => {
     const res = await safeFetchJson<SoundboardItem>('/api/soundboard', {
       method: 'POST',
@@ -1421,6 +1758,15 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isLocalAudioEnabled,
         loopMode,
         queue,
+        currentAmbienceTrack,
+        ambiencePlaybackState,
+        ambienceCurrentTime,
+        ambienceDuration,
+        ambienceVolume,
+        isAmbienceMuted,
+        effectiveAmbienceVolume,
+        ambienceLoopMode,
+        ambienceTracks,
         playTrack,
         stopTrack,
         addToQueue,
@@ -1428,6 +1774,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         clearQueue,
         togglePlayPause,
         seek,
+        playAmbienceTrack,
+        stopAmbienceTrack,
+        toggleAmbiencePlayPause,
+        seekAmbience,
+        setAmbienceVolume,
+        toggleAmbienceMute,
+        setAmbienceLoopMode,
+        createAmbienceTrack,
+        updateAmbienceTrack,
+        deleteAmbienceTrack,
         setVolume,
         setMusicVolume,
         setSfxVolume,

@@ -1,35 +1,30 @@
 import React, { useState } from 'react';
 import {
-  Volume2,
-  VolumeX,
   Bot,
-  Radio,
   Sparkles,
   Music,
   Users,
   MessageSquare,
   Shield,
-  Settings,
-  FolderOpen,
-  HardDrive,
-  Sliders,
-  Headphones,
-  SlidersHorizontal,
   ChevronDown,
-  Clock,
-  Play,
-  Pause,
-  RotateCcw
+  CloudRain,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { AudioMixerModal } from './AudioMixerModal';
+import { ConfigurationModal } from './ConfigurationModal';
+import { PresetManagerModal } from './PresetManagerModal';
 
 interface HeaderProps {
-  currentTab: 'master' | 'music' | 'soundboard' | 'npcs' | 'chat' | 'settings';
-  setCurrentTab: (tab: 'master' | 'music' | 'soundboard' | 'npcs' | 'chat' | 'settings') => void;
+  currentTab: 'master' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings';
+  setCurrentTab: (tab: 'master' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings') => void;
   onOpenDiscordModal: () => void;
   onOpenFolderModal: () => void;
   onOpenSessionModal: () => void;
+  onOpenTutorialModal?: () => void;
+  onOpenThemeModal?: () => void;
+  onOpenPresetModal?: (initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json') => void;
+  onOpenConfigModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -37,36 +32,37 @@ export const Header: React.FC<HeaderProps> = ({
   setCurrentTab,
   onOpenDiscordModal,
   onOpenFolderModal,
-  onOpenSessionModal
+  onOpenSessionModal,
+  onOpenTutorialModal,
+  onOpenThemeModal,
+  onOpenPresetModal,
+  onOpenConfigModal
 }) => {
   const {
     botStatus,
-    volume,
-    setVolume,
-    musicVolume,
-    sfxVolume,
-    isMuted,
-    toggleMute,
-    isMusicMuted,
-    isSfxMuted,
-    currentTrack,
     playbackState,
-    activeSfxIds,
-    isLocalAudioEnabled,
-    sessionSeconds,
-    isSessionTimerRunning,
-    toggleSessionTimer,
-    resetSessionTimer,
-    formatDuration
+    ambiencePlaybackState,
+    activeSfxIds
   } = useAudio();
 
-  const [isMixerOpen, setIsMixerOpen] = useState(false);
+  const [isInternalConfigOpen, setIsInternalConfigOpen] = useState(false);
+  const [isInternalMixerOpen, setIsInternalMixerOpen] = useState(false);
+  const [isInternalPresetOpen, setIsInternalPresetOpen] = useState(false);
+  const [internalPresetTab, setInternalPresetTab] = useState<'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json'>('encounters');
+
+  const handleOpenConfig = () => {
+    if (onOpenConfigModal) {
+      onOpenConfigModal();
+    } else {
+      setIsInternalConfigOpen(true);
+    }
+  };
 
   return (
     <>
       <header className="sticky top-0 z-40 bg-[#121417]/95 backdrop-blur-md border-b border-[#282C34] px-3 sm:px-5 py-2.5 transition-colors shadow-lg shadow-black/30">
         <div className="w-full max-w-[1600px] mx-auto flex items-center justify-between gap-2 sm:gap-4">
-          {/* Brand & Bot Status */}
+          {/* Brand & Logo */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 border border-orange-500/30 p-1 shadow-md shadow-orange-500/10 flex items-center justify-center">
@@ -84,7 +80,14 @@ export const Header: React.FC<HeaderProps> = ({
                   <h1 className="text-sm font-bold tracking-wide text-white font-rpg leading-tight">
                     CaranguejoRPG
                   </h1>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <span
+                    className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md border"
+                    style={{
+                      backgroundColor: 'var(--rpg-accent-muted)',
+                      color: 'var(--rpg-accent-primary)',
+                      borderColor: 'var(--rpg-accent-primary)'
+                    }}
+                  >
                     Mesa
                   </span>
                 </div>
@@ -95,20 +98,20 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Tabs - Expanded & Prominent */}
-          <div className="flex-1 min-w-0 flex items-center justify-center px-1 sm:px-3">
-            <nav className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full py-1.5 px-2 scrollbar-thin scrollbar-thumb-zinc-700/60 scrollbar-track-transparent rounded-2xl bg-[#16181D]/90 border border-[#2D3139] shadow-inner">
+          {/* Navigation Tabs - Only 6 core buttons: Escudo do Mestre, Músicas, Ambientação, Soundboard, NPCs, Chat */}
+          <div className="flex-1 min-w-0 flex items-center justify-center px-1 sm:px-2">
+            <nav className="flex items-center justify-center gap-1 sm:gap-1.5 md:gap-2 py-1 px-1.5 sm:px-2 rounded-2xl bg-[#16181D]/90 border border-[#2D3139] shadow-inner max-w-full">
               {/* Escudo do Mestre */}
               <button
                 id="tab-master-screen"
                 onClick={() => setCurrentTab('master')}
-                className={`shrink-0 flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap ${
+                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   currentTab === 'master'
                     ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
                 }`}
               >
-                <Shield className="w-4 h-4 text-indigo-400" />
+                <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
                 <span>Escudo do Mestre</span>
               </button>
 
@@ -116,16 +119,33 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 id="tab-music"
                 onClick={() => setCurrentTab('music')}
-                className={`shrink-0 flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap ${
+                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   currentTab === 'music'
                     ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
                 }`}
               >
-                <Music className="w-4 h-4 text-amber-400" />
+                <Music className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>Músicas</span>
                 {playbackState === 'playing' && (
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                )}
+              </button>
+
+              {/* Ambientação */}
+              <button
+                id="tab-ambience"
+                onClick={() => setCurrentTab('ambience')}
+                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  currentTab === 'ambience'
+                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
+                }`}
+              >
+                <CloudRain className="w-4 h-4 text-sky-400 shrink-0" />
+                <span>Ambientação</span>
+                {ambiencePlaybackState === 'playing' && (
+                  <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse shrink-0" />
                 )}
               </button>
 
@@ -133,13 +153,13 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 id="tab-soundboard"
                 onClick={() => setCurrentTab('soundboard')}
-                className={`shrink-0 flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap ${
+                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   currentTab === 'soundboard'
                     ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
                 }`}
               >
-                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>Soundboard</span>
                 {activeSfxIds.length > 0 && (
                   <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 shrink-0">
@@ -148,159 +168,65 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </button>
 
-              {/* NPCs */}
+              {/* Imagens (NPCs e Gerais) */}
               <button
                 id="tab-npcs"
                 onClick={() => setCurrentTab('npcs')}
-                className={`shrink-0 flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap ${
+                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   currentTab === 'npcs'
                     ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
                 }`}
               >
-                <Users className="w-4 h-4 text-cyan-400" />
-                <span>NPCs</span>
+                <ImageIcon className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Imagens</span>
               </button>
 
-              {/* Chat Discord */}
+              {/* Chat */}
               <button
                 id="tab-chat"
                 onClick={() => setCurrentTab('chat')}
-                className={`shrink-0 flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap ${
+                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
                   currentTab === 'chat'
                     ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
                     : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
                 }`}
               >
-                <MessageSquare className="w-4 h-4 text-violet-400" />
-                <span>Chat Discord</span>
-              </button>
-
-              <div className="w-px h-5 bg-zinc-700/60 mx-1 shrink-0" />
-
-              {/* Pastas Modal Button */}
-              <button
-                id="tab-folders"
-                onClick={onOpenFolderModal}
-                title="Gerenciador de Pastas"
-                className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold text-zinc-400 hover:text-white hover:bg-zinc-800/70 transition-colors whitespace-nowrap"
-              >
-                <FolderOpen className="w-4 h-4 text-zinc-400" />
-                <span>Pastas</span>
-              </button>
-
-              {/* Saves & Sessões Button */}
-              <button
-                id="tab-saves"
-                onClick={onOpenSessionModal}
-                title="Sessões Salvas & Saves da Mesa"
-                className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold text-indigo-300 hover:text-white bg-indigo-600/15 hover:bg-indigo-600/30 border border-indigo-500/35 transition-colors whitespace-nowrap"
-              >
-                <HardDrive className="w-4 h-4 text-indigo-400" />
-                <span>Saves</span>
+                <MessageSquare className="w-4 h-4 text-violet-400 shrink-0" />
+                <span>Chat</span>
               </button>
             </nav>
           </div>
 
-          {/* Right Controls: Session Timer + Audio Mixer + Discord Status */}
-          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-            {/* Session Duration Timer Widget in Header */}
-            <div
-              id="header-session-timer-widget"
-              className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs transition-all shadow-sm ${
-                isSessionTimerRunning
-                  ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-100 shadow-indigo-600/10'
-                  : 'bg-[#181B20] border-[#282C34] text-zinc-300'
-              }`}
-              title="Duração da Sessão (Persistente)"
-            >
-              <div
-                onClick={() => setCurrentTab('master')}
-                className="flex items-center gap-1.5 cursor-pointer hover:text-white"
-                title="Clique para ir ao Escudo do Mestre"
-              >
-                <Clock className={`w-3.5 h-3.5 ${isSessionTimerRunning ? 'text-indigo-400 animate-pulse' : 'text-zinc-400'}`} />
-                <span className="font-mono font-bold tracking-wider text-white text-xs sm:text-sm">
-                  {formatDuration(sessionSeconds)}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1 pl-1 border-l border-zinc-700/60">
-                {/* Play / Pause Toggle Button */}
-                <button
-                  type="button"
-                  onClick={toggleSessionTimer}
-                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                    isSessionTimerRunning
-                      ? 'bg-amber-600/30 text-amber-300 hover:bg-amber-600/50'
-                      : 'bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50'
-                  }`}
-                  title={isSessionTimerRunning ? 'Pausar Duração da Sessão' : 'Iniciar Duração da Sessão'}
-                >
-                  {isSessionTimerRunning ? (
-                    <Pause className="w-3 h-3 fill-current" />
-                  ) : (
-                    <Play className="w-3 h-3 fill-current" />
-                  )}
-                </button>
-
-                {/* Reset Button */}
-                <button
-                  type="button"
-                  onClick={resetSessionTimer}
-                  className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors cursor-pointer"
-                  title="Zerar Tempo da Sessão"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-
-            {/* Audio Mixer Studio Button */}
+          {/* Right Controls: Unified Configuration Button with Bot Status Icon */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              id="btn-open-audio-mixer"
-              onClick={() => setIsMixerOpen(true)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs sm:text-[13px] font-semibold transition-all shadow-sm ${
-                isMuted || isMusicMuted || isSfxMuted
-                  ? 'bg-rose-950/40 border-rose-500/40 text-rose-200 hover:bg-rose-900/40'
-                  : 'bg-[#181B20] border-[#282C34] hover:border-indigo-500/40 text-zinc-200 hover:bg-[#20242B]'
-              }`}
-              title="Abrir Mixer de Áudio (Separar Música e Efeitos)"
-            >
-              <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
-              <span>Mixer</span>
-              <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700/50">
-                {isMuted ? 'Mudo' : `${Math.round(volume * 100)}%`}
-              </span>
-            </button>
-
-            {/* Discord Status Button */}
-            <button
-              id="btn-discord-status-modal"
-              onClick={onOpenDiscordModal}
-              className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+              id="btn-open-configuration-tab"
+              onClick={handleOpenConfig}
+              className={`flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-sm ${
                 botStatus.isOnline
-                  ? 'bg-emerald-950/40 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/40 shadow-sm shadow-emerald-500/10'
-                  : 'bg-[#181B20] text-zinc-300 border-[#282C34] hover:border-zinc-600 hover:bg-[#20242B]'
+                  ? 'bg-emerald-950/30 text-emerald-200 border-emerald-500/40 hover:bg-emerald-900/40 hover:border-emerald-400 shadow-emerald-500/10'
+                  : 'bg-[#181B20] text-zinc-200 border-[#282C34] hover:border-indigo-500/50 hover:bg-[#20242B]'
               }`}
-              title={botStatus.isOnline ? 'Discord Conectado' : 'Clique para configurar o bot do Discord'}
+              title="Painel de Configuração (Pastas, Saves, Discord Bot, Áudio Mixer, Guia, Temas & Predefinições)"
             >
+              {/* Bot status icon with pulsing indicator */}
               <div className="relative flex items-center justify-center">
-                <Bot className="w-3.5 h-3.5 text-indigo-400" />
+                <Bot className="w-4 h-4 text-indigo-400" />
                 <span
                   className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
                     botStatus.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'
                   }`}
                 />
               </div>
-              <div className="hidden xl:flex flex-col items-start leading-none">
-                <span className="text-[11px] font-semibold">
-                  {botStatus.isOnline ? (botStatus.username || 'Discord Conectado') : 'Discord Offline'}
+
+              <div className="flex flex-col items-start leading-tight">
+                <span className="text-xs font-bold text-white flex items-center gap-1">
+                  Configurações
+                  <ChevronDown className="w-3 h-3 text-zinc-400" />
                 </span>
-                <span className="text-[9px] text-zinc-400 truncate max-w-[120px]">
-                  {botStatus.isOnline
-                    ? (botStatus.connectedVoiceChannel ? botStatus.connectedVoiceChannel.name : 'Sem Voz')
-                    : 'Modo Local'}
+                <span className="text-[10px] text-zinc-400 truncate max-w-[110px] font-normal hidden sm:inline">
+                  {botStatus.isOnline ? (botStatus.username || 'Discord Online') : 'Discord Offline'}
                 </span>
               </div>
             </button>
@@ -308,8 +234,54 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </header>
 
+      {/* Internal Configuration Modal */}
+      <ConfigurationModal
+        isOpen={isInternalConfigOpen}
+        onClose={() => setIsInternalConfigOpen(false)}
+        onOpenDiscordSetup={() => {
+          setIsInternalConfigOpen(false);
+          onOpenDiscordModal();
+        }}
+        onOpenMixerModal={() => {
+          setIsInternalConfigOpen(false);
+          setIsInternalMixerOpen(true);
+        }}
+        onOpenThemeModal={() => {
+          setIsInternalConfigOpen(false);
+          if (onOpenThemeModal) onOpenThemeModal();
+        }}
+        onOpenTutorialModal={() => {
+          setIsInternalConfigOpen(false);
+          if (onOpenTutorialModal) onOpenTutorialModal();
+        }}
+        onOpenPresetModal={(tab) => {
+          setIsInternalConfigOpen(false);
+          if (onOpenPresetModal) {
+            onOpenPresetModal(tab);
+          } else {
+            setInternalPresetTab(tab || 'encounters');
+            setIsInternalPresetOpen(true);
+          }
+        }}
+        onOpenFolderModal={() => {
+          setIsInternalConfigOpen(false);
+          onOpenFolderModal();
+        }}
+        onOpenSessionModal={() => {
+          setIsInternalConfigOpen(false);
+          onOpenSessionModal();
+        }}
+      />
+
       {/* Audio Mixer Studio Modal */}
-      <AudioMixerModal isOpen={isMixerOpen} onClose={() => setIsMixerOpen(false)} />
+      <AudioMixerModal isOpen={isInternalMixerOpen} onClose={() => setIsInternalMixerOpen(false)} />
+
+      {/* Preset Manager Modal fallback */}
+      <PresetManagerModal
+        isOpen={isInternalPresetOpen}
+        onClose={() => setIsInternalPresetOpen(false)}
+        initialTab={internalPresetTab}
+      />
     </>
   );
 };

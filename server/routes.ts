@@ -2,9 +2,9 @@ import express, { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { db, UPLOADS_DIR, MUSIC_DIR, SFX_DIR, NPCS_DIR, SAVES_DIR } from './db.js';
+import { db, UPLOADS_DIR, MUSIC_DIR, AMBIENCE_DIR, SFX_DIR, NPCS_DIR, SAVES_DIR } from './db.js';
 import { discordBot } from './discordBot.js';
-import { Folder, MusicTrack, SoundboardItem, NPC, DiceRollResult, SoundboardLayout } from '../src/types.js';
+import { Folder, MusicTrack, AmbienceTrack, SoundboardItem, NPC, DiceRollResult, SoundboardLayout } from '../src/types.js';
 import { rollWodDice } from './wodDice.js';
 
 const router = Router();
@@ -15,6 +15,7 @@ const storage = multer.diskStorage({
     const type = req.query.type as string;
     let targetDir = UPLOADS_DIR;
     if (type === 'music') targetDir = MUSIC_DIR;
+    else if (type === 'ambience') targetDir = AMBIENCE_DIR;
     else if (type === 'sfx') targetDir = SFX_DIR;
     else if (type === 'npc') targetDir = NPCS_DIR;
 
@@ -198,6 +199,36 @@ const handleRollDice = async (req: Request, res: Response) => {
 };
 router.post('/discord/roll-dice', handleRollDice);
 router.post('/bot/roll-dice', handleRollDice);
+
+const handlePostEncounter = async (req: Request, res: Response) => {
+  try {
+    const { encounter, customChannelId } = req.body;
+    if (!encounter || !encounter.title) {
+      return res.status(400).json({ success: false, error: 'Dados do encontro são obrigatórios.' });
+    }
+    const result = await discordBot.postEncounter(encounter, customChannelId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao enviar encontro ao Discord.' });
+  }
+};
+router.post('/discord/post-encounter', handlePostEncounter);
+router.post('/bot/post-encounter', handlePostEncounter);
+
+const handlePostRoulette = async (req: Request, res: Response) => {
+  try {
+    const { result, customChannelId } = req.body;
+    if (!result || !result.sliceLabel) {
+      return res.status(400).json({ success: false, error: 'Resultado da roleta é obrigatório.' });
+    }
+    const outcome = await discordBot.postRouletteResult(result, customChannelId);
+    res.json(outcome);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao enviar resultado da roleta ao Discord.' });
+  }
+};
+router.post('/discord/post-roulette', handlePostRoulette);
+router.post('/bot/post-roulette', handlePostRoulette);
 
 // ==========================================
 // DISCORD VOICE PLAYBACK ENDPOINTS
@@ -415,6 +446,46 @@ router.delete('/music/:id', (req: Request, res: Response) => {
 });
 
 // ==========================================
+// AMBIENCE TRACKS ENDPOINTS
+// ==========================================
+
+router.get('/ambience', (req: Request, res: Response) => {
+  res.json(db.getAmbienceTracks());
+});
+
+router.post('/ambience', (req: Request, res: Response) => {
+  const { title, environment, duration, url, folderId, tags, isLocal, coverUrl } = req.body;
+  if (!title || !url) {
+    return res.status(400).json({ error: 'Título e URL são obrigatórios.' });
+  }
+  const track: AmbienceTrack = {
+    id: `amb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    title,
+    environment: environment || 'Ambiente',
+    duration: duration || 300,
+    url,
+    folderId,
+    tags: Array.isArray(tags) ? tags : [],
+    isLocal: !!isLocal,
+    coverUrl,
+    createdAt: Date.now()
+  };
+  const created = db.addAmbienceTrack(track);
+  res.status(201).json(created);
+});
+
+router.put('/ambience/:id', (req: Request, res: Response) => {
+  const updated = db.updateAmbienceTrack(req.params.id, req.body);
+  if (!updated) return res.status(404).json({ error: 'Faixa de ambientação não encontrada.' });
+  res.json(updated);
+});
+
+router.delete('/ambience/:id', (req: Request, res: Response) => {
+  const success = db.deleteAmbienceTrack(req.params.id);
+  res.json({ success });
+});
+
+// ==========================================
 // SOUNDBOARD ITEMS ENDPOINTS
 // ==========================================
 
@@ -513,7 +584,7 @@ router.get('/npcs', (req: Request, res: Response) => {
 });
 
 router.post('/npcs', (req: Request, res: Response) => {
-  const { name, title, description, secretDmNotes, imageUrl, folderId, tags, alignment, race, classOrType, hp, maxHp, ac, cr, quote } = req.body;
+  const { name, title, description, secretDmNotes, imageUrl, folderId, tags, alignment, race, classOrType, hp, maxHp, ac, cr, quote, isGeneralImage } = req.body;
   if (!name || !description) {
     return res.status(400).json({ error: 'Nome e descrição são obrigatórios.' });
   }
@@ -534,6 +605,7 @@ router.post('/npcs', (req: Request, res: Response) => {
     ac: ac || 12,
     cr,
     quote,
+    isGeneralImage: !!isGeneralImage,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
@@ -897,6 +969,7 @@ router.post('/upload', upload.single('file'), (req: Request, res: Response) => {
   const type = req.query.type as string;
   let relativePath = `/media/uploads/${req.file.filename}`;
   if (type === 'music') relativePath = `/media/music/${req.file.filename}`;
+  else if (type === 'ambience') relativePath = `/media/ambience/${req.file.filename}`;
   else if (type === 'sfx') relativePath = `/media/sfx/${req.file.filename}`;
   else if (type === 'npc') relativePath = `/media/npcs/${req.file.filename}`;
 
@@ -936,7 +1009,8 @@ router.post('/upload/bulk', upload.array('files', 150), (req: Request, res: Resp
   }
 
   const targetCategory = (req.query.type as string) || 'music';
-  const folderType = targetCategory === 'sfx' ? 'soundboard' : (targetCategory as 'music' | 'npc');
+  const isImageCategory = targetCategory === 'image' || req.body.isGeneralImage === 'true';
+  const folderType = targetCategory === 'sfx' ? 'soundboard' : 'npc';
   let targetFolderId = (req.body.folderId as string) || (req.query.folderId as string) || undefined;
   const autoCreateItems = req.body.autoCreateItems !== 'false';
 
@@ -1036,16 +1110,17 @@ router.post('/upload/bulk', upload.array('files', 150), (req: Request, res: Resp
       };
       newSfxItems.push(sfx);
       importedResults.push(sfx);
-    } else if (targetCategory === 'npc') {
+    } else if (targetCategory === 'npc' || targetCategory === 'image') {
       relativeUrl = `/media/npcs/${file.filename}`;
       const npc: NPC = {
         id: `npc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
         name: cleanTitle,
-        title: 'NPC / Criatura',
+        title: isImageCategory ? 'Imagem / Cenário' : 'NPC / Criatura',
         description: '',
         imageUrl: relativeUrl,
         folderId: itemFolderId,
         tags: autoTags.filter(t => t !== 'Local'),
+        isGeneralImage: isImageCategory,
         createdAt: Date.now(),
         updatedAt: Date.now()
       };

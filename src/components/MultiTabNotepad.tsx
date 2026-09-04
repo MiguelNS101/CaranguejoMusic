@@ -19,40 +19,14 @@ import {
 import { NoteTab } from '../types';
 import { useAudio } from '../context/AudioContext';
 import { safeFetchJson } from '../services/api';
+import { getNoteTabTemplates } from '../utils/presetStore';
 
 const DEFAULT_TABS: NoteTab[] = [
   {
     id: 'tab-general',
-    title: 'Geral & Resumo',
+    title: 'Notas Gerais',
     emoji: '📜',
-    content: '## Resumo da Sessão\n\n- [ ] Investigar os desaparecimentos na vila\n- [ ] Encontrar a entrada oculta para as Catacumbas\n- [ ] Proteger o bardo dos assassinos encapuzados\n\n*Notas do Mestre:* O clérigo da ordem solar sabe mais do que revelou...',
-    isDefault: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: 'tab-clues',
-    title: 'Pistas & Segredos',
-    emoji: '🗝️',
-    content: '## Pistas & Segredos Reveláveis\n\n1. 🗝️ O anel de prata encontrado no bosque possui o sinete da casa nobre caída.\n2. 📜 A profecia menciona uma lua escarlate dentro de três noites.\n3. 🔒 O taverneiro é secretamente um informante do culto.',
-    isDefault: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: 'tab-loot',
-    title: 'Tesouro & Loot',
-    emoji: '💰',
-    content: '## Tesouros da Aventura\n\n- 💰 180 Moedas de Ouro (PO)\n- 💎 2x Gemas de Turquesa (50 PO cada)\n- 🧪 3x Poções de Cura Maior (4d4 + 4)\n- ⚔️ Adaga Sussurrante (+1, emite leve luz azul perto de mortos-vivos)',
-    isDefault: true,
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  },
-  {
-    id: 'tab-npcs',
-    title: 'NPCs & Contatos',
-    emoji: '👤',
-    content: '## Contatos Rápidos\n\n- **Garrick (Ferreiro):** Leal, odeia o lorde corrupto. Cobra metade pelo conserto se trouxerem minério.\n- **Irmã Valéria:** Sacerdotisa, pode curar maldições em troca de favores sagrados.\n- **Vulto Mascarado:** Espião neutro, vende informações no beco à meia-noite.',
+    content: '',
     isDefault: true,
     createdAt: Date.now(),
     updatedAt: Date.now()
