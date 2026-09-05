@@ -6,6 +6,7 @@ import { db, UPLOADS_DIR, MUSIC_DIR, AMBIENCE_DIR, SFX_DIR, NPCS_DIR, SAVES_DIR 
 import { discordBot } from './discordBot.js';
 import { Folder, MusicTrack, AmbienceTrack, SoundboardItem, NPC, DiceRollResult, SoundboardLayout } from '../src/types.js';
 import { rollWodDice } from './wodDice.js';
+import { parseAndRollDice } from '../src/utils/diceParser.js';
 
 const router = Router();
 
@@ -203,11 +204,24 @@ router.post('/bot/announce-turn', handleAnnounceTurn);
 
 const handleRollDice = async (req: Request, res: Response) => {
   try {
-    const roll = req.body as DiceRollResult;
-    const result = await discordBot.broadcastDiceRoll(roll);
-    res.json(result);
+    let roll: DiceRollResult;
+    if (req.body && Array.isArray(req.body.rolls)) {
+      roll = req.body as DiceRollResult;
+    } else {
+      const notation = req.body?.notation || '1d20';
+      const label = req.body?.label;
+      roll = parseAndRollDice(notation, label);
+    }
+
+    const broadcast = req.body?.broadcastToDiscord !== false;
+    let discordResult = { success: true };
+    if (broadcast) {
+      discordResult = await discordBot.broadcastDiceRoll(roll);
+    }
+
+    res.json({ success: true, roll, discord: discordResult });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err?.message || 'Erro ao transmitir rolagem de dados.' });
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao processar rolagem de dados.' });
   }
 };
 router.post('/discord/roll-dice', handleRollDice);

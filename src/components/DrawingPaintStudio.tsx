@@ -45,6 +45,12 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { DiscordChannel } from '../types';
 import { safeFetchJson } from '../services/api';
+import {
+  moveLayerUp,
+  moveLayerDown,
+  moveLayerToTop,
+  moveLayerToBottom
+} from '../utils/layerManager';
 
 type Tool = 'brush' | 'eraser' | 'line' | 'rectangle' | 'circle' | 'text' | 'arrow' | 'select' | 'marquee';
 
@@ -537,50 +543,28 @@ export const DrawingPaintStudio: React.FC = () => {
 
   // Bring layer 1 step forward (closer to top)
   const handleMoveLayerUp = (id: string) => {
-    const idx = layers.findIndex(l => l.id === id);
-    if (idx >= layers.length - 1) return; // already on top
-    const next = [...layers];
-    const temp = next[idx];
-    next[idx] = next[idx + 1];
-    next[idx + 1] = temp;
-    setLayers(next);
+    setLayers(prev => moveLayerUp(prev, id));
     setTimeout(composeCanvas, 20);
     logAction('Camada movida para frente', 'drawing');
   };
 
   // Send layer 1 step backward (closer to bottom)
   const handleMoveLayerDown = (id: string) => {
-    const idx = layers.findIndex(l => l.id === id);
-    if (idx <= 0) return; // already at bottom
-    const next = [...layers];
-    const temp = next[idx];
-    next[idx] = next[idx - 1];
-    next[idx - 1] = temp;
-    setLayers(next);
+    setLayers(prev => moveLayerDown(prev, id));
     setTimeout(composeCanvas, 20);
     logAction('Camada movida para trás', 'drawing');
   };
 
   // Bring to Front (topmost z-index)
   const handleMoveLayerToTop = (id: string) => {
-    const idx = layers.findIndex(l => l.id === id);
-    if (idx >= layers.length - 1) return;
-    const layer = layers[idx];
-    const next = layers.filter(l => l.id !== id);
-    next.push(layer);
-    setLayers(next);
+    setLayers(prev => moveLayerToTop(prev, id));
     setTimeout(composeCanvas, 20);
     logAction('Camada trazida para o topo', 'drawing');
   };
 
   // Send to Back (bottommost z-index)
   const handleMoveLayerToBottom = (id: string) => {
-    const idx = layers.findIndex(l => l.id === id);
-    if (idx <= 0) return;
-    const layer = layers[idx];
-    const next = layers.filter(l => l.id !== id);
-    next.unshift(layer);
-    setLayers(next);
+    setLayers(prev => moveLayerToBottom(prev, id));
     setTimeout(composeCanvas, 20);
     logAction('Camada enviada para o fundo', 'drawing');
   };

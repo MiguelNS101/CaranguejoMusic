@@ -26,7 +26,17 @@ import {
   Maximize2,
   Grid,
   Users,
-  MessageSquare
+  MessageSquare,
+  Paintbrush,
+  Columns,
+  TestTube,
+  Palette,
+  Scissors,
+  Lock,
+  Send,
+  Eye,
+  Sliders,
+  Copy
 } from 'lucide-react';
 
 interface AppTutorialModalProps {
@@ -42,7 +52,9 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
   onOpenDiscordConfig,
   onOpenFolderImport
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'audio' | 'widgets' | 'discord' | 'commands'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'audio' | 'widgets' | 'paint' | 'chat_reader' | 'discord' | 'commands' | 'tests'
+  >('overview');
 
   if (!isOpen) return null;
 
@@ -60,7 +72,7 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
                 Manual Completo & Guia da Mesa RPG
               </h2>
               <p className="text-xs text-zinc-400">
-                Aprenda a operar o som ambiente, escudo do mestre, roletas, encontros e o bot do Discord.
+                Aprenda a operar o estúdio de pintura, leitor do Discord, áudio, escudo 2D, roletas e testes automatizados.
               </p>
             </div>
           </div>
@@ -96,7 +108,7 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
             }`}
           >
             <Music className="w-3.5 h-3.5" />
-            <span>2. Músicas & Ambientação</span>
+            <span>2. Áudio & Mixer</span>
           </button>
 
           <button
@@ -108,7 +120,37 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
             }`}
           >
             <Shield className="w-3.5 h-3.5" />
-            <span>3. Escudo & Ferramentas</span>
+            <span>3. Escudo & Módulos</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('paint')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'paint'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+            }`}
+          >
+            <Paintbrush className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="flex items-center gap-1">
+              4. Desenho & Paint
+              <span className="px-1 py-0.2 rounded bg-indigo-500/30 text-[9px] text-indigo-300 font-bold uppercase">Novo</span>
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('chat_reader')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'chat_reader'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="flex items-center gap-1">
+              5. Chat & Multi-Abas
+              <span className="px-1 py-0.2 rounded bg-indigo-500/30 text-[9px] text-indigo-300 font-bold uppercase">Novo</span>
+            </span>
           </button>
 
           <button
@@ -120,7 +162,7 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
             }`}
           >
             <Bot className="w-3.5 h-3.5" />
-            <span>4. Configuração do Discord</span>
+            <span>6. Conexão Discord</span>
           </button>
 
           <button
@@ -132,7 +174,22 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
             }`}
           >
             <Terminal className="w-3.5 h-3.5" />
-            <span>5. Comandos & Curiosidades</span>
+            <span>7. Comandos</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('tests')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'tests'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+            }`}
+          >
+            <TestTube className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="flex items-center gap-1">
+              8. Testes do App
+              <span className="px-1 py-0.2 rounded bg-emerald-500/30 text-[9px] text-emerald-300 font-bold uppercase">v2.0</span>
+            </span>
           </button>
         </div>
 
@@ -538,7 +595,235 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: CONFIGURAÇÃO DO DISCORD */}
+          {/* TAB 4: ESTÚDIO DE DESENHO & PAINT MULTI-CAMADAS */}
+          {activeTab === 'paint' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="p-4 rounded-2xl bg-indigo-950/25 border border-indigo-500/30 space-y-2">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <Paintbrush className="w-4 h-4 text-indigo-400" />
+                  Estúdio de Desenho Tático & Paint Multi-Camadas
+                </h3>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  O <strong>Desenhar & Paint</strong> transforma o escudo em uma mesa tática digital completa. Crie mapas de combate, esboce armadilhas, posicione tokens de criaturas e envie a arte diretamente para o Discord dos jogadores.
+                </p>
+              </div>
+
+              {/* Seção 1: Sistema de Camadas Z-Index */}
+              <div className="p-4 rounded-2xl bg-[#141619] border border-[#2D3139] space-y-3">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-indigo-400" /> 1. Sistema Profissional de Camadas (Layers Z-Index)
+                  </h4>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300 font-semibold border border-indigo-500/30">
+                    Pilha Independente
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-zinc-800/80 space-y-1.5">
+                    <span className="font-bold text-indigo-300 text-xs flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                      + Nova Camada & Empilhamento
+                    </span>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Cada camada funciona como uma folha de acetato transparente independente. Você pode desenhar o mapa na camada de baixo, um grid tático no meio e anotações ou monstros na camada superior.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-zinc-800/80 space-y-1.5">
+                    <span className="font-bold text-indigo-300 text-xs flex items-center gap-1.5">
+                      <ChevronRight className="w-3.5 h-3.5 text-indigo-400" />
+                      Trazer para Frente / Trazer para Trás
+                    </span>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Use os botões de reordenação para mover a camada ativa 1 nível para cima ou para baixo, ou use os atalhos de salto rápido para enviá-la diretamente para o Topo Máximo ou Fundo Máximo.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-zinc-800/80 space-y-1.5">
+                    <span className="font-bold text-indigo-300 text-xs flex items-center gap-1.5">
+                      <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                      Opacidade Individual (0% a 100%)
+                    </span>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      Cada camada possui seu próprio slider de opacidade. Ideal para simular névoa de guerra translúcida, raios de luar, auras de magia ou demarcação semitransparente de áreas de efeito.
+                    </p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-zinc-800/80 space-y-1.5">
+                    <span className="font-bold text-indigo-300 text-xs flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-amber-400" />
+                      Bloquear (Cadeado) & Ocultar (Olho)
+                    </span>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      <strong>Cadeado:</strong> Bloqueia a camada para evitar riscos acidentais após terminar o mapa de fundo. <strong>Olho:</strong> Oculte elementos ou armadilhas secretas e torne-os visíveis apenas na hora da revelação!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção 2: Ferramentas de Traçado & Seleção */}
+              <div className="p-4 rounded-2xl bg-[#141619] border border-[#2D3139] space-y-3">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Paintbrush className="w-3.5 h-3.5 text-amber-400" /> 2. Ferramentas de Desenho, Formas & Seleção
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs text-zinc-300">
+                  <div className="p-2.5 rounded-xl bg-[#1A1D21] border border-zinc-800 space-y-1">
+                    <span className="font-bold text-white block">Pincel & Borracha</span>
+                    <span className="text-[11px] text-zinc-400">
+                      Espessura de 1 a 64 pixels, suavização anti-aliasing e seletor rápido de paleta de cores ou código HEX personalizado.
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-[#1A1D21] border border-zinc-800 space-y-1">
+                    <span className="font-bold text-white block">Linhas & Setas Táticas</span>
+                    <span className="text-[11px] text-zinc-400">
+                      Trace retas exatas ou setas táticas para ilustrar vetores de movimento, rajadas de flechas ou direção do vento.
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-[#1A1D21] border border-zinc-800 space-y-1">
+                    <span className="font-bold text-white block">Retângulos & Círculos</span>
+                    <span className="text-[11px] text-zinc-400">
+                      Geometrias precisas com opção de contorno oco ou preenchimento total. Essencial para áreas de explosão (Bola de Fogo).
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-[#1A1D21] border border-zinc-800 space-y-1">
+                    <span className="font-bold text-white block flex items-center gap-1">
+                      <Scissors className="w-3 h-3 text-indigo-400" /> Cortar & Seleção (Marquee)
+                    </span>
+                    <span className="text-[11px] text-zinc-400">
+                      Delimite uma área retangular na tela para: <strong>Mover</strong> (recorta e flutua), <strong>Duplicar</strong> (clona a região) ou <strong>Apagar</strong>.
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-[#1A1D21] border border-zinc-800 space-y-1">
+                    <span className="font-bold text-white block">Texto na Tela</span>
+                    <span className="text-[11px] text-zinc-400">
+                      Clique no canvas para escrever rótulos elegantes, numerações de salas ("Sala 14 - Cripta") e avisos aos jogadores.
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-[#1A1D21] border border-zinc-800 space-y-1">
+                    <span className="font-bold text-white block">Grade & Grid Tático</span>
+                    <span className="text-[11px] text-zinc-400">
+                      Sobreponha um quadriculado de combate com tamanho configurável (20 a 100px) e opacidade regulável para alinhamento tático.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Seção 3: Manipulação de Imagens & Postagem no Discord */}
+              <div className="p-4 rounded-2xl bg-[#141619] border border-[#2D3139] space-y-3">
+                <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Image className="w-3.5 h-3.5 text-emerald-400" /> 3. Importação de Tokens & Postagem no Discord
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-zinc-300">
+                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-zinc-800 space-y-1.5">
+                    <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <Image className="w-3.5 h-3.5" /> Manipulação Livre de Imagens
+                    </span>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      Clique em <strong>+ Imagem</strong> para carregar PNGs ou JPGs de tokens, monstros ou mapas. Use o painel flutuante para redimensionar (com travamento de proporção opcional), girar em graus, espelhar horizontalmente/verticalmente e aplicar filtros visuais (Brilho, Contraste, Saturação, Sépia ou Inversão).
+                    </p>
+                    <span className="text-[10px] text-zinc-500 block">
+                      Dica: Clique em "Fixar na Camada Atual" ou "Criar Nova Camada" quando posicionar o token!
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-zinc-800 space-y-1.5">
+                    <span className="font-bold text-indigo-400 flex items-center gap-1.5">
+                      <Send className="w-3.5 h-3.5" /> Enviar ao Discord em Tempo Real
+                    </span>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      O botão <strong>Enviar ao Discord</strong> compõe automaticamente todas as camadas visíveis em um PNG de altíssima fidelidade e transmite o arquivo diretamente para o canal de texto de sua escolha no servidor do Discord, com uma legenda ou aviso de narrativa acoplado.
+                    </p>
+                    <span className="text-[10px] text-zinc-500 block">
+                      Os jogadores visualizam instantaneamente o mapa ou pistas no chat do Discord sem precisar de plataformas pesadas externas.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: LEITOR DO DISCORD COM MULTI-ABAS & SPLIT-VIEW */}
+          {activeTab === 'chat_reader' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="p-4 rounded-2xl bg-indigo-950/25 border border-indigo-500/30 space-y-2">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-indigo-400" />
+                  Leitor de Chat do Discord com Multi-Abas & Dividir Tela
+                </h3>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  Monitore a conversa dos jogadores, rolagens de dados de bots e sussurros secretos sem precisar sair do painel do mestre.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                <div className="p-3.5 rounded-xl bg-[#141619] border border-[#2D3139] space-y-2">
+                  <span className="font-bold text-indigo-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Columns className="w-3.5 h-3.5" /> Sistema de Multi-Abas de Canais
+                  </span>
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    Você não precisa ficar alternando canais manualmente:
+                  </p>
+                  <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-inside">
+                    <li>Clique em <strong>+ Aba</strong> para abrir novos canais simultaneamente no topo do leitor (ex: <code>#chat-geral</code>, <code>#rolagens</code>, <code>#sussurros</code>).</li>
+                    <li>Cada aba mantém seu próprio histórico de mensagens e estado de leitura.</li>
+                    <li>Feche abas desnecessárias com um clique no botão <strong>X</strong>.</li>
+                  </ul>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#141619] border border-[#2D3139] space-y-2">
+                  <span className="font-bold text-emerald-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Columns className="w-3.5 h-3.5" /> Dividir Tela (Split-View)
+                  </span>
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    Ative o botão <strong>Dividir Tela</strong> para exibir dois canais do Discord lado a lado na mesma tela!
+                  </p>
+                  <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-inside">
+                    <li><strong>Painel Esquerdo:</strong> Acompanhe o canal público de interpretação dos jogadores.</li>
+                    <li><strong>Painel Direito:</strong> Monitore o canal secreto de rolagens de dados, comandos do mestre ou sussurros.</li>
+                    <li>Controle de canal independente em cada lado da divisão.</li>
+                  </ul>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#141619] border border-[#2D3139] space-y-2">
+                  <span className="font-bold text-amber-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Palette className="w-3.5 h-3.5" /> Cores Personalizadas por Jogador
+                  </span>
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    Facilite a leitura rápida durante combates e diálogos caóticos atribuindo cores customizadas aos participantes:
+                  </p>
+                  <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-inside">
+                    <li>Clique no avatar ou nome do jogador no chat para abrir o seletor de cor.</li>
+                    <li>Escolha uma cor temática (ex: Dourado para Paladino, Verde para Ladino, Vermelho para o Mestre).</li>
+                    <li>As cores são salvas na memória persistente do seu navegador.</li>
+                  </ul>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-[#141619] border border-[#2D3139] space-y-2">
+                  <span className="font-bold text-sky-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Bot className="w-3.5 h-3.5" /> Sincronização & Busca em Tempo Real
+                  </span>
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    Recursos automáticos de produtividade:
+                  </p>
+                  <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-inside">
+                    <li><strong>Rolagem Automática (Auto-Scroll):</strong> Rola suavemente para baixo quando chegam novas mensagens.</li>
+                    <li><strong>Barra de Busca:</strong> Localize mensagens antigas, pistas digitadas ou rolagens passadas por texto ou nome do jogador.</li>
+                    <li><strong>Renderização de Embeds:</strong> Visualização nativa de rolagens formatadas e avisos do CaranguejoBot.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: CONFIGURAÇÃO DO DISCORD */}
           {activeTab === 'discord' && (
             <div className="space-y-4 animate-fade-in">
               <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/40 space-y-2">
@@ -653,6 +938,88 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
                       Exemplo: <code>\r 7d10 Ataque com Garras</code> ou <code>\kr 8d10 Tiro Certeiro</code>.
                     </span>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 8: SISTEMA DE TESTES AUTOMATIZADOS */}
+          {activeTab === 'tests' && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 space-y-2">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <TestTube className="w-4 h-4 text-emerald-400" />
+                  Sistema de Testes Automatizados & Verificação Contínua
+                </h3>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  O CaranguejoRPG agora conta com uma suíte completa de testes automatizados alimentada por <strong>Vitest</strong> e <strong>TypeScript</strong>. Ela valida as regras de negócio críticas do app para garantir que nada quebre durante o desenvolvimento, customização ou build de produção.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Comandos de Terminal */}
+                <div className="p-3.5 rounded-xl bg-[#141619] border border-[#2D3139] space-y-2.5">
+                  <span className="font-bold text-emerald-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Terminal className="w-3.5 h-3.5" /> Comandos de Execução
+                  </span>
+                  <div className="space-y-2 text-xs">
+                    <div className="p-2 rounded-lg bg-black/40 border border-zinc-800/80 font-mono">
+                      <div className="text-emerald-400 font-bold">npm test</div>
+                      <div className="text-[11px] text-zinc-400 mt-0.5">Executa todos os testes unitários e de integração em modo rápido (CI/build).</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-black/40 border border-zinc-800/80 font-mono">
+                      <div className="text-sky-400 font-bold">npm run test:watch</div>
+                      <div className="text-[11px] text-zinc-400 mt-0.5">Modo observador: re-executa testes automaticamente ao salvar arquivos modificados.</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-black/40 border border-zinc-800/80 font-mono">
+                      <div className="text-amber-400 font-bold">npm run lint</div>
+                      <div className="text-[11px] text-zinc-400 mt-0.5">Verificação estrita de tipagem TypeScript sem emitir arquivos (<code>tsc --noEmit</code>).</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status da Cobertura */}
+                <div className="p-3.5 rounded-xl bg-[#141619] border border-[#2D3139] space-y-2.5">
+                  <span className="font-bold text-indigo-400 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Módulos Críticos Cobertos
+                  </span>
+                  <ul className="text-xs text-zinc-300 space-y-1.5 list-none">
+                    <li className="flex items-start gap-2">
+                      <span className="text-emerald-400 mt-0.5 font-bold">✓</span>
+                      <div>
+                        <strong className="text-white">Motor WoD D10 (Storyteller):</strong>
+                        <span className="text-zinc-400 block text-[11px]">Testa limites de 1 a 100 dados, regra de acerto no 7, Keen Roll (9 e 10), explosão de sucessos e cancelamento de sucessos por falhas críticas (1s).</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-emerald-400 mt-0.5 font-bold">✓</span>
+                      <div>
+                        <strong className="text-white">Parser & Rolador D&D (d20, d6, d100):</strong>
+                        <span className="text-zinc-400 block text-[11px]">Validação de expressões como <code>1d20+5</code>, <code>2d6-2</code>, detecção de 20 Natural e 1 Natural.</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-emerald-400 mt-0.5 font-bold">✓</span>
+                      <div>
+                        <strong className="text-white">Gerenciador de Camadas Z-Index:</strong>
+                        <span className="text-zinc-400 block text-[11px]">Reordenação, saltos ao topo/fundo, clamp seguro de opacidade e proteção contra deleção da última camada.</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-emerald-400 mt-0.5 font-bold">✓</span>
+                      <div>
+                        <strong className="text-white">Roleta de Probabilidades & Slices:</strong>
+                        <span className="text-zinc-400 block text-[11px]">Normalização estrita para exatamente 100% e cálculo de ângulo do ponteiro.</span>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-emerald-400 mt-0.5 font-bold">✓</span>
+                      <div>
+                        <strong className="text-white">Cores dos Jogadores & Curiosidades:</strong>
+                        <span className="text-zinc-400 block text-[11px]">Cores determinísticas e validação estrutural do banco de dados de curiosidades de caranguejos.</span>
+                      </div>
+                    </li>
+                  </ul>
                 </div>
               </div>
             </div>
