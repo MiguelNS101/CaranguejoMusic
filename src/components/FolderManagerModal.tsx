@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FolderOpen,
   Plus,
   Trash2,
   Edit2,
   Music,
+  CloudRain,
   Sparkles,
   Users,
   Check,
@@ -17,14 +18,22 @@ import { useAudio } from '../context/AudioContext';
 interface FolderManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialType?: 'music' | 'ambience' | 'soundboard' | 'npc';
 }
 
-export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({ isOpen, onClose }) => {
-  const { folders, createFolder, deleteFolder, updateFolder, musicTracks, soundboardItems, npcs } = useAudio();
+export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({ isOpen, onClose, initialType = 'music' }) => {
+  const { folders, createFolder, deleteFolder, updateFolder, musicTracks, ambienceTracks, soundboardItems, npcs } = useAudio();
 
-  const [activeType, setActiveType] = useState<'music' | 'soundboard' | 'npc'>('music');
+  const [activeType, setActiveType] = useState<'music' | 'ambience' | 'soundboard' | 'npc'>(initialType);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderColor, setNewFolderColor] = useState('#6366f1');
+
+  useEffect(() => {
+    if (isOpen && initialType) {
+      setActiveType(initialType);
+      setEditingFolderId(null);
+    }
+  }, [isOpen, initialType]);
 
   // Editing state
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -67,6 +76,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({ isOpen, 
 
   const getItemCount = (folderId: string) => {
     if (activeType === 'music') return musicTracks.filter(m => m.folderId === folderId).length;
+    if (activeType === 'ambience') return ambienceTracks.filter(a => a.folderId === folderId).length;
     if (activeType === 'soundboard') return soundboardItems.filter(s => s.folderId === folderId).length;
     return npcs.filter(n => n.folderId === folderId).length;
   };
@@ -107,7 +117,7 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({ isOpen, 
         </div>
 
         {/* Type Switcher */}
-        <div className="flex items-center gap-2 bg-[#121417] p-1.5 rounded-2xl border border-[#282C34]">
+        <div className="flex items-center gap-1.5 bg-[#121417] p-1.5 rounded-2xl border border-[#282C34]">
           <button
             type="button"
             onClick={() => {
@@ -122,6 +132,22 @@ export const FolderManagerModal: React.FC<FolderManagerModalProps> = ({ isOpen, 
           >
             <Music className="w-3.5 h-3.5" />
             Músicas
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveType('ambience');
+              setEditingFolderId(null);
+            }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeType === 'ambience'
+                ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/30'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+            }`}
+          >
+            <CloudRain className="w-3.5 h-3.5" />
+            Ambiente
           </button>
 
           <button

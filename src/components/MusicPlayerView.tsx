@@ -101,8 +101,9 @@ export const MusicPlayerView: React.FC = () => {
     return matchesFolder && matchesSearch;
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const [isDraggingUpload, setIsDraggingUpload] = useState(false);
+
+  const uploadAudioFile = async (file: File) => {
     if (!file) return;
 
     setIsUploading(true);
@@ -126,6 +127,11 @@ export const MusicPlayerView: React.FC = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadAudioFile(file);
   };
 
   const handleCreateTrack = async (e: React.FormEvent) => {
@@ -623,11 +629,32 @@ export const MusicPlayerView: React.FC = () => {
               {/* File Upload Option */}
               <div>
                 <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                  1. Enviar Arquivo Local (.mp3, .wav, .ogg)
+                  1. Enviar Arquivo Local (.mp3, .wav, .ogg) (Arraste ou Selecione)
                 </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-[#2D3139] hover:border-indigo-500/70 rounded-xl p-4 text-center cursor-pointer bg-[#141619] transition-colors"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingUpload(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingUpload(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingUpload(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) uploadAudioFile(file);
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+                    isDraggingUpload
+                      ? 'border-indigo-400 bg-indigo-950/40'
+                      : 'border-[#2D3139] hover:border-indigo-500/70 bg-[#141619]'
+                  }`}
                 >
                   <input
                     type="file"
@@ -638,7 +665,7 @@ export const MusicPlayerView: React.FC = () => {
                   />
                   <Upload className="w-6 h-6 text-[#9E9E9E] mx-auto mb-1" />
                   <p className="text-xs text-[#E0E0E0] font-medium">
-                    {isUploading ? 'Enviando arquivo...' : 'Clique para selecionar arquivo de áudio do seu computador'}
+                    {isUploading ? 'Enviando arquivo...' : 'Arraste o áudio aqui ou clique para selecionar'}
                   </p>
                   <p className="text-[10px] text-[#9E9E9E] mt-0.5">
                     Salva diretamente na pasta local persistente de músicas

@@ -126,10 +126,10 @@ export const ScratchpadWidget: React.FC<ScratchpadWidgetProps> = ({
           type="button"
           onClick={handleSendToDiscord}
           disabled={isSending || !content.trim()}
-          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-40 cursor-pointer transition-all"
+          className="px-3.5 py-1.5 rounded-xl bg-gradient-to-b from-[#2E3440] via-[#21252E] to-[#16181D] hover:from-[#3A4252] hover:to-[#1C1F26] text-zinc-100 hover:text-white border border-[#3E4554] hover:border-indigo-400/70 text-xs font-bold font-rpg flex items-center gap-1.5 shadow-md disabled:opacity-40 cursor-pointer transition-all active:scale-95"
         >
-          <Send className="w-3.5 h-3.5" />
-          {isSending ? 'Enviando...' : 'Postar no Discord'}
+          <Send className="w-3.5 h-3.5 text-indigo-400" />
+          <span>{isSending ? 'Enviando...' : 'Postar no Discord'}</span>
         </button>
       </div>
     </div>

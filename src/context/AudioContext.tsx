@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import {
   MusicTrack,
   AmbienceTrack,
+  AmbienceQueueItem,
   QueueItem,
   SoundboardItem,
   PlaybackState,
@@ -14,7 +15,9 @@ import {
   SoundboardButtonConfig,
   SessionSaveMeta,
   WodDiceRollResult,
-  DiscordGuild
+  DiscordGuild,
+  ActionLogItem,
+  ActionLogCategory
 } from '../types';
 import { safeFetchJson, apiFetch, resolveApiUrl } from '../services/api';
 import { ensureDesktopBackend } from '../services/desktopBackend';
@@ -46,7 +49,8 @@ interface AudioContextType {
   effectiveAmbienceVolume: number;
   ambienceLoopMode: LoopMode;
   ambienceTracks: AmbienceTrack[];
-  
+  ambienceQueue: AmbienceQueueItem[];
+
   // Playback & Mixing Actions (Music)
   playTrack: (track: MusicTrack, immediate?: boolean, startOffset?: number) => void;
   stopTrack: () => void;
@@ -76,6 +80,10 @@ interface AudioContextType {
   setAmbienceVolume: (vol: number) => void;
   toggleAmbienceMute: () => void;
   setAmbienceLoopMode: (mode: LoopMode) => void;
+  addToAmbienceQueue: (track: AmbienceTrack) => void;
+  removeFromAmbienceQueue: (queueItemId: string) => void;
+  clearAmbienceQueue: () => void;
+  playNextAmbienceInQueue: () => void;
   createAmbienceTrack: (track: Partial<AmbienceTrack>) => Promise<AmbienceTrack>;
   updateAmbienceTrack: (id: string, updates: Partial<AmbienceTrack>) => Promise<AmbienceTrack>;
   deleteAmbienceTrack: (id: string) => Promise<void>;
@@ -160,6 +168,11 @@ interface AudioContextType {
   updateNpc: (id: string, updates: Partial<NPC>) => Promise<NPC>;
   deleteNpc: (id: string) => Promise<void>;
   postNpcToDiscord: (npcId: string, customChannelId?: string) => Promise<{ success: boolean; error?: string }>;
+
+  // Immediate Action History Log (Footer Component)
+  actionLogs: ActionLogItem[];
+  logAction: (text: string, category?: ActionLogCategory) => void;
+  clearActionLogs: () => void;
 }
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
@@ -236,6 +249,36 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [activeSfxIds, setActiveSfxIds] = useState<string[]>([]);
 
+  // Action Logs State (Recent 3 actions tracked for footer and history)
+  const [actionLogs, setActionLogs] = useState<ActionLogItem[]>(() => [
+    {
+      id: 'init-1',
+      text: 'Painel do Mestre CaranguejoRPG pronto para a sessão',
+      category: 'system',
+      timestamp: new Date()
+    },
+    {
+      id: 'init-2',
+      text: 'Mixer e canais de áudio inicializados com sucesso',
+      category: 'music',
+      timestamp: new Date()
+    }
+  ]);
+
+  const logAction = (text: string, category: ActionLogCategory = 'system') => {
+    const newItem: ActionLogItem = {
+      id: 'act-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+      text,
+      category,
+      timestamp: new Date()
+    };
+    setActionLogs(prev => [newItem, ...prev].slice(0, 30));
+  };
+
+  const clearActionLogs = () => {
+    setActionLogs([]);
+  };
+
   // Ambience Audio Player & Mixing State
   const [currentAmbienceTrack, setCurrentAmbienceTrack] = useState<AmbienceTrack | null>(null);
   const [ambiencePlaybackState, setAmbiencePlaybackState] = useState<PlaybackState>('idle');
@@ -243,6 +286,11 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [ambienceDuration, setAmbienceDuration] = useState<number>(0);
   const [ambienceLoopMode, setAmbienceLoopMode] = useState<LoopMode>('loop');
   const [ambienceTracks, setAmbienceTracks] = useState<AmbienceTrack[]>([]);
+  const [ambienceQueue, setAmbienceQueue] = useState<AmbienceQueueItem[]>([]);
+  const ambienceQueueRef = useRef<AmbienceQueueItem[]>([]);
+  ambienceQueueRef.current = ambienceQueue;
+  const currentAmbienceTrackRef = useRef<AmbienceTrack | null>(null);
+  currentAmbienceTrackRef.current = currentAmbienceTrack;
 
   // Ambience Stream Volume (0-1)
   const [ambienceVolume, setAmbienceVolumeState] = useState<number>(() => {
@@ -546,9 +594,14 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const handleAmbEnded = () => {
-      if (ambienceLoopMode === 'track' || ambienceLoopMode === 'queue' || ambienceLoopMode === 'loop') {
+      const isTrackLoop = currentAmbienceTrackRef.current?.isLoop !== false;
+      if (isTrackLoop && (ambienceLoopMode === 'track' || ambienceLoopMode === 'queue' || ambienceLoopMode === 'loop')) {
         ambAudio.currentTime = 0;
         ambAudio.play().catch(() => {});
+      } else if (ambienceQueueRef.current.length > 0) {
+        const nextItem = ambienceQueueRef.current[0];
+        setAmbienceQueue(prev => prev.slice(1));
+        playAmbienceTrack(nextItem.track, true, 0);
       } else {
         setAmbiencePlaybackState('idle');
         setAmbienceCurrentTime(0);
@@ -732,6 +785,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
 
+    logAction(`Música "${track.title}" iniciada`, 'music');
     setCurrentTrack(track);
     if (track.duration && !isNaN(track.duration) && track.duration > 0) {
       setDuration(track.duration);
@@ -918,6 +972,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
 
+    logAction(`Ambiente "${track.title}" iniciado`, 'ambience');
     setCurrentAmbienceTrack(track);
     if (track.duration && !isNaN(track.duration) && track.duration > 0) {
       setAmbienceDuration(track.duration);
@@ -932,7 +987,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       ambienceAudioRef.current.muted = !isLocalAudioEnabled || isMuted || isAmbienceMuted;
       ambienceAudioRef.current.volume = effectiveAmbienceVolume;
-      ambienceAudioRef.current.loop = (ambienceLoopMode === 'track' || ambienceLoopMode === 'queue' || ambienceLoopMode === 'loop');
+      const isTrackLoop = track.isLoop !== false;
+      ambienceAudioRef.current.loop = isTrackLoop && (ambienceLoopMode === 'track' || ambienceLoopMode === 'queue' || ambienceLoopMode === 'loop');
 
       if (startOffset > 0) {
         isAmbienceSeekingRef.current = true;
@@ -1038,6 +1094,33 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTimeout(() => {
       isAmbienceSeekingRef.current = false;
     }, 1000);
+  };
+
+  const addToAmbienceQueue = (track: AmbienceTrack) => {
+    const item: AmbienceQueueItem = {
+      id: `aq-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      track,
+      addedAt: Date.now()
+    };
+    setAmbienceQueue(prev => [...prev, item]);
+  };
+
+  const removeFromAmbienceQueue = (queueItemId: string) => {
+    setAmbienceQueue(prev => prev.filter(q => q.id !== queueItemId));
+  };
+
+  const clearAmbienceQueue = () => {
+    setAmbienceQueue([]);
+  };
+
+  const playNextAmbienceInQueue = () => {
+    if (ambienceQueueRef.current.length > 0) {
+      const nextItem = ambienceQueueRef.current[0];
+      setAmbienceQueue(prev => prev.slice(1));
+      playAmbienceTrack(nextItem.track, true, 0);
+    } else {
+      stopAmbienceTrack();
+    }
   };
 
   // Master Volume Setter
@@ -1247,6 +1330,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Soundboard Audio Player with dedicated SFX volume mix
   const playSoundboard = (item: SoundboardItem) => {
+    logAction(`Efeito sonoro "${item.name}" disparado`, 'soundboard');
     const calcVol = getEffectiveSfxVolume(item.volume);
 
     // If local web preview is activated, play in browser
@@ -1705,6 +1789,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const postNpcToDiscord = async (npcId: string, customChannelId?: string) => {
     try {
+      const npc = npcs.find(n => n.id === npcId);
+      logAction(`NPC "${npc?.name || 'Personagem'}" enviado ao chat`, 'npc');
       const res = await safeFetchJson<{ success: boolean; error?: string }>('/api/discord/post-npc', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1724,6 +1810,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     customChannelId?: string
   ): Promise<{ success: boolean; error?: string }> => {
     try {
+      logAction(`Turno anunciado: ${combatantName} (Inic ${initiative})`, 'chat');
       const res = await safeFetchJson<{ success: boolean; error?: string }>('/api/discord/announce-turn', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1767,6 +1854,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         effectiveAmbienceVolume,
         ambienceLoopMode,
         ambienceTracks,
+        ambienceQueue,
         playTrack,
         stopTrack,
         addToQueue,
@@ -1781,6 +1869,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAmbienceVolume,
         toggleAmbienceMute,
         setAmbienceLoopMode,
+        addToAmbienceQueue,
+        removeFromAmbienceQueue,
+        clearAmbienceQueue,
+        playNextAmbienceInQueue,
         createAmbienceTrack,
         updateAmbienceTrack,
         deleteAmbienceTrack,
@@ -1852,7 +1944,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         createNpc,
         updateNpc,
         deleteNpc,
-        postNpcToDiscord
+        postNpcToDiscord,
+        actionLogs,
+        logAction,
+        clearActionLogs
       }}
     >
       {children}

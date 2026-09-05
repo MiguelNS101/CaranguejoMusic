@@ -15,6 +15,8 @@ import {
   Clock,
   Layers,
   FolderUp,
+  FolderPlus,
+  ListPlus,
   Headphones,
   CloudRain,
   PhoneOff,
@@ -27,17 +29,9 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { AmbienceTrack } from '../types';
 import { FolderImportModal } from './FolderImportModal';
+import { FolderManagerModal } from './FolderManagerModal';
 import { AudioScrubber } from './AudioScrubber';
 import { apiFetch, resolveApiUrl } from '../services/api';
-
-const QUICK_ATMOSPHERE_PRESETS = [
-  { id: 'tavern', name: 'Taverna Movimentada', icon: '🍺', desc: 'Canecos, risadas, lareira e burburinho de aventureiros.', tags: ['taverna', 'social', 'cidade'] },
-  { id: 'rain', name: 'Chuva & Tempestade', icon: '🌧️', desc: 'Gotas no telhado, vento uivante e trovões distantes.', tags: ['chuva', 'tempestade', 'natureza'] },
-  { id: 'dungeon', name: 'Masmorra & Ecos', icon: '🗝️', desc: 'Gotas gotejando em pedra fria, correntes e escuridão.', tags: ['masmorra', 'caverna', 'tensão'] },
-  { id: 'forest', name: 'Floresta Élfica', icon: '🌲', desc: 'Folhas ao vento, pássaros cantando e calmaria mágica.', tags: ['floresta', 'natureza', 'viagem'] },
-  { id: 'campfire', name: 'Fogueira no Acampamento', icon: '🔥', desc: 'Gravetos estalando, grilos e brisa noturna tranquila.', tags: ['acampamento', 'descanso', 'noite'] },
-  { id: 'combat', name: 'Tensão & Sombra', icon: '⚔️', desc: 'Bumbo de guerra, zumbido sombrio e perigo iminente.', tags: ['combate', 'suspense', 'ameaça'] }
-];
 
 export const AmbiencePlayerView: React.FC = () => {
   const {
@@ -58,8 +52,13 @@ export const AmbiencePlayerView: React.FC = () => {
     toggleAmbiencePlayPause,
     seekAmbience,
     ambienceTracks,
+    ambienceQueue,
+    addToAmbienceQueue,
+    removeFromAmbienceQueue,
+    clearAmbienceQueue,
     folders,
     createAmbienceTrack,
+    updateAmbienceTrack,
     deleteAmbienceTrack,
     botStatus,
     disconnectVoiceChannel
@@ -69,6 +68,7 @@ export const AmbiencePlayerView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [isFolderImportOpen, setIsFolderImportOpen] = useState<boolean>(false);
+  const [isFolderManagerOpen, setIsFolderManagerOpen] = useState<boolean>(false);
 
   // New Track Form State
   const [newTitle, setNewTitle] = useState('');
@@ -77,7 +77,9 @@ export const AmbiencePlayerView: React.FC = () => {
   const [newFolderId, setNewFolderId] = useState('');
   const [newTags, setNewTags] = useState('');
   const [newCoverUrl, setNewCoverUrl] = useState('');
+  const [newIsLoop, setNewIsLoop] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatTime = (secs: number) => {
@@ -87,7 +89,7 @@ export const AmbiencePlayerView: React.FC = () => {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const ambienceFolders = folders.filter(f => f.type === 'ambience' || f.type === 'music');
+  const ambienceFolders = folders.filter(f => f.type === 'ambience');
 
   const filteredTracks = ambienceTracks.filter(track => {
     const matchesFolder = selectedFolderId === 'all' || track.folderId === selectedFolderId;
@@ -97,10 +99,8 @@ export const AmbiencePlayerView: React.FC = () => {
     return matchesFolder && matchesSearch;
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const uploadAudioFile = async (file: File) => {
     if (!file) return;
-
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
@@ -125,6 +125,11 @@ export const AmbiencePlayerView: React.FC = () => {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadAudioFile(file);
+  };
+
   const handleCreateTrack = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newUrl.trim()) return;
@@ -139,6 +144,7 @@ export const AmbiencePlayerView: React.FC = () => {
       url: newUrl.trim(),
       folderId: newFolderId || (ambienceFolders.length > 0 ? ambienceFolders[0].id : undefined),
       tags: tagsArray,
+      isLoop: newIsLoop,
       coverUrl: newCoverUrl.trim() || undefined
     });
 
@@ -148,6 +154,7 @@ export const AmbiencePlayerView: React.FC = () => {
     setNewFolderId('');
     setNewTags('');
     setNewCoverUrl('');
+    setNewIsLoop(true);
     setIsAddModalOpen(false);
   };
 
@@ -392,32 +399,32 @@ export const AmbiencePlayerView: React.FC = () => {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setIsFolderImportOpen(true)}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#242830] hover:bg-[#2D3139] text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition-colors cursor-pointer"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#22262B] hover:bg-[#2D3139] text-[#E0E0E0] hover:text-white border border-[#3A3F4A] text-xs font-bold transition-all cursor-pointer shadow-sm"
               >
-                <FolderUp className="w-4 h-4" />
-                Importar Pasta
+                <FolderUp className="w-4 h-4 text-indigo-400" />
+                <span>Importar Pasta</span>
               </button>
 
               {/* Add Ambience Track Button */}
               <button
                 id="btn-add-ambience"
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all cursor-pointer"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
-                Adicionar Ambiente
+                <Plus className="w-4 h-4 text-white" />
+                <span>Adicionar Ambiente</span>
               </button>
             </div>
           </div>
 
           {/* Folder Category Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
             <button
               onClick={() => setSelectedFolderId('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border cursor-pointer shadow-sm ${
                 selectedFolderId === 'all'
-                  ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
-                  : 'bg-[#1A1D21] text-[#9E9E9E] border-[#2D3139] hover:border-[#363B44] hover:text-[#FFFFFF]'
+                  ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-600/30'
+                  : 'bg-[#141619] hover:bg-[#22262B] text-[#9E9E9E] hover:text-white border-[#2D3139]'
               }`}
             >
               Todos os Ambientes ({ambienceTracks.length})
@@ -430,27 +437,36 @@ export const AmbiencePlayerView: React.FC = () => {
                 <button
                   key={folder.id}
                   onClick={() => setSelectedFolderId(folder.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border cursor-pointer shadow-sm ${
                     isSelected
-                      ? 'bg-indigo-600/20 text-indigo-300 border-indigo-500/40 shadow-sm'
-                      : 'bg-[#1A1D21] text-[#9E9E9E] border-[#2D3139] hover:border-[#363B44] hover:text-[#FFFFFF]'
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-600/30'
+                      : 'bg-[#141619] hover:bg-[#22262B] text-[#9E9E9E] hover:text-white border-[#2D3139]'
                   }`}
                 >
                   <span
-                    className="w-2 h-2 rounded-full"
+                    className="w-2.5 h-2.5 rounded-full ring-1 ring-white/30"
                     style={{ backgroundColor: folder.color || '#38bdf8' }}
                   />
-                  {folder.name} ({count})
+                  <span>{folder.name} ({count})</span>
                 </button>
               );
             })}
+
+            <button
+              onClick={() => setIsFolderManagerOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap bg-[#22262B] hover:bg-[#2D3139] text-[#E0E0E0] hover:text-white border border-[#3A3F4A] transition-all cursor-pointer shadow-sm"
+              title="Gerenciar e Criar Pastas de Ambiente"
+            >
+              <FolderPlus className="w-4 h-4 text-indigo-400" />
+              <span>+ Pasta de Ambiente</span>
+            </button>
           </div>
 
           {/* Tracks List */}
           <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl overflow-hidden shadow-lg">
             <div className="p-3.5 border-b border-[#2D3139] text-xs font-semibold uppercase tracking-wider text-[#9E9E9E] flex items-center justify-between">
               <span>Faixas Encontradas ({filteredTracks.length})</span>
-              <span className="text-[11px] text-[#9E9E9E]">Clique para tocar ou gerenciar</span>
+              <span className="text-[11px] text-[#9E9E9E]">Clique para tocar ou enfileirar</span>
             </div>
 
             <div className="divide-y divide-[#2D3139]/60">
@@ -467,17 +483,17 @@ export const AmbiencePlayerView: React.FC = () => {
                     <div
                       key={track.id}
                       className={`p-3.5 flex items-center justify-between gap-3 hover:bg-[#22262B] transition-colors group ${
-                        isCurrent ? 'bg-indigo-600/10' : ''
+                        isCurrent ? 'bg-sky-600/10' : ''
                       }`}
                     >
                       {/* Track Index & Cover */}
                       <div className="flex items-center gap-3 min-w-0">
                         <button
                           onClick={() => playAmbienceTrack(track)}
-                          className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border transition-all ${
+                          className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border transition-all cursor-pointer ${
                             isCurrent
-                              ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
-                              : 'bg-[#141619] text-[#E0E0E0] border-[#2D3139] group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-500'
+                              ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
+                              : 'bg-[#141619] text-[#E0E0E0] border-[#2D3139] group-hover:bg-sky-600 group-hover:text-white group-hover:border-sky-500'
                           }`}
                         >
                           {isPlayingThis ? (
@@ -488,11 +504,11 @@ export const AmbiencePlayerView: React.FC = () => {
                         </button>
 
                         <div className="min-w-0">
-                          <h4 className={`text-xs font-bold truncate ${isCurrent ? 'text-indigo-300' : 'text-[#FFFFFF]'}`}>
+                          <h4 className={`text-xs font-bold truncate ${isCurrent ? 'text-sky-300' : 'text-[#FFFFFF]'}`}>
                             {track.title}
                           </h4>
                           <p className="text-[11px] text-[#9E9E9E] truncate">
-                            Atmosfera Contínua
+                            {track.isLoop !== false ? 'Loop Infinito' : 'Tocar 1x'}
                           </p>
                         </div>
                       </div>
@@ -505,15 +521,37 @@ export const AmbiencePlayerView: React.FC = () => {
                           </span>
                         ))}
 
-                        {track.duration && track.duration > 0 ? (
-                          <span className="text-xs font-mono text-[#9E9E9E] w-12 text-right">
+                        {/* Loop Toggle Button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const nextLoop = track.isLoop === false ? true : false;
+                            updateAmbienceTrack(track.id, { isLoop: nextLoop });
+                          }}
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold flex items-center gap-1 border transition-all cursor-pointer ${
+                            track.isLoop !== false
+                              ? 'bg-sky-950/60 text-sky-300 border-sky-600/50 hover:bg-sky-900/60'
+                              : 'bg-zinc-800/80 text-zinc-400 border-zinc-700 hover:text-white'
+                          }`}
+                          title={track.isLoop !== false ? 'Loop Infinito ativo. Clique para alternar para tocar apenas 1x.' : 'Tocar 1x ativo. Clique para alternar para Loop Infinito.'}
+                        >
+                          <Repeat className="w-3 h-3" />
+                          {track.isLoop !== false ? 'Loop ∞' : '1x'}
+                        </button>
+
+                        {track.duration && track.duration > 0 && (
+                          <span className="text-xs font-mono text-[#9E9E9E] w-12 text-right hidden sm:inline-block">
                             {formatTime(track.duration)}
                           </span>
-                        ) : (
-                          <span className="text-[10px] font-mono text-sky-400 bg-sky-950/40 px-1.5 py-0.5 rounded border border-sky-800/40">
-                            Loop ∞
-                          </span>
                         )}
+
+                        <button
+                          onClick={() => addToAmbienceQueue(track)}
+                          className="p-1.5 text-[#9E9E9E] hover:text-sky-300 hover:bg-[#141619] rounded-lg transition-colors cursor-pointer"
+                          title="Adicionar à Fila de Ambiente"
+                        >
+                          <ListPlus className="w-4 h-4" />
+                        </button>
 
                         <button
                           onClick={() => deleteAmbienceTrack(track.id)}
@@ -531,87 +569,88 @@ export const AmbiencePlayerView: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Atmosphere Presets & Ambient Panel (4 cols) */}
+        {/* Right Column: Ambience Queue Manager (4 cols) */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 shadow-lg flex flex-col h-full min-h-[400px]">
             <div className="flex items-center justify-between pb-3 border-b border-[#2D3139]">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-sky-400" />
                 <h3 className="text-sm font-bold uppercase tracking-wider text-[#FFFFFF] font-rpg">
-                  Cenários & Presets Rápidos
+                  Fila de Ambiente
                 </h3>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-950/40 text-sky-300 border border-sky-500/30">
-                Atalhos
-              </span>
+              {ambienceQueue.length > 0 && (
+                <button
+                  onClick={clearAmbienceQueue}
+                  className="text-xs text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
+                >
+                  Limpar Fila
+                </button>
+              )}
             </div>
 
-            {/* Presets List */}
+            {/* Queue List */}
             <div className="flex-1 overflow-y-auto space-y-2 py-3 pr-1">
-              {QUICK_ATMOSPHERE_PRESETS.map((preset) => {
-                // Find if an existing track matches any tag or title
-                const matchingTrack = ambienceTracks.find(t => 
-                  t.title.toLowerCase().includes(preset.tags[0]) || 
-                  (t.tags && t.tags.some(tag => preset.tags.includes(tag.toLowerCase())))
-                );
-
-                return (
+              {ambienceQueue.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center text-[#9E9E9E] text-xs">
+                  <CloudRain className="w-8 h-8 mb-2 opacity-30 text-sky-400" />
+                  <p>A fila de ambiente está vazia.</p>
+                  <p className="text-[11px] text-[#6E7681] mt-1">
+                    Clique no ícone de lista (+) em qualquer som ambiente ao lado para enfileirar.
+                  </p>
+                </div>
+              ) : (
+                ambienceQueue.map((item, idx) => (
                   <div
-                    key={preset.id}
+                    key={item.id}
                     className="p-2.5 rounded-xl bg-[#141619] border border-[#2D3139] flex items-center justify-between gap-2 hover:border-[#363B44] transition-colors"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-base select-none shrink-0">
-                        {preset.icon}
+                      <span className="w-5 text-center text-xs font-mono text-sky-400 font-bold shrink-0">
+                        {idx + 1}
                       </span>
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-[#E0E0E0] truncate">
-                          {preset.name}
+                          {item.track.title}
                         </p>
-                        <p className="text-[10px] text-[#9E9E9E] truncate">
-                          {preset.desc}
-                        </p>
+                        <span className="text-[9px] font-mono text-zinc-400">
+                          {item.track.isLoop !== false ? 'Loop Infinito' : 'Tocar 1x'}
+                        </span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      {matchingTrack ? (
-                        <button
-                          onClick={() => playAmbienceTrack(matchingTrack)}
-                          className={`p-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                            currentAmbienceTrack?.id === matchingTrack.id && isPlaying
-                              ? 'bg-amber-500 text-zinc-950'
-                              : 'text-[#9E9E9E] hover:text-sky-300 hover:bg-[#22262B]'
-                          }`}
-                          title="Tocar este cenário sonoro agora"
-                        >
-                          <Play className="w-3.5 h-3.5 fill-current" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setSearchQuery(preset.tags[0]);
-                          }}
-                          className="text-[10px] px-2 py-1 rounded bg-[#22262B] text-zinc-400 hover:text-sky-300 hover:border-sky-500/40 border border-transparent transition-all cursor-pointer"
-                          title="Filtrar faixas com este tema"
-                        >
-                          Filtrar
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          playAmbienceTrack(item.track, true, 0);
+                          removeFromAmbienceQueue(item.id);
+                        }}
+                        className="p-1 text-[#9E9E9E] hover:text-sky-300 transition-colors cursor-pointer"
+                        title="Tocar Agora"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                      <button
+                        onClick={() => removeFromAmbienceQueue(item.id)}
+                        className="p-1 text-[#9E9E9E] hover:text-rose-400 transition-colors cursor-pointer"
+                        title="Remover da Fila"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                );
-              })}
+                ))
+              )}
             </div>
 
-            {/* Presets Footer Info */}
+            {/* Queue Footer Info */}
             <div className="pt-3 border-t border-[#2D3139] flex items-center justify-between text-xs text-[#9E9E9E]">
               <span className="flex items-center gap-1">
-                <Wind className="w-3.5 h-3.5 text-sky-400" />
-                Loop Contínuo
+                <Layers className="w-3.5 h-3.5 text-sky-400" />
+                Fila Sequencial
               </span>
               <span className="font-mono text-sky-300">
-                {ambienceTracks.length} faixas na biblioteca
+                {ambienceQueue.length} na fila
               </span>
             </div>
           </div>
@@ -641,11 +680,32 @@ export const AmbiencePlayerView: React.FC = () => {
               {/* File Upload Box */}
               <div>
                 <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                  1. Enviar Arquivo de Áudio Local
+                  1. Enviar Arquivo de Áudio Local (Arraste ou Selecione)
                 </label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-[#2D3139] hover:border-sky-500/60 rounded-xl p-4 text-center cursor-pointer bg-[#141619] transition-colors"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingUpload(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingUpload(false);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsDraggingUpload(false);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) uploadAudioFile(file);
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+                    isDraggingUpload
+                      ? 'border-sky-400 bg-sky-950/40'
+                      : 'border-[#2D3139] hover:border-sky-500/60 bg-[#141619]'
+                  }`}
                 >
                   <input
                     type="file"
@@ -668,7 +728,7 @@ export const AmbiencePlayerView: React.FC = () => {
                     <div className="space-y-1">
                       <Upload className="w-6 h-6 text-[#9E9E9E] mx-auto" />
                       <p className="text-xs text-[#E0E0E0] font-medium">
-                        Clique para selecionar um arquivo de áudio
+                        Arraste seu arquivo aqui ou clique para selecionar
                       </p>
                       <p className="text-[10px] text-[#9E9E9E]">
                         MP3, WAV, OGG, FLAC, WEBM
@@ -705,6 +765,30 @@ export const AmbiencePlayerView: React.FC = () => {
                   onChange={(e) => setNewUrl(e.target.value)}
                   className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-2 text-xs text-[#E0E0E0] focus:outline-none focus:border-sky-500/70"
                 />
+              </div>
+
+              {/* Loop Setting Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#141619] border border-[#2D3139]">
+                <div>
+                  <label className="text-xs font-semibold text-[#E0E0E0] block">
+                    Modo de Reprodução
+                  </label>
+                  <p className="text-[11px] text-[#9E9E9E]">
+                    {newIsLoop ? 'Tocar indefinidamente em loop contínuo' : 'Tocar apenas uma vez (one-shot)'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNewIsLoop(!newIsLoop)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                    newIsLoop
+                      ? 'bg-sky-600 text-white border-sky-500'
+                      : 'bg-[#22262B] text-[#9E9E9E] border-[#2D3139] hover:text-white'
+                  }`}
+                >
+                  <Repeat className="w-3.5 h-3.5" />
+                  {newIsLoop ? 'Loop Infinito' : 'Tocar 1x'}
+                </button>
               </div>
 
               {/* Folder & Tags */}
@@ -779,6 +863,13 @@ export const AmbiencePlayerView: React.FC = () => {
         isOpen={isFolderImportOpen}
         onClose={() => setIsFolderImportOpen(false)}
         defaultCategory="ambience"
+      />
+
+      {/* Folder Manager Modal */}
+      <FolderManagerModal
+        isOpen={isFolderManagerOpen}
+        onClose={() => setIsFolderManagerOpen(false)}
+        initialType="ambience"
       />
     </div>
   );

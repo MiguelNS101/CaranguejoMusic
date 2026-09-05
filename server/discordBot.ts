@@ -841,15 +841,48 @@ export class DiscordBotService {
 
       const textChannel = channel as TextChannel;
 
+      // Prepare file attachments if provided (base64 image, local file path or url)
+      const files: AttachmentBuilder[] = [];
+      if (payload.base64Image) {
+        const matches = payload.base64Image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        const b64Data = matches && matches.length === 3 ? matches[2] : payload.base64Image;
+        try {
+          const buffer = Buffer.from(b64Data, 'base64');
+          const fileName = payload.attachmentName || 'desenho_mestre.png';
+          files.push(new AttachmentBuilder(buffer, { name: fileName }));
+        } catch (e) {
+          console.warn('Could not parse base64 image:', e);
+        }
+      } else if (payload.imageUrl || payload.attachmentUrl) {
+        const imgUrl = payload.imageUrl || payload.attachmentUrl;
+        if (imgUrl.startsWith('/media/')) {
+          let localPath = '';
+          if (imgUrl.startsWith('/media/npcs/')) {
+            localPath = path.join(process.cwd(), 'data', 'npcs', imgUrl.replace('/media/npcs/', ''));
+          } else if (imgUrl.startsWith('/media/uploads/')) {
+            localPath = path.join(process.cwd(), 'data', 'uploads', imgUrl.replace('/media/uploads/', ''));
+          }
+          if (localPath && fs.existsSync(localPath)) {
+            files.push(new AttachmentBuilder(localPath, { name: path.basename(localPath) }));
+          }
+        }
+      }
+
       // Handle styled types
       if (payload.type === 'narrative') {
         const narrativeEmbed = new EmbedBuilder()
           .setColor('#c2410c') // Amber/orange narrative tone
           .setAuthor({ name: '📜 Narração do Mestre' })
-          .setDescription(`*${payload.content}*`)
+          .setDescription(payload.content ? `*${payload.content}*` : '*[Imagem enviada pelo Mestre]*')
           .setTimestamp();
         
-        const sent = await textChannel.send({ embeds: [narrativeEmbed] });
+        if (files.length > 0) {
+          narrativeEmbed.setImage(`attachment://${files[0].name}`);
+        } else if (payload.imageUrl && (payload.imageUrl.startsWith('http://') || payload.imageUrl.startsWith('https://'))) {
+          narrativeEmbed.setImage(payload.imageUrl);
+        }
+
+        const sent = await textChannel.send({ embeds: [narrativeEmbed], files: files.length > 0 ? files : undefined });
         return { success: true, messageId: sent.id };
       }
 
@@ -869,7 +902,11 @@ export class DiscordBotService {
           });
         }
         if (payload.embed.thumbnailUrl) embed.setThumbnail(payload.embed.thumbnailUrl);
-        if (payload.embed.imageUrl) embed.setImage(payload.embed.imageUrl);
+        if (files.length > 0 && !payload.embed.imageUrl) {
+          embed.setImage(`attachment://${files[0].name}`);
+        } else if (payload.embed.imageUrl) {
+          embed.setImage(payload.embed.imageUrl);
+        }
         if (payload.embed.footerText) embed.setFooter({ text: payload.embed.footerText });
         if (payload.embed.fields && payload.embed.fields.length > 0) {
           embed.addFields(payload.embed.fields);
@@ -877,14 +914,18 @@ export class DiscordBotService {
 
         const sent = await textChannel.send({
           content: payload.content || undefined,
-          embeds: [embed]
+          embeds: [embed],
+          files: files.length > 0 ? files : undefined
         });
         return { success: true, messageId: sent.id };
       }
 
-      // Plain text message
-      if (payload.content) {
-        const sent = await textChannel.send({ content: payload.content });
+      // Plain text message (or message with image attachment)
+      if (payload.content || files.length > 0) {
+        const sent = await textChannel.send({
+          content: payload.content || undefined,
+          files: files.length > 0 ? files : undefined
+        });
         return { success: true, messageId: sent.id };
       }
 
@@ -892,6 +933,63 @@ export class DiscordBotService {
     } catch (err: any) {
       console.error('Error sending discord message:', err);
       return { success: false, error: err?.message || 'Falha ao enviar mensagem no Discord.' };
+    }
+  }
+
+  // ==========================================
+  // DISCORD CHAT MESSAGES READER
+  // ==========================================
+
+  public async getChannelMessages(channelId: string, limit: number = 40): Promise<{ success: boolean; messages?: any[]; channelName?: string; error?: string }> {
+    if (!this.client?.isReady()) {
+      return { success: false, error: 'Bot do Discord não está conectado.' };
+    }
+    try {
+      const channel = await this.client.channels.fetch(channelId);
+      if (!channel || !channel.isTextBased()) {
+        return { success: false, error: 'Canal de texto não encontrado ou inacessível.' };
+      }
+      const textChannel = channel as TextChannel;
+      const fetched = await textChannel.messages.fetch({ limit: Math.min(limit, 100) });
+      const messages = Array.from(fetched.values()).map(msg => ({
+        id: msg.id,
+        author: {
+          id: msg.author.id,
+          username: msg.author.username,
+          discriminator: msg.author.discriminator,
+          avatar: msg.author.displayAvatarURL(),
+          bot: msg.author.bot,
+        },
+        content: msg.content,
+        cleanContent: msg.cleanContent,
+        createdAt: msg.createdAt.toISOString(),
+        attachments: Array.from(msg.attachments.values()).map(att => ({
+          id: att.id,
+          name: att.name,
+          url: att.url,
+          proxyURL: att.proxyURL,
+          contentType: att.contentType,
+          size: att.size,
+        })),
+        embeds: msg.embeds.map(e => ({
+          title: e.title,
+          description: e.description,
+          color: e.color,
+          fields: e.fields,
+          image: e.image?.url,
+          thumbnail: e.thumbnail?.url,
+          footer: e.footer?.text,
+        }))
+      })).reverse();
+
+      return {
+        success: true,
+        channelName: textChannel.name,
+        messages
+      };
+    } catch (err: any) {
+      console.error('Error fetching channel messages:', err);
+      return { success: false, error: err?.message || 'Falha ao buscar mensagens do canal.' };
     }
   }
 

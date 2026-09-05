@@ -2535,24 +2535,36 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
           </div>
         </div>
 
-        {/* Single Unified Button */}
+        {/* Top Header Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => setIsCustomizerOpen(!isCustomizerOpen)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer shadow-md ${
-              isOrganizeMode
-                ? 'bg-amber-500 hover:bg-amber-400 text-black ring-2 ring-amber-300/60 shadow-amber-500/30'
-                : isCustomizerOpen
-                  ? 'bg-indigo-600 text-white ring-2 ring-indigo-400/50 shadow-indigo-600/30'
-                  : 'bg-[#141619] hover:bg-[#22262B] text-white border border-[#2D3139] hover:border-indigo-500/50'
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer shadow-md ${
+              isCustomizerOpen
+                ? 'bg-indigo-600 text-white shadow-indigo-600/30'
+                : 'bg-[#1A1D21] hover:bg-[#22262B] text-zinc-200 border border-[#2D3139]'
             }`}
             title="Central de Personalização: organize, adicione blocos e configure o Escudo do Mestre"
           >
-            <SlidersHorizontal className="w-4 h-4 text-amber-400" />
-            <span>{isOrganizeMode ? 'Organizando Escudo...' : 'Personalizar Escudo & Módulos'}</span>
+            <SlidersHorizontal className="w-4 h-4 text-indigo-400" />
+            <span>Personalizar Escudo</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsOrganizeMode(!isOrganizeMode)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all cursor-pointer shadow-md ${
+              isOrganizeMode
+                ? 'bg-indigo-600 text-white shadow-indigo-600/30 ring-2 ring-indigo-400/50'
+                : 'bg-[#1A1D21] hover:bg-[#22262B] text-zinc-200 border border-[#2D3139]'
+            }`}
+            title="Ativar modo de organização livre na grade 2D"
+          >
+            <Move className={`w-4 h-4 ${isOrganizeMode ? 'text-white' : 'text-indigo-400'}`} />
+            <span>{isOrganizeMode ? 'Organizando Grade...' : 'Organizar Grade'}</span>
             {isOrganizeMode && (
-              <span className="w-2 h-2 rounded-full bg-black animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
             )}
           </button>
         </div>
@@ -2560,36 +2572,38 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
 
       {/* Organize Mode Active Banner */}
       {isOrganizeMode && (
-        <div className="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-amber-200 text-xs animate-fadeIn shadow-lg">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300">
-              <Move className="w-4 h-4 animate-bounce" />
+        <div className="bg-[#181B20] border border-indigo-500/40 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-zinc-200 text-xs animate-fadeIn shadow-2xl">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow">
+              <Move className="w-5 h-5 animate-bounce" />
             </div>
             <div>
-              <span className="font-bold text-amber-300 block">Modo Grade Livre 2D Ativo (Posicionamento em Qualquer Célula)</span>
-              <span className="text-[11px] opacity-90">
-                Arraste qualquer bloco para soltar na coluna e linha desejadas da grade, ou use os botões <b>[1/3, 2/3, 3/3]</b> e <b>(◀ Col / Col ▶)</b> no cabeçalho do bloco.
+              <span className="font-bold text-white text-sm block">
+                Modo Grade Livre 2D Ativo (Posicionamento em Qualquer Célula)
+              </span>
+              <span className="text-xs text-zinc-400 leading-relaxed block mt-0.5">
+                Arraste qualquer bloco para soltar na coluna e linha desejadas da grade, ou use os botões <b className="text-indigo-300 font-mono">[1/3, 2/3, 3/3]</b> e <b className="text-indigo-300 font-mono">(◀ Col / Col ▶)</b> no cabeçalho do bloco.
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <button
               type="button"
               onClick={autoAlignAllGridWidgets}
-              className="px-3 py-1.5 rounded-xl bg-[#141619] hover:bg-[#22262B] text-amber-300 border border-amber-500/40 font-bold text-xs shrink-0 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-[#22262B] hover:bg-[#2D3139] text-[#E0E0E0] hover:text-white border border-[#3A3F4A] font-bold text-xs shrink-0 cursor-pointer shadow-sm transition-all flex items-center gap-1.5"
               title="Limpar posições fixas e auto-alinhar blocos em fluxo contínuo"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid className="w-3.5 h-3.5 text-indigo-400" />
               <span>Auto-Alinhar Tudo</span>
             </button>
 
             <button
               type="button"
               onClick={() => setIsOrganizeMode(false)}
-              className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs shrink-0 cursor-pointer shadow-md transition-all flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <Check className="w-3.5 h-3.5 stroke-[3]" />
+              <Check className="w-4 h-4" />
               <span>Concluir Organização</span>
             </button>
           </div>
@@ -2606,7 +2620,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                 <Settings2 className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2 font-rpg">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   Central de Personalização do Escudo
                 </h3>
                 <p className="text-xs text-[#9E9E9E]">
@@ -2644,11 +2658,11 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
               <div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Move className="w-3.5 h-3.5 text-amber-400" />
+                    <Move className="w-3.5 h-3.5 text-indigo-400" />
                     Modo Organizar & Snapping
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    isOrganizeMode ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-[#22262B] text-[#9E9E9E]'
+                    isOrganizeMode ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/40' : 'bg-[#22262B] text-[#9E9E9E]'
                   }`}>
                     {isOrganizeMode ? 'Ativado' : 'Desativado'}
                   </span>
@@ -2663,18 +2677,18 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                 onClick={() => setIsOrganizeMode(!isOrganizeMode)}
                 className={`w-full py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   isOrganizeMode
-                    ? 'bg-amber-500 text-black hover:bg-amber-400 shadow-md shadow-amber-500/20'
+                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30'
                     : 'bg-[#22262B] hover:bg-[#2D3139] text-white border border-[#3A3F4A]'
                 }`}
               >
                 {isOrganizeMode ? (
                   <>
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <Check className="w-3.5 h-3.5" />
                     <span>Concluir e Salvar Posições</span>
                   </>
                 ) : (
                   <>
-                    <Move className="w-3.5 h-3.5 text-amber-400" />
+                    <Move className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Ativar Modo Organizar</span>
                   </>
                 )}
@@ -2699,9 +2713,9 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                   setIsAddWidgetModalOpen(true);
                   setIsCustomizerOpen(false);
                 }}
-                className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 px-3 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>+ Adicionar Novo Bloco</span>
               </button>
             </div>

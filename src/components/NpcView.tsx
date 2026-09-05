@@ -22,11 +22,13 @@ import {
   X,
   MapPin,
   Layers,
-  FileText
+  FileText,
+  Paintbrush
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { NPC } from '../types';
 import { FolderImportModal } from './FolderImportModal';
+import { DrawingPaintStudio } from './DrawingPaintStudio';
 import { apiFetch, resolveApiUrl } from '../services/api';
 
 export const NpcView: React.FC = () => {
@@ -40,8 +42,8 @@ export const NpcView: React.FC = () => {
     botStatus
   } = useAudio();
 
-  // Top Sub-Tabs: 'npcs' or 'general'
-  const [activeSubTab, setActiveSubTab] = useState<'npcs' | 'general'>('npcs');
+  // Top Sub-Tabs: 'npcs' | 'general' | 'paint'
+  const [activeSubTab, setActiveSubTab] = useState<'npcs' | 'general' | 'paint'>('npcs');
 
   const [selectedFolderId, setSelectedFolderId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -139,8 +141,9 @@ export const NpcView: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const [isDraggingModalUpload, setIsDraggingModalUpload] = useState(false);
+
+  const uploadSingleImageFile = async (file: File) => {
     if (!file) return;
 
     setIsUploading(true);
@@ -166,6 +169,11 @@ export const NpcView: React.FC = () => {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadSingleImageFile(file);
   };
 
   // 1-Click Fast Batch Images Import
@@ -286,6 +294,20 @@ export const NpcView: React.FC = () => {
               {generalImageList.length}
             </span>
           </button>
+
+          <button
+            onClick={() => {
+              setActiveSubTab('paint');
+            }}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeSubTab === 'paint'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B]'
+            }`}
+          >
+            <Paintbrush className="w-4 h-4" />
+            <span>Desenhar & Paint</span>
+          </button>
         </div>
 
         {/* Discord Bot Status Indicator */}
@@ -295,8 +317,14 @@ export const NpcView: React.FC = () => {
         </div>
       </div>
 
-      {/* Action Header & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-5 shadow-lg">
+      {/* Paint Studio Sub-Tab - Kept mounted to preserve drawing canvas & layers */}
+      <div className={activeSubTab === 'paint' ? 'block' : 'hidden'}>
+        <DrawingPaintStudio />
+      </div>
+
+      <div className={activeSubTab !== 'paint' ? 'block space-y-6' : 'hidden'}>
+          {/* Action Header & Search */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-5 shadow-lg">
         <div>
           <div className="flex items-center gap-2">
             {activeSubTab === 'npcs' ? (
@@ -694,6 +722,7 @@ export const NpcView: React.FC = () => {
           )}
         </div>
       )}
+      </div>
 
       {/* Add / Edit Modal (Unified for NPCs or General Images) */}
       {isModalOpen && (
@@ -731,12 +760,33 @@ export const NpcView: React.FC = () => {
               {/* Image Upload or URL */}
               <div>
                 <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                  1. Imagem / {activeSubTab === 'npcs' ? 'Retrato do Personagem' : 'Arquivo Visual'}
+                  1. Imagem / {activeSubTab === 'npcs' ? 'Retrato do Personagem' : 'Arquivo Visual'} (Arraste ou Selecione)
                 </label>
                 <div className="space-y-2">
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-[#2D3139] hover:border-indigo-500/60 rounded-xl p-4 text-center cursor-pointer bg-[#141619] transition-colors"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingModalUpload(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingModalUpload(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingModalUpload(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) uploadSingleImageFile(file);
+                    }}
+                    className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors ${
+                      isDraggingModalUpload
+                        ? 'border-indigo-400 bg-indigo-950/40'
+                        : 'border-[#2D3139] hover:border-indigo-500/60 bg-[#141619]'
+                    }`}
                   >
                     <input
                       type="file"
@@ -766,7 +816,7 @@ export const NpcView: React.FC = () => {
                       <div className="space-y-1">
                         <Upload className="w-6 h-6 text-[#9E9E9E] mx-auto" />
                         <p className="text-xs text-[#E0E0E0] font-medium">
-                          Clique para selecionar do computador
+                          Arraste o arquivo de imagem aqui ou clique para selecionar
                         </p>
                         <p className="text-[10px] text-[#9E9E9E]">PNG, JPG, WEBP, GIF</p>
                       </div>

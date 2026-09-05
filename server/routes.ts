@@ -157,6 +157,19 @@ router.post('/bot/send-message', handleSendMessage);
 router.post('/discord/message', handleSendMessage);
 router.post('/bot/message', handleSendMessage);
 
+const handleGetChannelMessages = async (req: Request, res: Response) => {
+  try {
+    const { channelId } = req.params;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 40;
+    const result = await discordBot.getChannelMessages(channelId, limit);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao buscar mensagens do Discord.' });
+  }
+};
+router.get('/discord/channels/:channelId/messages', handleGetChannelMessages);
+router.get('/bot/channels/:channelId/messages', handleGetChannelMessages);
+
 const handlePostNpc = async (req: Request, res: Response) => {
   try {
     const { npcId, customChannelId } = req.body;
@@ -1010,7 +1023,7 @@ router.post('/upload/bulk', upload.array('files', 150), (req: Request, res: Resp
 
   const targetCategory = (req.query.type as string) || 'music';
   const isImageCategory = targetCategory === 'image' || req.body.isGeneralImage === 'true';
-  const folderType = targetCategory === 'sfx' ? 'soundboard' : 'npc';
+  const folderType = targetCategory === 'sfx' ? 'soundboard' : targetCategory === 'ambience' ? 'ambience' : targetCategory === 'music' ? 'music' : 'npc';
   let targetFolderId = (req.body.folderId as string) || (req.query.folderId as string) || undefined;
   const autoCreateItems = req.body.autoCreateItems !== 'false';
 
@@ -1026,6 +1039,7 @@ router.post('/upload/bulk', upload.array('files', 150), (req: Request, res: Resp
 
   const importedResults: any[] = [];
   const newMusicTracks: MusicTrack[] = [];
+  const newAmbienceTracks: AmbienceTrack[] = [];
   const newSfxItems: SoundboardItem[] = [];
   const newNpcs: NPC[] = [];
 
@@ -1093,6 +1107,22 @@ router.post('/upload/bulk', upload.array('files', 150), (req: Request, res: Resp
       };
       newMusicTracks.push(track);
       importedResults.push(track);
+    } else if (targetCategory === 'ambience') {
+      relativeUrl = `/media/ambience/${file.filename}`;
+      const ambience: AmbienceTrack = {
+        id: `amb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+        title: cleanTitle,
+        category: 'Importado',
+        duration: 300,
+        url: relativeUrl,
+        folderId: itemFolderId,
+        tags: autoTags,
+        isLocal: true,
+        isLoop: true,
+        createdAt: Date.now()
+      };
+      newAmbienceTracks.push(ambience);
+      importedResults.push(ambience);
     } else if (targetCategory === 'sfx') {
       relativeUrl = `/media/sfx/${file.filename}`;
       const sfx: SoundboardItem = {
@@ -1131,6 +1161,7 @@ router.post('/upload/bulk', upload.array('files', 150), (req: Request, res: Resp
 
   if (autoCreateItems) {
     if (newMusicTracks.length > 0) db.addMusicTracksBulk(newMusicTracks);
+    if (newAmbienceTracks.length > 0) db.addAmbienceTracksBulk(newAmbienceTracks);
     if (newSfxItems.length > 0) db.addSoundboardItemsBulk(newSfxItems);
     if (newNpcs.length > 0) db.addNpcsBulk(newNpcs);
   }

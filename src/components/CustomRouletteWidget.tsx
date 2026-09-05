@@ -342,14 +342,14 @@ export const CustomRouletteWidget: React.FC = () => {
           <button
             onClick={spinRoulette}
             disabled={isSpinning || options.length < 2}
-            className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
+            className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${
               isSpinning
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 cursor-not-allowed'
-                : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 shadow-amber-500/25'
+                ? 'bg-indigo-600/30 text-indigo-300 cursor-not-allowed'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
             }`}
           >
-            <Play className={`w-4 h-4 fill-current ${isSpinning ? 'animate-spin' : ''}`} />
-            <span>{isSpinning ? 'Girando a Roleta...' : 'GIRAR ROLETA'}</span>
+            <Play className={`w-4 h-4 fill-white ${isSpinning ? 'animate-spin' : ''}`} />
+            <span>{isSpinning ? 'Girando a Roleta...' : 'Girar Roleta'}</span>
           </button>
         </div>
 
@@ -357,20 +357,20 @@ export const CustomRouletteWidget: React.FC = () => {
         <div className="flex flex-col space-y-3">
           {/* Winner Banner */}
           {selectedResult ? (
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-[#1A1D21] to-[#141619] border border-amber-500/40 shadow-lg shadow-amber-500/10 flex flex-col justify-between space-y-3">
+            <div className="p-4 rounded-2xl bg-[#1A1D21] border border-indigo-500/30 shadow-md flex flex-col justify-between space-y-3">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                   Resultado Sorteado
                 </span>
                 <h3 className="text-lg font-bold text-white mt-1.5 flex items-center gap-2">
                   <span
-                    className="w-3.5 h-3.5 rounded-full shrink-0"
+                    className="w-3.5 h-3.5 rounded-full shrink-0 ring-2 ring-white/30"
                     style={{ backgroundColor: selectedResult.color }}
                   />
                   {selectedResult.label}
                 </h3>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  Probabilidade calculada do setor: <strong className="text-amber-400">{selectedResult.percentage}%</strong>
+                  Probabilidade calculada do setor: <strong className="text-indigo-400">{selectedResult.percentage}%</strong>
                 </p>
               </div>
 
@@ -379,14 +379,15 @@ export const CustomRouletteWidget: React.FC = () => {
                 <button
                   onClick={handleSendToDiscord}
                   disabled={isSending}
-                  className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/25 transition-all cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2 px-3.5 rounded-xl bg-[#22262B] hover:bg-[#2D3139] text-[#E0E0E0] hover:text-white border border-[#3A3F4A] text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  title="Postar Resultado no Discord"
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isSending ? 'Enviando...' : 'Mandar no Chat'}</span>
+                  <Send className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{isSending ? 'Enviando...' : 'Postar no Discord'}</span>
                 </button>
                 <button
                   onClick={handleCopy}
-                  className="p-2 rounded-xl bg-[#1A1D21] border border-[#2D3139] text-zinc-300 hover:text-white hover:bg-[#252830] transition-colors"
+                  className="p-2 rounded-lg bg-[#22262B] hover:bg-[#2B3037] text-zinc-300 hover:text-white border border-[#2D3139] transition-colors cursor-pointer"
                   title="Copiar Resultado"
                 >
                   <Copy className="w-4 h-4" />

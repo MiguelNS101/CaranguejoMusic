@@ -41,7 +41,7 @@ interface ConfigurationModalProps {
   onOpenPresetModal: (initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json') => void;
   onOpenFolderModal?: () => void;
   onOpenSessionModal?: () => void;
-  initialTab?: 'discord' | 'mixer' | 'folders' | 'saves' | 'themes' | 'guide' | 'presets';
+  initialTab?: 'discord' | 'mixer' | 'folders' | 'saves' | 'themes' | 'guide' | 'presets' | 'playerColors';
 }
 
 export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
@@ -56,12 +56,27 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
   onOpenSessionModal,
   initialTab = 'discord'
 }) => {
-  const [activeTab, setActiveTab] = useState<'discord' | 'mixer' | 'folders' | 'saves' | 'themes' | 'guide' | 'presets'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'discord' | 'mixer' | 'folders' | 'saves' | 'themes' | 'guide' | 'presets' | 'playerColors'>(initialTab);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderType, setNewFolderType] = useState<'music' | 'soundboard' | 'npc'>('music');
   const [newSessionName, setNewSessionName] = useState('');
   const [sessionActionMsg, setSessionActionMsg] = useState<string | null>(null);
   const backupFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Player Colors State for Discord Reader and Chat
+  const [configPlayerColors, setConfigPlayerColors] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem('caranguejo_user_colors');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      'mestre': '#fbbf24',
+      'gm': '#fbbf24',
+      'bot': '#818cf8'
+    };
+  });
+  const [newConfigPlayerName, setNewConfigPlayerName] = useState('');
+  const [newConfigPlayerColor, setNewConfigPlayerColor] = useState('#38bdf8');
 
   const {
     botStatus,
@@ -214,6 +229,19 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
           >
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span>Predefinições (JSON)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('playerColors')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
+              activeTab === 'playerColors'
+                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+            }`}
+          >
+            <Palette className="w-4 h-4 text-pink-400" />
+            <span>Cores dos Jogadores ({Object.keys(configPlayerColors).length})</span>
           </button>
 
           <button
@@ -435,10 +463,10 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
                       onClose();
                       onOpenFolderModal();
                     }}
-                    className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition-all shadow-md shadow-amber-600/30 flex items-center gap-2 cursor-pointer shrink-0"
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 flex items-center gap-2 cursor-pointer shrink-0"
                   >
                     <FolderOpen className="w-4 h-4" />
-                    Abrir Gerenciador de Pastas
+                    <span>Abrir Gerenciador de Pastas</span>
                   </button>
                 )}
               </div>
@@ -734,10 +762,10 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
                     onClose();
                     onOpenThemeModal();
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 shadow transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[#22262B] hover:bg-[#2D3139] text-[#E0E0E0] hover:text-white border border-[#3A3F4A] text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
                 >
-                  <Palette className="w-3.5 h-3.5" />
-                  Customizador Completo & CSS
+                  <Palette className="w-4 h-4 text-indigo-400" />
+                  <span>Customizador Completo & CSS</span>
                 </button>
               </div>
 
@@ -919,6 +947,134 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
                   </p>
                   <p className="text-[10px] text-zinc-500 mt-1">Importar / Exportar</p>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CORES DOS JOGADORES (DISCORD CHAT) */}
+          {activeTab === 'playerColors' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-[#141619] border border-[#2D3139] space-y-2">
+                <div className="flex items-center gap-2">
+                  <Palette className="w-5 h-5 text-pink-400" />
+                  <h3 className="text-sm font-bold text-white">Identificação Visual por Cores de Jogadores</h3>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Defina cores exclusivas para cada jogador ou mestre da mesa. O leitor multi-abas do Discord exibirá avatares, bordas e nomes com as tonalidades configuradas aqui.
+                </p>
+              </div>
+
+              {/* Add New Color Form */}
+              <div className="p-4 rounded-2xl bg-[#141619] border border-[#2D3139] space-y-3">
+                <h4 className="text-xs font-bold text-zinc-200">Vincular Jogador / Personagem a uma Cor:</h4>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                  <input
+                    type="text"
+                    value={newConfigPlayerName}
+                    onChange={(e) => setNewConfigPlayerName(e.target.value)}
+                    placeholder="Nome de usuário no Discord..."
+                    className="flex-1 w-full bg-[#1A1D21] border border-[#2D3139] rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500"
+                  />
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <input
+                      type="color"
+                      value={newConfigPlayerColor}
+                      onChange={(e) => setNewConfigPlayerColor(e.target.value)}
+                      className="w-9 h-9 rounded-xl cursor-pointer bg-transparent border border-[#2D3139]"
+                      title="Escolher Cor"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!newConfigPlayerName.trim()) return;
+                        const updated = {
+                          ...configPlayerColors,
+                          [newConfigPlayerName.trim().toLowerCase()]: newConfigPlayerColor
+                        };
+                        setConfigPlayerColors(updated);
+                        try {
+                          localStorage.setItem('caranguejo_user_colors', JSON.stringify(updated));
+                        } catch {}
+                        setNewConfigPlayerName('');
+                      }}
+                      className="flex-1 sm:flex-initial px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow cursor-pointer"
+                    >
+                      Salvar Cor
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* List of Configured Player Colors */}
+              <div className="p-4 rounded-2xl bg-[#141619] border border-[#2D3139] space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-zinc-300">Jogadores Cadastrados ({Object.keys(configPlayerColors).length}):</h4>
+                  {Object.keys(configPlayerColors).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const defaultCols = { 'mestre': '#fbbf24', 'gm': '#fbbf24', 'bot': '#818cf8' };
+                        setConfigPlayerColors(defaultCols);
+                        try {
+                          localStorage.setItem('caranguejo_user_colors', JSON.stringify(defaultCols));
+                        } catch {}
+                      }}
+                      className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors"
+                    >
+                      Restaurar Padrão
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                  {Object.entries(configPlayerColors).map(([pName, pColor]) => (
+                    <div
+                      key={pName}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-[#1A1D21] border border-[#2D3139]"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className="w-4 h-4 rounded-full border border-white/20 shadow shrink-0"
+                          style={{ backgroundColor: pColor }}
+                        />
+                        <span className="text-xs font-bold text-white truncate capitalize">{pName}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={pColor}
+                          onChange={(e) => {
+                            const updated = {
+                              ...configPlayerColors,
+                              [pName]: e.target.value
+                            };
+                            setConfigPlayerColors(updated);
+                            try {
+                              localStorage.setItem('caranguejo_user_colors', JSON.stringify(updated));
+                            } catch {}
+                          }}
+                          className="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+                          title="Alterar cor"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...configPlayerColors };
+                            delete updated[pName];
+                            setConfigPlayerColors(updated);
+                            try {
+                              localStorage.setItem('caranguejo_user_colors', JSON.stringify(updated));
+                            } catch {}
+                          }}
+                          className="p-1 text-zinc-500 hover:text-rose-400 rounded transition-colors"
+                          title="Remover"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

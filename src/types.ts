@@ -38,7 +38,46 @@ export interface AmbienceTrack {
   tags: string[];
   isLocal: boolean;
   coverUrl?: string;
+  isLoop?: boolean; // Toggle per item: true = loop infinito, false = reproduzir apenas 1x
   createdAt: number;
+}
+
+export interface AmbienceQueueItem {
+  id: string;
+  track: AmbienceTrack;
+  addedAt: number;
+  addedBy?: string;
+}
+
+export interface DiscordChatMessage {
+  id: string;
+  author: {
+    id: string;
+    username: string;
+    discriminator?: string;
+    avatar?: string;
+    bot?: boolean;
+  };
+  content: string;
+  cleanContent?: string;
+  createdAt: string;
+  attachments: Array<{
+    id: string;
+    name: string;
+    url: string;
+    proxyURL?: string;
+    contentType?: string;
+    size?: number;
+  }>;
+  embeds: Array<{
+    title?: string;
+    description?: string;
+    color?: number;
+    fields?: Array<{ name: string; value: string; inline?: boolean }>;
+    image?: string;
+    thumbnail?: string;
+    footer?: string;
+  }>;
 }
 
 export interface QueueItem {
@@ -181,6 +220,10 @@ export interface DiscordMessagePayload {
   content?: string;
   channelId?: string;
   type?: 'narrative' | 'embed' | 'plain' | 'npc' | 'dice';
+  base64Image?: string;
+  attachmentName?: string;
+  imageUrl?: string;
+  attachmentUrl?: string;
   embed?: {
     title?: string;
     description?: string;
@@ -431,5 +474,23 @@ export interface RoulettePreset {
   category: string;
   slices: Omit<RouletteSlice, 'id'>[];
 }
+
+// Action Log for immediate history footer
+export type ActionLogCategory = 'music' | 'ambience' | 'soundboard' | 'npc' | 'chat' | 'dice' | 'drawing' | 'system';
+
+export interface ActionLogItem {
+  id: string;
+  text: string;
+  category: ActionLogCategory;
+  timestamp: Date;
+}
+
+// Player / User Color config
+export interface PlayerColorConfig {
+  username: string;
+  color: string;
+  label?: string;
+}
+
 
 

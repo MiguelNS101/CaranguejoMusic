@@ -375,10 +375,10 @@ export const MultiTabNotepad: React.FC<MultiTabNotepadProps> = ({
             type="button"
             onClick={handleSendToDiscord}
             disabled={isSendingToDiscord || !activeTab?.content.trim()}
-            className="flex items-center gap-1 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500 text-xs font-bold transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-b from-[#2E3440] via-[#21252E] to-[#16181D] hover:from-[#3A4252] hover:to-[#1C1F26] text-zinc-100 hover:text-white border border-[#3E4554] hover:border-indigo-400/70 text-xs font-bold font-rpg transition-all disabled:opacity-50 cursor-pointer shadow-md active:scale-95"
             title="Postar esta aba diretamente no canal de texto do Discord"
           >
-            <Send className="w-3.5 h-3.5" />
+            <Send className="w-3.5 h-3.5 text-indigo-400" />
             <span>{isSendingToDiscord ? 'Enviando...' : 'Postar no Discord'}</span>
           </button>
         </div>

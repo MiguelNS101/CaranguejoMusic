@@ -552,10 +552,10 @@ export const EncounterGeneratorWidget: React.FC = () => {
         <button
           onClick={generateEncounter}
           disabled={isGenerating}
-          className="w-full py-2 px-4 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-indigo-600/25 transition-all cursor-pointer disabled:opacity-50"
+          className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
         >
           <Dices className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
-          {isGenerating ? 'Rolando Parâmetros...' : 'Gerar Encontro Aleatório'}
+          <span>{isGenerating ? 'Rolando Parâmetros...' : 'Gerar Encontro Aleatório'}</span>
         </button>
       </div>
 
@@ -584,24 +584,24 @@ export const EncounterGeneratorWidget: React.FC = () => {
           <div className="border-b border-[#2D3139]/80 pb-3 flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-rpg">
                   {currentEncounter.environmentName}
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-rpg">
                   {currentEncounter.difficultyLabel}
                 </span>
               </div>
-              <h3 className="text-sm font-bold text-white mt-1.5 flex items-center gap-2">
-                <Swords className="w-4 h-4 text-red-400 shrink-0" />
+              <h3 className="text-sm font-bold text-white mt-1.5 flex items-center gap-2 font-rpg">
+                <Swords className="w-4 h-4 text-amber-400 shrink-0" />
                 {currentEncounter.title}
               </h3>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={handleCopy}
-                className="p-1.5 rounded-lg bg-[#1A1D21] border border-[#2D3139] text-zinc-400 hover:text-white hover:bg-[#252830] transition-colors"
+                className="p-1.5 rounded-lg bg-[#22262B] hover:bg-[#2B3037] text-zinc-300 hover:text-white border border-[#2D3139] transition-colors cursor-pointer"
                 title="Copiar Texto"
               >
                 <Copy className="w-4 h-4" />
@@ -609,11 +609,11 @@ export const EncounterGeneratorWidget: React.FC = () => {
               <button
                 onClick={handleSendToDiscord}
                 disabled={isSending}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
-                title="Mandar Encontro no Chat do Discord"
+                className="px-3.5 py-1.5 rounded-xl bg-[#22262B] hover:bg-[#2D3139] text-[#E0E0E0] hover:text-white border border-[#3A3F4A] text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                title="Postar Encontro no Chat do Discord"
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>{isSending ? 'Enviando...' : 'Mandar no Chat'}</span>
+                <Send className="w-3.5 h-3.5 text-indigo-400" />
+                <span>{isSending ? 'Enviando...' : 'Postar no Discord'}</span>
               </button>
             </div>
           </div>
@@ -697,10 +697,10 @@ export const EncounterGeneratorWidget: React.FC = () => {
           </p>
           <button
             onClick={generateEncounter}
-            className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+            className="mt-4 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 flex items-center gap-2 transition-all cursor-pointer"
           >
             <Dices className="w-4 h-4" />
-            Gerar Primeiro Encontro
+            <span>Gerar Encontro Aleatório</span>
           </button>
         </div>
       )}

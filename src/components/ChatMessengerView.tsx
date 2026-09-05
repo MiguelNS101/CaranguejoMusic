@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MessageSquare,
   Send,
@@ -8,17 +8,24 @@ import {
   AlertCircle,
   Plus,
   Trash2,
-  Image,
+  Image as ImageIcon,
   Scroll,
   Dices,
-  Bot
+  Bot,
+  Upload,
+  X,
+  FileImage
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { DiscordChannel, DiscordGuild } from '../types';
 import { safeFetchJson } from '../services/api';
+import { DiscordMessageReader } from './DiscordMessageReader';
 
 export const ChatMessengerView: React.FC = () => {
   const { botStatus } = useAudio();
+
+  // Sub-tabs: 'composer' (Send Messages/Images) vs 'reader' (Real-time Discord Chat)
+  const [activeSubTab, setActiveSubTab] = useState<'composer' | 'reader'>('composer');
 
   const [messageType, setMessageType] = useState<'narrative' | 'embed' | 'plain'>('narrative');
   const [channels, setChannels] = useState<DiscordChannel[]>([]);
@@ -26,6 +33,11 @@ export const ChatMessengerView: React.FC = () => {
 
   // Plain / Narrative
   const [textContent, setTextContent] = useState<string>('');
+
+  // Attached Image for Composer (drag-and-drop or file select)
+  const [attachedImage, setAttachedImage] = useState<{ name: string; base64: string; size?: number } | null>(null);
+  const [isDraggingComposer, setIsDraggingComposer] = useState<boolean>(false);
+  const composerFileInputRef = useRef<HTMLInputElement>(null);
 
   // Rich Embed State
   const [embedTitle, setEmbedTitle] = useState<string>('📜 Mensagem do Mestre da Mesa');
@@ -87,6 +99,21 @@ export const ChatMessengerView: React.FC = () => {
     });
   };
 
+  const handleComposerImageFile = (file: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAttachedImage({
+          name: file.name,
+          base64: reader.result,
+          size: file.size
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSending(true);
@@ -98,17 +125,17 @@ export const ChatMessengerView: React.FC = () => {
     };
 
     if (messageType === 'narrative') {
-      if (!textContent.trim()) {
+      if (!textContent.trim() && !attachedImage) {
         setIsSending(false);
         return;
       }
-      payload.content = textContent.trim();
+      payload.content = textContent.trim() || undefined;
     } else if (messageType === 'plain') {
-      if (!textContent.trim()) {
+      if (!textContent.trim() && !attachedImage) {
         setIsSending(false);
         return;
       }
-      payload.content = textContent.trim();
+      payload.content = textContent.trim() || undefined;
     } else if (messageType === 'embed') {
       payload.embed = {
         title: embedTitle.trim() || undefined,
@@ -122,6 +149,11 @@ export const ChatMessengerView: React.FC = () => {
       };
     }
 
+    if (attachedImage) {
+      payload.base64Image = attachedImage.base64;
+      payload.attachmentName = attachedImage.name;
+    }
+
     try {
       const res = await safeFetchJson<{ success: boolean; error?: string }>('/api/bot/send-message', {
         method: 'POST',
@@ -129,10 +161,11 @@ export const ChatMessengerView: React.FC = () => {
         body: JSON.stringify(payload)
       });
       if (res.success && res.data?.success) {
-        setFeedback({ status: 'success', msg: 'Mensagem enviada com sucesso para o Discord!' });
+        setFeedback({ status: 'success', msg: 'Mensagem e anexo transmitidos com sucesso ao Discord!' });
         if (messageType === 'narrative' || messageType === 'plain') {
           setTextContent('');
         }
+        setAttachedImage(null);
         setTimeout(() => setFeedback({ status: 'idle' }), 3500);
       } else {
         setFeedback({ status: 'error', msg: res.data?.error || res.error || 'Falha ao enviar mensagem ao Discord.' });
@@ -146,6 +179,54 @@ export const ChatMessengerView: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
+      {/* Sub-Tabs Switcher: Composer vs Reader */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#1A1D21] p-2.5 border border-[#2D3139] rounded-2xl shadow-md">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('composer')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeSubTab === 'composer'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-[#9E9E9E] hover:text-white hover:bg-[#20242a]'
+            }`}
+          >
+            <Send className="w-4 h-4" />
+            <span>Compositor & Upload de Imagens</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('reader')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeSubTab === 'reader'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-[#9E9E9E] hover:text-white hover:bg-[#20242a]'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4 text-emerald-400" />
+            <span>Leitor Discord em Tempo Real</span>
+            {botStatus.isOnline && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            )}
+          </button>
+        </div>
+
+        <div className="hidden sm:flex items-center gap-2 text-xs px-2 text-[#9E9E9E]">
+          {activeSubTab === 'reader'
+            ? 'Monitore e responda o chat dos jogadores sem dar Alt+Tab'
+            : 'Envie descrições de cena, cards e imagens direto pro Discord'}
+        </div>
+      </div>
+
+      {activeSubTab === 'reader' ? (
+        <DiscordMessageReader
+          channels={channels}
+          initialChannelId={selectedChannelId}
+          isBotOnline={botStatus.isOnline}
+        />
+      ) : (
+        <>
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-5 shadow-lg">
         <div>
@@ -234,7 +315,29 @@ export const ChatMessengerView: React.FC = () => {
           </div>
 
           {/* Composer Box */}
-          <form onSubmit={handleSendMessage} className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-5 shadow-lg space-y-4">
+          <form
+            onSubmit={handleSendMessage}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDraggingComposer(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDraggingComposer(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDraggingComposer(false);
+              const file = e.dataTransfer.files?.[0];
+              if (file) handleComposerImageFile(file);
+            }}
+            className={`bg-[#1A1D21] border rounded-2xl p-5 shadow-lg space-y-4 transition-colors ${
+              isDraggingComposer ? 'border-indigo-400 bg-indigo-950/30' : 'border-[#2D3139]'
+            }`}
+          >
             
             {messageType === 'narrative' && (
               <div className="space-y-3">
@@ -247,7 +350,7 @@ export const ChatMessengerView: React.FC = () => {
                   onChange={(e) => setTextContent(e.target.value)}
                   placeholder="Escreva a narração da cena... O bot formatará em um pergaminho com destaque dourado no Discord."
                   className="w-full bg-[#141619] border border-[#2D3139] rounded-xl p-3 text-sm text-[#E0E0E0] placeholder:text-[#6E7681] focus:outline-none focus:border-indigo-500/70 leading-relaxed resize-none"
-                  required
+                  required={!attachedImage}
                 />
               </div>
             )}
@@ -263,10 +366,82 @@ export const ChatMessengerView: React.FC = () => {
                   onChange={(e) => setTextContent(e.target.value)}
                   placeholder="Digite sua mensagem para o canal..."
                   className="w-full bg-[#141619] border border-[#2D3139] rounded-xl p-3 text-sm text-[#E0E0E0] placeholder:text-[#6E7681] focus:outline-none focus:border-indigo-500/70 resize-none"
-                  required
+                  required={!attachedImage}
                 />
               </div>
             )}
+
+            {/* Image Attachment & Drag-and-Drop Area */}
+            <div className="space-y-2 pt-2 border-t border-[#2D3139]">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-[#E0E0E0] flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-indigo-400" />
+                  Anexo de Imagem para o Chat
+                </label>
+                <span className="text-[10px] text-[#9E9E9E]">
+                  Suporta arrastar e soltar (Drag and Drop)
+                </span>
+              </div>
+
+              {attachedImage ? (
+                <div className="flex items-center gap-3 bg-[#141619] p-3 rounded-xl border border-indigo-500/50">
+                  <img
+                    src={attachedImage.base64}
+                    alt={attachedImage.name}
+                    className="w-14 h-14 object-cover rounded-lg border border-[#2D3139] shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-emerald-400 truncate flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Imagem pronta para envio
+                    </p>
+                    <p className="text-[11px] text-zinc-300 truncate">
+                      {attachedImage.name}
+                    </p>
+                    {attachedImage.size && (
+                      <p className="text-[10px] text-[#9E9E9E]">
+                        {(attachedImage.size / 1024).toFixed(1)} KB
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAttachedImage(null)}
+                    className="p-1.5 text-zinc-400 hover:text-rose-400 rounded-lg hover:bg-[#20242a] transition-colors cursor-pointer"
+                    title="Remover anexo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => composerFileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+                    isDraggingComposer
+                      ? 'border-indigo-400 bg-indigo-950/40'
+                      : 'border-[#2D3139] hover:border-indigo-500/60 bg-[#141619]'
+                  }`}
+                >
+                  <input
+                    type="file"
+                    ref={composerFileInputRef}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleComposerImageFile(f);
+                    }}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <Upload className="w-6 h-6 text-indigo-400 mx-auto mb-1.5" />
+                  <p className="text-xs text-[#E0E0E0] font-semibold">
+                    Clique para selecionar ou arraste uma imagem aqui
+                  </p>
+                  <p className="text-[10px] text-[#9E9E9E] mt-0.5">
+                    PNG, JPG, WEBP, GIF (o bot transmitirá como anexo no canal)
+                  </p>
+                </div>
+              )}
+            </div>
 
             {messageType === 'embed' && (
               <div className="space-y-3.5">
@@ -540,6 +715,23 @@ export const ChatMessengerView: React.FC = () => {
                       )}
                     </div>
                   )}
+
+                  {/* Attached Image Simulation */}
+                  {attachedImage && (
+                    <div className="mt-3 rounded-xl overflow-hidden border border-[#2D3139] bg-[#1E2024] max-w-sm">
+                      <img
+                        src={attachedImage.base64}
+                        alt="Anexo Simulado"
+                        className="max-h-52 w-full object-contain rounded-t-xl bg-black/40"
+                      />
+                      <div className="p-2 bg-[#141619] text-[10px] text-zinc-300 flex items-center justify-between border-t border-[#2D3139]">
+                        <span className="truncate font-semibold">{attachedImage.name}</span>
+                        <span className="text-emerald-400 font-mono text-[9px] uppercase px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/30">
+                          Anexo
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -547,6 +739,8 @@ export const ChatMessengerView: React.FC = () => {
         </div>
 
       </div>
+      </>
+      )}
     </div>
   );
 };

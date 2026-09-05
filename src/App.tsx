@@ -16,6 +16,7 @@ import { ThemeCustomizerModal } from './components/ThemeCustomizerModal';
 import { PresetManagerModal } from './components/PresetManagerModal';
 import { ConfigurationModal } from './components/ConfigurationModal';
 import { AudioMixerModal } from './components/AudioMixerModal';
+import { ActionLogFooter } from './components/ActionLogFooter';
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState<'master' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings'>(() => {
@@ -89,7 +90,9 @@ export default function App() {
 
             {currentTab === 'soundboard' && <SoundboardView />}
 
-            {currentTab === 'npcs' && <NpcView />}
+            <div className={currentTab === 'npcs' ? 'block' : 'hidden'}>
+              <NpcView />
+            </div>
 
             {currentTab === 'chat' && <ChatMessengerView />}
 
@@ -136,6 +139,9 @@ export default function App() {
               </div>
             )}
           </main>
+
+          {/* Action Log Footer (Last 3 Actions History) */}
+          <ActionLogFooter />
 
           {/* Global Modals */}
           <ConfigurationModal

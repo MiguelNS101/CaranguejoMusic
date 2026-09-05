@@ -39,6 +39,7 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
   const [selectedFolderId, setSelectedFolderId] = useState<string>(defaultFolderId || '');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'success' | 'error'; message?: string }>({ status: 'idle' });
 
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -54,8 +55,7 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
     return true;
   });
 
-  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileList = e.target.files;
+  const processFileList = (fileList: FileList | File[]) => {
     if (!fileList || fileList.length === 0) return;
 
     const files: File[] = Array.from(fileList);
@@ -71,6 +71,12 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
 
     setSelectedFiles(filtered);
     setFeedback({ status: 'idle' });
+  };
+
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      processFileList(e.target.files);
+    }
   };
 
   const formatCleanName = (fileName: string) => {
@@ -301,46 +307,75 @@ export const FolderImportModal: React.FC<FolderImportModalProps> = ({
                 3. Escolher Pasta ou Arquivos pelo Navegador
               </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Folder Selector */}
-                <button
-                  type="button"
-                  onClick={() => folderInputRef.current?.click()}
-                  className="p-5 rounded-2xl bg-[#1A1D21] border border-dashed border-[#2D3139] hover:border-indigo-500/70 hover:bg-[#1F2329] transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer"
-                >
-                  <FolderOpen className="w-8 h-8 text-indigo-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-bold text-white">Selecionar Pasta Inteira</span>
-                  <span className="text-[11px] text-[#9E9E9E]">Lê arquivos e subpastas</span>
-                </button>
-                <input
-                  type="file"
-                  ref={folderInputRef}
-                  onChange={handleFilesSelected}
-                  // @ts-ignore
-                  webkitdirectory=""
-                  directory=""
-                  multiple
-                  className="hidden"
-                />
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                  if (e.dataTransfer.files) {
+                    processFileList(e.dataTransfer.files);
+                  }
+                }}
+                className={`p-3 rounded-2xl border-2 border-dashed transition-all ${
+                  isDragging
+                    ? 'border-indigo-400 bg-indigo-950/40'
+                    : 'border-transparent'
+                }`}
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Folder Selector */}
+                  <button
+                    type="button"
+                    onClick={() => folderInputRef.current?.click()}
+                    className="p-5 rounded-2xl bg-[#1A1D21] border border-dashed border-[#2D3139] hover:border-indigo-500/70 hover:bg-[#1F2329] transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer"
+                  >
+                    <FolderOpen className="w-8 h-8 text-indigo-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-bold text-white">Selecionar Pasta Inteira</span>
+                    <span className="text-[11px] text-[#9E9E9E]">Lê arquivos e subpastas</span>
+                  </button>
+                  <input
+                    type="file"
+                    ref={folderInputRef}
+                    onChange={handleFilesSelected}
+                    // @ts-ignore
+                    webkitdirectory=""
+                    directory=""
+                    multiple
+                    className="hidden"
+                  />
 
-                {/* Multiple files selector */}
-                <button
-                  type="button"
-                  onClick={() => multipleFilesInputRef.current?.click()}
-                  className="p-5 rounded-2xl bg-[#1A1D21] border border-dashed border-[#2D3139] hover:border-indigo-500/70 hover:bg-[#1F2329] transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer"
-                >
-                  <UploadCloud className="w-8 h-8 text-amber-400 group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-bold text-white">Selecionar Vários Arquivos</span>
-                  <span className="text-[11px] text-[#9E9E9E]">Escolha múltiplos áudios/imagens</span>
-                </button>
-                <input
-                  type="file"
-                  ref={multipleFilesInputRef}
-                  onChange={handleFilesSelected}
-                  multiple
-                  accept={category === 'npc' ? 'image/*' : 'audio/*'}
-                  className="hidden"
-                />
+                  {/* Multiple files selector */}
+                  <button
+                    type="button"
+                    onClick={() => multipleFilesInputRef.current?.click()}
+                    className="p-5 rounded-2xl bg-[#1A1D21] border border-dashed border-[#2D3139] hover:border-indigo-500/70 hover:bg-[#1F2329] transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer"
+                  >
+                    <UploadCloud className="w-8 h-8 text-amber-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-bold text-white">Selecionar Vários Arquivos</span>
+                    <span className="text-[11px] text-[#9E9E9E]">Escolha múltiplos áudios/imagens</span>
+                  </button>
+                  <input
+                    type="file"
+                    ref={multipleFilesInputRef}
+                    onChange={handleFilesSelected}
+                    multiple
+                    accept={category === 'npc' ? 'image/*' : 'audio/*'}
+                    className="hidden"
+                  />
+                </div>
+                <p className="text-[11px] text-[#9E9E9E] text-center mt-2">
+                  Dica: Você também pode arrastar e soltar arquivos de áudio ou imagens diretamente nesta área!
+                </p>
               </div>
             </div>
           )}
