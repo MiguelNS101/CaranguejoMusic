@@ -17,7 +17,11 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { ActionLogCategory } from '../types';
 
-export const ActionLogFooter: React.FC = () => {
+interface ActionLogFooterProps {
+  onOpenDiagnostics?: () => void;
+}
+
+export const ActionLogFooter: React.FC<ActionLogFooterProps> = ({ onOpenDiagnostics }) => {
   const { actionLogs = [], clearActionLogs } = useAudio();
   const [isMinimized, setIsMinimized] = useState<boolean>(() => {
     try {
@@ -142,6 +146,19 @@ export const ActionLogFooter: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {onOpenDiagnostics && (
+              <button
+                id="btn-footer-diagnostics-lag"
+                type="button"
+                onClick={onOpenDiagnostics}
+                className="px-2 py-0.5 rounded-lg bg-indigo-950/50 hover:bg-indigo-900/70 border border-indigo-500/40 text-indigo-300 hover:text-white text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Abrir Diagnóstico, Logs & Investigador de Lag de Áudio"
+              >
+                <Activity className="w-3 h-3 text-emerald-400" />
+                <span className="hidden sm:inline">Diagnóstico & Lag</span>
+              </button>
+            )}
+
             {recentThree.length > 0 && (
               <button
                 id="btn-clear-action-logs"

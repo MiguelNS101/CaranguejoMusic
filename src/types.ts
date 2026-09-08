@@ -150,6 +150,17 @@ export interface DiagnosticLog {
   details?: string;
 }
 
+export interface AudioPerformanceDiagnostics {
+  bufferStallCount: number;
+  lastBufferingTimestamp?: string;
+  voicePingWs?: number;
+  voicePingUdp?: number;
+  streamHealth: 'excellent' | 'good' | 'warning' | 'critical' | 'idle';
+  latencyStatus: 'excellent' | 'good' | 'high' | 'critical' | 'unknown';
+  activeEngine: string;
+  diagnosticNotes: string[];
+}
+
 export interface VoiceDiagnostics {
   modules: {
     opusDiscord: { available: boolean; version?: string; error?: string };
@@ -173,6 +184,7 @@ export interface VoiceDiagnostics {
     playerState: string;
     currentTrack?: string;
   };
+  audioPerformance?: AudioPerformanceDiagnostics;
   environment: {
     nodeVersion: string;
     platform: string;

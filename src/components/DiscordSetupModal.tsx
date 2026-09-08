@@ -32,9 +32,10 @@ import { DiscordDiagnosticsPanel } from './DiscordDiagnosticsPanel';
 interface DiscordSetupModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: 'bot' | 'diagnostics' | 'guide' | 'docker' | 'portable';
 }
 
-export const DiscordSetupModal: React.FC<DiscordSetupModalProps> = ({ isOpen, onClose }) => {
+export const DiscordSetupModal: React.FC<DiscordSetupModalProps> = ({ isOpen, onClose, initialTab = 'bot' }) => {
   const { botConfig, botStatus, refreshBotStatus, disconnectVoiceChannel, connectVoiceChannel } = useAudio();
 
   const [token, setToken] = useState(botConfig.token || '');
@@ -50,7 +51,13 @@ export const DiscordSetupModal: React.FC<DiscordSetupModalProps> = ({ isOpen, on
   const [saveProgressMsg, setSaveProgressMsg] = useState('');
   const [isVoiceConnecting, setIsVoiceConnecting] = useState(false);
   const [feedback, setFeedback] = useState<{ status: 'idle' | 'success' | 'error'; msg?: string }>({ status: 'idle' });
-  const [activeSubTab, setActiveSubTab] = useState<'bot' | 'diagnostics' | 'guide' | 'docker' | 'portable'>('bot');
+  const [activeSubTab, setActiveSubTab] = useState<'bot' | 'diagnostics' | 'guide' | 'docker' | 'portable'>(initialTab);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveSubTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   const [copiedInvite, setCopiedInvite] = useState(false);
   const [copiedEnv, setCopiedEnv] = useState(false);
   const [envRawText, setEnvRawText] = useState('');
@@ -325,7 +332,7 @@ NODE_ENV=production
             }`}
           >
             <Activity className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Diagnóstico & Logs</span>
+            <span>Diagnóstico, Logs & Lag</span>
           </button>
           <button
             onClick={() => setActiveSubTab('portable')}

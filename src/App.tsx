@@ -36,6 +36,7 @@ export default function App() {
   }, [currentTab]);
 
   const [isDiscordModalOpen, setIsDiscordModalOpen] = useState<boolean>(false);
+  const [discordModalTab, setDiscordModalTab] = useState<'bot' | 'diagnostics' | 'guide' | 'docker' | 'portable'>('bot');
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState<boolean>(false);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = useState<boolean>(false);
@@ -141,7 +142,12 @@ export default function App() {
           </main>
 
           {/* Action Log Footer (Last 3 Actions History) */}
-          <ActionLogFooter />
+          <ActionLogFooter
+            onOpenDiagnostics={() => {
+              setDiscordModalTab('diagnostics');
+              setIsDiscordModalOpen(true);
+            }}
+          />
 
           {/* Global Modals */}
           <ConfigurationModal
@@ -149,6 +155,7 @@ export default function App() {
             onClose={() => setIsConfigModalOpen(false)}
             onOpenDiscordSetup={() => {
               setIsConfigModalOpen(false);
+              setDiscordModalTab('bot');
               setIsDiscordModalOpen(true);
             }}
             onOpenMixerModal={() => {
@@ -192,6 +199,7 @@ export default function App() {
           <DiscordSetupModal
             isOpen={isDiscordModalOpen}
             onClose={() => setIsDiscordModalOpen(false)}
+            initialTab={discordModalTab}
           />
 
           <FolderManagerModal

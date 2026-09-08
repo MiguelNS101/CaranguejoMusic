@@ -91,7 +91,13 @@ export class DiscordBotService {
 
   // Diagnostic Logs Circular Buffer
   private diagnosticLogs: DiagnosticLog[] = [];
-  private maxLogs: number = 120;
+  private maxLogs: number = 150;
+
+  // Audio Performance & Lag Tracking (Non-invasive diagnostic monitors)
+  private bufferStallCount: number = 0;
+  private lastBufferingTimestamp?: string;
+  private voiceDisconnectCount: number = 0;
+  private lastHighPingLoggedAt: number = 0;
 
   constructor() {
     this.logDiagnostic('info', 'system', 'Inicializando serviço DiscordBot do CaranguejoRPG...', `Node ${process.version} em ${process.platform} (${process.arch})`);
@@ -246,6 +252,74 @@ export class DiscordBotService {
       playerState = this.audioPlayer.state.status;
     }
 
+    // Audio Performance Assessment & Lag Analysis
+    const diagnosticNotes: string[] = [];
+    let latencyStatus: 'excellent' | 'good' | 'high' | 'critical' | 'unknown' = 'unknown';
+
+    if (voicePing !== undefined) {
+      if (voicePing < 80) {
+        latencyStatus = 'excellent';
+      } else if (voicePing < 160) {
+        latencyStatus = 'good';
+      } else if (voicePing < 280) {
+        latencyStatus = 'high';
+        diagnosticNotes.push(`Latência de voz moderadamente alta (${voicePing}ms). Pode causar pequenos atrasos no áudio.`);
+        if (Date.now() - this.lastHighPingLoggedAt > 60000) {
+          this.lastHighPingLoggedAt = Date.now();
+          this.logDiagnostic(
+            'warn',
+            'voice',
+            `[PING ALTO] Latência no canal de voz está em ${voicePing}ms.`,
+            'Pode haver pequenos atrasos ou microcortes no áudio transmitido para o Discord.'
+          );
+        }
+      } else {
+        latencyStatus = 'critical';
+        diagnosticNotes.push(`Latência crítica no canal de voz (${voicePing}ms). Alto risco de áudio picotado, voz robótica ou travamentos.`);
+        if (Date.now() - this.lastHighPingLoggedAt > 30000) {
+          this.lastHighPingLoggedAt = Date.now();
+          this.logDiagnostic(
+            'warn',
+            'voice',
+            `[ALERTA DE LAG CRÍTICO] Latência do canal de voz extremamente alta (${voicePing}ms).`,
+            'A conexão UDP com os servidores do Discord está lenta ou instável. Recomenda-se trocar a região do canal de voz no Discord.'
+          );
+        }
+      }
+    }
+
+    if (this.bufferStallCount > 0) {
+      diagnosticNotes.push(`${this.bufferStallCount} interrupções de buffer (stalls) registradas nesta sessão.`);
+    }
+
+    if (activeOpusEngine.includes('opusscript')) {
+      diagnosticNotes.push('Motor Opus baseado em JavaScript (opusscript) em uso. Se a CPU estiver sob estresse, pode haver pequenos engasgos.');
+    }
+
+    let streamHealth: 'excellent' | 'good' | 'warning' | 'critical' | 'idle' = 'idle';
+    if (this.isPlayingVoice) {
+      if (latencyStatus === 'critical' || this.bufferStallCount >= 3) {
+        streamHealth = 'critical';
+      } else if (latencyStatus === 'high' || this.bufferStallCount >= 1) {
+        streamHealth = 'warning';
+      } else if (latencyStatus === 'good') {
+        streamHealth = 'good';
+      } else {
+        streamHealth = 'excellent';
+      }
+    }
+
+    const audioPerformance = {
+      bufferStallCount: this.bufferStallCount,
+      lastBufferingTimestamp: this.lastBufferingTimestamp,
+      voicePingWs: voicePing,
+      voicePingUdp: (this.voiceConnection as any)?.ping?.udp,
+      streamHealth,
+      latencyStatus,
+      activeEngine: activeOpusEngine,
+      diagnosticNotes
+    };
+
     const mem = process.memoryUsage();
 
     return {
@@ -271,6 +345,7 @@ export class DiscordBotService {
         playerState,
         currentTrack: this.currentTrackName || undefined
       },
+      audioPerformance,
       environment: {
         nodeVersion: process.version,
         platform: process.platform,
@@ -1031,13 +1106,24 @@ export class DiscordBotService {
           adapterCreator: guild.voiceAdapterCreator as any
         });
 
-        // Monitor Voice Connection State
+        // Monitor Voice Connection State & Network Lag
         this.voiceConnection.on('stateChange', (oldState, newState) => {
-          this.logDiagnostic(
-            newState.status === VoiceConnectionStatus.Ready ? 'success' : 'info',
-            'voice',
-            `Estado da conexão de voz alterado: ${oldState.status} -> ${newState.status}`
-          );
+          const isReconnecting = newState.status === VoiceConnectionStatus.Signalling || newState.status === VoiceConnectionStatus.Connecting;
+          if (isReconnecting && oldState.status === VoiceConnectionStatus.Ready) {
+            this.voiceDisconnectCount++;
+            this.logDiagnostic(
+              'warn',
+              'voice',
+              `[ALERTA DE REDE/LAG] Canal de voz perdeu estado Ready e está reconectando: ${oldState.status} -> ${newState.status}. O áudio foi interrompido temporariamente.`,
+              `Possível causa: oscilação na rota UDP, perda de pacotes da internet ou troca de região de voz pelo Discord.`
+            );
+          } else {
+            this.logDiagnostic(
+              newState.status === VoiceConnectionStatus.Ready ? 'success' : 'info',
+              'voice',
+              `Estado da conexão de voz alterado: ${oldState.status} -> ${newState.status}`
+            );
+          }
         });
 
         this.voiceConnection.on('error', (error) => {
@@ -1059,7 +1145,14 @@ export class DiscordBotService {
           });
 
           this.audioPlayer.on(AudioPlayerStatus.Buffering, () => {
-            this.logDiagnostic('info', 'audio', 'Buffering de áudio em andamento...');
+            this.bufferStallCount++;
+            this.lastBufferingTimestamp = new Date().toLocaleTimeString('pt-BR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            this.logDiagnostic(
+              'warn',
+              'audio',
+              `[PERFORMANCE] Buffer stall #${this.bufferStallCount} detectado (player entrou em Buffering). O áudio pode ter travado ou gaguejado.`,
+              `Horário: ${this.lastBufferingTimestamp} | Causa provável: oscilação UDP com Discord, leitura lenta de disco ou pico de uso de CPU.`
+            );
           });
 
           this.audioPlayer.on(AudioPlayerStatus.Paused, () => {

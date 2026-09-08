@@ -18,7 +18,15 @@ import {
   ShieldCheck,
   Play,
   RotateCcw,
-  Monitor
+  Monitor,
+  Wifi,
+  AlertTriangle,
+  FileText,
+  HelpCircle,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  Gauge
 } from 'lucide-react';
 import { VoiceDiagnostics, DiagnosticLog } from '../types';
 import { safeFetchJson } from '../services/api';
@@ -47,7 +55,8 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
   const [isTesting, setIsTesting] = useState(false);
   const [isRestartingBackend, setIsRestartingBackend] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; msg: string } | null>(null);
-  const [filterLevel, setFilterLevel] = useState<'all' | 'error' | 'desktop' | 'voice' | 'bot' | 'audio'>('all');
+  const [filterLevel, setFilterLevel] = useState<'all' | 'error' | 'lag' | 'desktop' | 'voice' | 'bot' | 'audio'>('all');
+  const [showLagGuide, setShowLagGuide] = useState(false);
   const [isAutoRefresh, setIsAutoRefresh] = useState(true);
   const [copiedLogId, setCopiedLogId] = useState<string | null>(null);
   const [isAllCopied, setIsAllCopied] = useState(false);
@@ -209,10 +218,41 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
     if (filterLevel === 'voice') return log.source === 'voice';
     if (filterLevel === 'bot') return log.source === 'bot';
     if (filterLevel === 'audio') return log.source === 'audio';
+    if (filterLevel === 'lag') {
+      const msg = `${log.message} ${log.details || ''}`.toLowerCase();
+      return (
+        log.source === 'audio' ||
+        log.source === 'voice' ||
+        log.level === 'warn' ||
+        log.level === 'error' ||
+        msg.includes('lag') ||
+        msg.includes('ping') ||
+        msg.includes('buffer') ||
+        msg.includes('stall') ||
+        msg.includes('rede') ||
+        msg.includes('latência') ||
+        msg.includes('desconect') ||
+        msg.includes('stutter')
+      );
+    }
     return true;
   });
 
   const errorCount = combinedLogs.filter(l => l.level === 'error').length;
+  const lagEventsCount = combinedLogs.filter(log => {
+    const msg = `${log.message} ${log.details || ''}`.toLowerCase();
+    return (
+      log.source === 'audio' ||
+      log.source === 'voice' ||
+      log.level === 'warn' ||
+      log.level === 'error' ||
+      msg.includes('buffer') ||
+      msg.includes('stall') ||
+      msg.includes('ping') ||
+      msg.includes('lag')
+    );
+  }).length;
+
   const activeEngine = diagnostics?.modules?.activeOpusEngine || (isLoading ? 'Carregando diagnóstico...' : 'Verificando motor de áudio...');
   const hasWorkingDecoder = Boolean(
     diagnostics?.modules?.opusscript?.available ||
@@ -234,6 +274,67 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
     navigator.clipboard.writeText(text);
     setCopiedLogId(log.id);
     setTimeout(() => setCopiedLogId(null), 2000);
+  };
+
+  const handleDownloadLagReport = () => {
+    const audioPerf = diagnostics?.audioPerformance;
+    const reportText = `================================================================================
+CARANGUEJORPG - RELATÓRIO DE DIAGNÓSTICO DE LAG E ÁUDIO DISCORD
+Data do Diagnóstico: ${new Date().toLocaleString('pt-BR')}
+================================================================================
+
+[1] STATUS DE LATÊNCIA & REDE:
+- Ping no Canal de Voz: ${diagnostics?.connection?.voicePing !== undefined ? `${diagnostics.connection.voicePing} ms` : 'Não mensurado / Desconectado'}
+- Status de Latência: ${audioPerf?.latencyStatus || 'Desconhecido'}
+- Ping do Bot Gateway (API): ${diagnostics?.connection?.botPing !== undefined ? `${diagnostics.connection.botPing} ms` : 'Desconhecido'}
+- Estado da Conexão de Voz: ${diagnostics?.connection?.voiceState || 'Desconectado'}
+- Canal de Voz: ${diagnostics?.connection?.voiceChannelName || 'Nenhum'} (${diagnostics?.connection?.voiceChannelId || '--'})
+- Servidor (Guild): ${diagnostics?.connection?.guildName || 'Nenhum'} (${diagnostics?.connection?.guildId || '--'})
+
+[2] ESTABILIDADE DO PLAYER & BUFFER:
+- Estado do Player: ${diagnostics?.connection?.playerState || 'Não iniciado'}
+- Faixa Atual: ${diagnostics?.connection?.currentTrack || 'Nenhuma'}
+- Quedas de Buffer (Stalls): ${audioPerf?.bufferStallCount || 0}
+- Última Interrupção de Buffer: ${audioPerf?.lastBufferingTimestamp || 'Nenhuma registrada'}
+- Classificação do Stream: ${audioPerf?.streamHealth || 'idle'}
+
+[3] MOTOR DE DECODIFICAÇÃO OPUS & SISTEMA:
+- Motor Opus Ativo: ${diagnostics?.modules?.activeOpusEngine || 'Não detectado'}
+- @discordjs/opus (Nativo C++): ${diagnostics?.modules?.opusDiscord?.available ? 'SIM' : 'NÃO'}
+- opusscript (Portátil JS): ${diagnostics?.modules?.opusscript?.available ? 'SIM' : 'NÃO'}
+- FFmpeg Disponível: ${diagnostics?.modules?.ffmpeg?.available ? 'SIM' : 'NÃO'}
+- Memória RAM Utilizada: ${diagnostics?.environment?.memoryUsageMB ? `${diagnostics.environment.memoryUsageMB} MB` : '--'}
+- Node.js: ${diagnostics?.environment?.nodeVersion || '--'}
+- Plataforma: ${diagnostics?.environment?.platform || '--'} (${diagnostics?.environment?.arch || '--'})
+- Tempo Ativo (Uptime): ${diagnostics?.environment?.uptime ? `${Math.floor(diagnostics.environment.uptime / 60)} minutos` : '--'}
+
+[4] NOTAS DE DIAGNÓSTICO AUTOMÁTICO:
+${(audioPerf?.diagnosticNotes && audioPerf.diagnosticNotes.length > 0)
+  ? audioPerf.diagnosticNotes.map(n => `* ${n}`).join('\n')
+  : '* Nenhum problema crítico de áudio foi detectado pelos sensores no momento.'}
+
+[5] HISTÓRICO DE LOGS DE ÁUDIO, VOZ E SISTEMA:
+${combinedLogs
+  .filter(l => l.source === 'audio' || l.source === 'voice' || l.level === 'warn' || l.level === 'error')
+  .map(l => `[${l.timestamp}] [${(l.source || '').toUpperCase()}] [${(l.level || '').toUpperCase()}] ${l.message}${l.details ? ' -> ' + l.details : ''}`)
+  .join('\n') || 'Nenhum log relevante registrado.'}
+
+================================================================================
+DICAS PARA O MESTRE/USUÁRIO:
+1. Se o Ping de voz estiver acima de 200ms, troque a Região do Canal de Voz no Discord para o seu país (ex: Brasil).
+2. Se houver Stalls de Buffer, verifique se o áudio está em HD/SSD rápido ou se a internet oscilou.
+3. Se o motor for opusscript e o PC estiver sob 100% de uso (jogo pesado aberto), a decodificação de áudio pode atrasar.
+================================================================================`;
+
+    const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `caranguejorpg-relatorio-lag-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleDownloadReport = () => {
@@ -540,6 +641,264 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
         </div>
       </div>
 
+      {/* Audio Lag & Stutter Investigator Panel */}
+      <div className="p-4 bg-gradient-to-br from-[#16181E] via-[#14161B] to-[#121417] rounded-2xl border border-indigo-500/30 shadow-lg space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-[#282D37]">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
+              <Gauge className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-bold text-white text-sm flex items-center gap-2">
+                Investigador de Lag & Estabilidade de Áudio
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                  Monitor em Tempo Real
+                </span>
+              </h4>
+              <p className="text-[#9E9E9E] text-[11px]">
+                Detecta oscilações de ping, stalls de buffer e problemas de conexão UDP do Discord.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFilterLevel('lag')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                filterLevel === 'lag'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-600/30'
+                  : 'bg-[#222730] hover:bg-[#2A303C] text-amber-300 border border-amber-500/30'
+              }`}
+              title="Filtrar logs apenas de eventos de áudio, voz e lag"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Ver Logs de Lag ({lagEventsCount})</span>
+            </button>
+
+            <button
+              onClick={handleDownloadLagReport}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20 cursor-pointer"
+              title="Baixar relatório técnico de lag para diagnóstico"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Exportar Relatório</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Real-time Telemetry Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          {/* Card 1: Voice Ping */}
+          <div className="p-3 bg-[#0E1013] rounded-xl border border-[#262B35] space-y-1">
+            <div className="flex items-center justify-between text-[11px] text-[#9E9E9E]">
+              <span className="flex items-center gap-1.5">
+                <Wifi className="w-3.5 h-3.5 text-indigo-400" />
+                Ping no Canal de Voz
+              </span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                  diagnostics?.connection?.voicePing === undefined
+                    ? 'text-gray-400'
+                    : diagnostics.connection.voicePing < 100
+                    ? 'text-emerald-400'
+                    : diagnostics.connection.voicePing < 250
+                    ? 'text-amber-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {diagnostics?.connection?.voicePing === undefined
+                  ? 'Desconectado'
+                  : diagnostics.connection.voicePing < 100
+                  ? 'Excelente'
+                  : diagnostics.connection.voicePing < 250
+                  ? 'Atenção'
+                  : 'Crítico'}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5 pt-1">
+              <span className="text-xl font-extrabold text-white font-mono">
+                {diagnostics?.connection?.voicePing !== undefined ? `${diagnostics.connection.voicePing} ms` : '--'}
+              </span>
+              <span className="text-[10px] text-[#6E7681]">
+                (Gateway: {diagnostics?.connection?.botPing !== undefined ? `${diagnostics.connection.botPing}ms` : '--'})
+              </span>
+            </div>
+            <p className="text-[10px] text-[#6E7681] truncate">
+              {diagnostics?.connection?.voicePing !== undefined && diagnostics.connection.voicePing > 200
+                ? '⚠️ Ping alto pode causar voz robótica no Discord'
+                : 'Conexão direta com servidor de voz'}
+            </p>
+          </div>
+
+          {/* Card 2: Buffer Stalls */}
+          <div className="p-3 bg-[#0E1013] rounded-xl border border-[#262B35] space-y-1">
+            <div className="flex items-center justify-between text-[11px] text-[#9E9E9E]">
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-amber-400" />
+                Interrupções de Buffer
+              </span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                  (diagnostics?.audioPerformance?.bufferStallCount || 0) === 0
+                    ? 'text-emerald-400'
+                    : 'text-rose-400'
+                }`}
+              >
+                {(diagnostics?.audioPerformance?.bufferStallCount || 0) === 0 ? 'Normal' : 'Gaguejos'}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5 pt-1">
+              <span className="text-xl font-extrabold text-white font-mono">
+                {diagnostics?.audioPerformance?.bufferStallCount || 0}
+              </span>
+              <span className="text-[10px] text-[#6E7681]">
+                stalls registrados
+              </span>
+            </div>
+            <p className="text-[10px] text-[#6E7681] truncate">
+              {diagnostics?.audioPerformance?.lastBufferingTimestamp
+                ? `Último stall às ${diagnostics.audioPerformance.lastBufferingTimestamp}`
+                : 'Nenhum travamento detectado'}
+            </p>
+          </div>
+
+          {/* Card 3: Active Opus Engine */}
+          <div className="p-3 bg-[#0E1013] rounded-xl border border-[#262B35] space-y-1">
+            <div className="flex items-center justify-between text-[11px] text-[#9E9E9E]">
+              <span className="flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                Codec Opus (Áudio)
+              </span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                  diagnostics?.modules?.opusDiscord?.available
+                    ? 'text-emerald-400'
+                    : 'text-indigo-400'
+                }`}
+              >
+                {diagnostics?.modules?.opusDiscord?.available ? 'Nativo' : 'Portátil'}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5 pt-1">
+              <span className="text-sm font-bold text-white font-mono truncate max-w-[170px]" title={diagnostics?.modules?.activeOpusEngine}>
+                {diagnostics?.modules?.activeOpusEngine || 'opusscript'}
+              </span>
+            </div>
+            <p className="text-[10px] text-[#6E7681] truncate">
+              {diagnostics?.modules?.opusDiscord?.available
+                ? 'C++ de alta eficiência'
+                : 'JavaScript WASM universal'}
+            </p>
+          </div>
+
+          {/* Card 4: Stream State */}
+          <div className="p-3 bg-[#0E1013] rounded-xl border border-[#262B35] space-y-1">
+            <div className="flex items-center justify-between text-[11px] text-[#9E9E9E]">
+              <span className="flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                Status do Player
+              </span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                  diagnostics?.connection?.playerState === 'playing'
+                    ? 'text-emerald-400'
+                    : diagnostics?.connection?.playerState === 'buffering'
+                    ? 'text-amber-400'
+                    : 'text-gray-400'
+                }`}
+              >
+                {diagnostics?.connection?.playerState || 'Ocioso'}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5 pt-1">
+              <span className="text-sm font-bold text-white truncate max-w-[170px]">
+                {diagnostics?.connection?.currentTrack || 'Nenhuma música'}
+              </span>
+            </div>
+            <p className="text-[10px] text-[#6E7681] truncate">
+              Voz: {diagnostics?.connection?.voiceState || 'Desconectado'}
+            </p>
+          </div>
+        </div>
+
+        {/* Dynamic Diagnostics Advice */}
+        {diagnostics?.audioPerformance?.diagnosticNotes && diagnostics.audioPerformance.diagnosticNotes.length > 0 ? (
+          <div className="p-3 bg-amber-950/25 rounded-xl border border-amber-500/30 text-amber-200 text-[11px] space-y-1">
+            <strong className="flex items-center gap-1.5 text-amber-300">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Observações dos Sensores de Áudio:
+            </strong>
+            <ul className="list-disc pl-4 space-y-0.5">
+              {diagnostics.audioPerformance.diagnosticNotes.map((note, idx) => (
+                <li key={idx}>{note}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="p-2.5 bg-emerald-950/20 rounded-xl border border-emerald-500/25 text-emerald-300 text-[11px] flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>Nenhum gargalo severo de conexão ou buffer detectado no canal de voz no momento.</span>
+          </div>
+        )}
+
+        {/* Collapsible Troubleshooting Guide */}
+        <div className="pt-1">
+          <button
+            onClick={() => setShowLagGuide(!showLagGuide)}
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#181B22] hover:bg-[#1E222A] text-[#B0B8C4] hover:text-white border border-[#2D333F] text-[11px] font-semibold transition-colors cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5">
+              <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
+              O que pode fazer o áudio do bot travar ou parecer lagado? (Clique para ver as causas e soluções)
+            </span>
+            {showLagGuide ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {showLagGuide && (
+            <div className="mt-2.5 p-3.5 bg-[#0D0F13] rounded-xl border border-[#242A36] space-y-3 text-[11px] text-[#A6AFBC]">
+              <div className="space-y-1">
+                <h5 className="font-bold text-amber-300 flex items-center gap-1.5">
+                  1. Região do Canal de Voz no Discord (Causa mais comum de áudio picotado)
+                </h5>
+                <p className="leading-relaxed">
+                  O Discord frequentemente aloca o canal de voz em um datacenter fora do Brasil (ex: Estados Unidos). Isso eleva o ping para mais de 250ms, fazendo o áudio ficar picotado, robótico ou com pequenos atrasos para os ouvintes.
+                </p>
+                <div className="p-2 bg-[#171A21] rounded-lg border border-[#2A303D] text-[10px] text-white">
+                  <strong>Como corrigir no Discord:</strong> Clique na engrenagem ⚙️ ao lado do canal de voz no Discord ➔ vá em <strong>Visão Geral</strong> ➔ encontre o campo <strong>Substituição de Região</strong> ➔ mude de 'Automático' para <strong>'Brasil'</strong> (ou a região mais próxima) e salve as alterações.
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <h5 className="font-bold text-indigo-300 flex items-center gap-1.5">
+                  2. Oscilações na Conexão UDP da Internet
+                </h5>
+                <p className="leading-relaxed">
+                  O Discord transmite pacotes de voz através do protocolo UDP sem confirmação de entrega. Se a rede local sofrer interferência de Wi-Fi ou downloads simultâneos, pacotes de áudio de 20ms são perdidos, causando pequenos engasgos sem que o bot se desconecte.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <h5 className="font-bold text-emerald-300 flex items-center gap-1.5">
+                  3. Buffer Underrun (Stall de Leitura)
+                </h5>
+                <p className="leading-relaxed">
+                  Quando o reprodutor de áudio consome os dados mais rápido do que eles conseguem ser lidos do disco ou transmitidos, ele entra em modo <em>Buffering</em>. Se isso acontecer, você verá a contagem de "Interrupções de Buffer" aumentar aqui neste painel com o horário exato.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <h5 className="font-bold text-rose-300 flex items-center gap-1.5">
+                  4. Pico de Processador (CPU em 100%)
+                </h5>
+                <p className="leading-relaxed">
+                  O decodificador Opus gera 50 pacotes por segundo de forma contínua. Se o computador estiver executando jogos pesados com 100% de uso de CPU contínuo, a decodificação de áudio pode atrasar milissegundos suficientes para gerar microcortes.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Helpful Audio Tip Banner */}
       <div className="p-3 bg-indigo-950/20 rounded-2xl border border-indigo-500/30 flex items-start gap-2.5">
         <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
@@ -561,12 +920,17 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
                 {errorCount} {errorCount === 1 ? 'erro' : 'erros'}
               </span>
             )}
+            {lagEventsCount > 0 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                {lagEventsCount} {lagEventsCount === 1 ? 'evento de lag' : 'eventos de lag'}
+              </span>
+            )}
           </div>
 
           {/* Filter Chips & Actions */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <div className="flex items-center bg-[#0D0F12] p-0.5 rounded-xl border border-[#2D3139]">
-              {(['all', 'error', 'desktop', 'bot', 'voice', 'audio'] as const).map(f => (
+              {(['all', 'error', 'lag', 'desktop', 'bot', 'voice', 'audio'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilterLevel(f)}
@@ -576,7 +940,19 @@ export const DiscordDiagnosticsPanel: React.FC<DiscordDiagnosticsPanelProps> = (
                       : 'text-[#9E9E9E] hover:text-white'
                   }`}
                 >
-                  {f === 'all' ? 'Todos' : f === 'error' ? 'Erros' : f === 'desktop' ? 'Porta 3000' : f === 'voice' ? 'Voz' : f === 'audio' ? 'Áudio' : 'Bot'}
+                  {f === 'all'
+                    ? 'Todos'
+                    : f === 'error'
+                    ? 'Erros'
+                    : f === 'lag'
+                    ? 'Áudio / Lag ⚡'
+                    : f === 'desktop'
+                    ? 'Porta 3000'
+                    : f === 'voice'
+                    ? 'Voz'
+                    : f === 'audio'
+                    ? 'Áudio'
+                    : 'Bot'}
                 </button>
               ))}
             </div>
