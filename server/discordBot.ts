@@ -554,7 +554,7 @@ export class DiscordBotService {
       this.logDiagnostic('success', 'bot', `🤖 Discord Bot online e pronto: ${this.client?.user?.tag} (${this.client?.guilds.cache.size} servidores)`);
       console.log(`🤖 Discord Bot logged in as ${this.client?.user?.tag}!`);
       this.client?.user?.setPresence({
-        activities: [{ name: 'RPG Mundo das Trevas 🎲 \\r \\kr', type: ActivityType.Playing }],
+        activities: [{ name: 'RPG 🎲 \\r Multi-Dados | \\wr WoD | \\kr Keen', type: ActivityType.Playing }],
         status: 'online'
       });
 
@@ -693,24 +693,49 @@ export class DiscordBotService {
       }
 
       // Check for Advanced Multi-Dice Roll commands:
-      // Commands: !roll <formula> [motivo], !r <formula> [motivo], or shorthand !d20, !2d6+3, !1d100, etc.
-      const rollMatch = /^[!/\\](?:roll|r)\s+(.+)$/i.exec(content) || /^[!/\\](d\d+|[0-9]+d[0-9]+.*)$/i.exec(content);
+      // Comandos: \r <formula> [motivo], !r, /r, \roll, !roll, /roll
+      // Ou shorthand: \d20, !2d6+3, \1d100, etc.
+      const rollMatch = /^[!/\\](?:roll|r)(?:\s+(.*))?$/i.exec(content) || /^[!/\\](d\d+|[0-9]+d[0-9]+.*)$/i.exec(content);
       if (rollMatch) {
-        const fullExpr = rollMatch[1].trim();
-        const formulaMatch = fullExpr.match(/^((?:[+-]?\s*(?:\d*d\d+(?:kh\d+|kl\d+)?|\d+)\s*)+)(.*)$/i);
-        if (formulaMatch && formulaMatch[1].trim()) {
-          const formulaStr = formulaMatch[1].trim();
-          const labelStr = formulaMatch[2]?.trim() || undefined;
-          const parsed = parseAdvancedDiceFormula(formulaStr);
-          if (parsed) {
-            const rollerName = message.member?.displayName || message.author.username;
-            const result = rollAdvancedDice(formulaStr, rollerName, labelStr);
-            result.source = 'discord';
-            db.addDiceRoll(result);
-            const embed = this.createAdvancedDiceEmbed(result);
-            await message.reply({ embeds: [embed] });
-            return;
-          }
+        let rawInput = (rollMatch[1] || '').trim();
+        if (!rawInput) {
+          rawInput = '1d20';
+        }
+
+        // Separate formula from optional action label
+        // Matches tokens like 1d20, 2d20kh1, +5, -2, etc.
+        const formulaMatch = rawInput.match(/^((?:[+-]?\s*(?:\d*d\d+(?:kh\d+|kl\d+)?|\d+)\s*)+)(.*)$/i);
+        let formulaStr = formulaMatch && formulaMatch[1].trim() ? formulaMatch[1].trim() : rawInput;
+        const labelStr = (formulaMatch && formulaMatch[2]?.trim()) || undefined;
+
+        // If just a plain number like '20', '6', '100', treat as '1d20', '1d6', '1d100'
+        if (/^\d+$/.test(formulaStr)) {
+          formulaStr = `1d${formulaStr}`;
+        } else if (/^d\d+$/i.test(formulaStr)) {
+          formulaStr = `1${formulaStr}`;
+        }
+
+        const parsed = parseAdvancedDiceFormula(formulaStr);
+        if (parsed) {
+          const rollerName = message.member?.displayName || message.author.username;
+          const result = rollAdvancedDice(formulaStr, rollerName, labelStr);
+          result.source = 'discord';
+          db.addDiceRoll(result);
+          const embed = this.createAdvancedDiceEmbed(result);
+          await message.reply({ embeds: [embed] });
+          return;
+        } else {
+          await message.reply(
+            `⚠️ **Fórmula de dados inválida.**\n` +
+            `Exemplos de uso para Multi-Dados:\n` +
+            `• \`\\r 1d20+5\` *(D20 com modificador)*\n` +
+            `• \`\\r 2d20kh1 + 2d6 + 3 Ataque com Vantagem\`\n` +
+            `• \`\\r 4d6\` ou \`\\r 1d100\`\n\n` +
+            `*Para rolar Mundo das Trevas (d10), use:*\n` +
+            `• \`\\wr 6\` (Normal, 10s explodem)\n` +
+            `• \`\\kr 6\` (Keen Roll, 9 e 10 explodem)`
+          );
+          return;
         }
       }
 
@@ -874,11 +899,28 @@ export class DiscordBotService {
       )
       .addFields([
         {
-          name: '🎲 Rolagem Mundo das Trevas (D10 Storyteller)',
+          name: '🎲 Rolagem Multi-Dados (d4 a d100 • D&D e Sistemas Gerais)',
           value:
-            '• `\\r 8d10` ou `\\r 8` — Rola 8d10 (Sucesso 7+, 10s explodem com novos dados, 1s cancelam sucessos priorizando críticos)\n' +
-            '• `\\kr 6d10` ou `\\kr 6` — **Keen Roll** (Críticos ativam no 9 e 10 e continuam explodindo)\n' +
-            '• `\\r 7d10 Esquiva` — Rola dados com anotação ou motivo da ação',
+            '• `\\r 1d20+5` — Rola d20 com modificador\n' +
+            '• `\\r 2d20kh1 + 2d6 + 3 Ataque com Vantagem` — Multi-dados com vantagem (`kh1`) e motivo\n' +
+            '• `\\r 4d6` ou `\\r 1d100` — Rola qualquer combinação (d4, d6, d8, d10, d12, d20, d100)\n' +
+            '• `\\r 2d20kl1` — Rolagem com desvantagem (`kl1`)',
+          inline: false
+        },
+        {
+          name: '🩸 Rolagem Mundo das Trevas (WoD Storyteller d10)',
+          value:
+            '• `\\wr 8` ou `\\wr 8d10` — **WoD Normal** (Sucesso 7+, 10s explodem, pares de 1 anulam)\n' +
+            '• `\\kr 6` ou `\\kr 6d10` — **Keen Roll** (Críticos e explosões no 9 e 10)\n' +
+            '• `\\wr 7 Furtividade` — Rola com anotação da ação',
+          inline: false
+        },
+        {
+          name: '🗺️ Mapas & Cenários da Mesa',
+          value:
+            '• `!mapa` — Exibe o mapa ativo com imagem e pontos de interesse públicos\n' +
+            '• `!mapas` — Lista todos os cenários e mapas disponíveis da campanha\n' +
+            '• `!marcador [nome]` ou `!poi [nome]` — Inspeciona detalhes de um ponto de interesse',
           inline: false
         },
         {

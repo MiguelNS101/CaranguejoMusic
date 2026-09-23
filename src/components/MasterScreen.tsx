@@ -1782,7 +1782,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                               : 'bg-[#141619] text-[#9E9E9E] border-[#2D3139] hover:text-white'
                           }`}
                         >
-                          {wodIsKeen ? '9 e 10 (\\kr)' : 'Apenas 10 (\\r)'}
+                          {wodIsKeen ? '9 e 10 (\\kr)' : 'Apenas 10 (\\wr)'}
                         </button>
                       </div>
                     </div>
@@ -1802,7 +1802,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                       className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
                     >
                       <Dices className="w-4 h-4" />
-                      {isWodRolling ? 'Rolando...' : `Rolar ${wodDiceCount}d10 (${wodIsKeen ? '\\kr' : '\\r'})`}
+                      {isWodRolling ? 'Rolando...' : `Rolar ${wodDiceCount}d10 (${wodIsKeen ? '\\kr' : '\\wr'})`}
                     </button>
 
                     {lastWodRoll && (

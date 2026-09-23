@@ -117,7 +117,7 @@ export function rollWodDice(
 
   return {
     id: `wod-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    command: `${isKeen ? '\\kr' : '\\r'} ${count}d10${label ? ` ${label}` : ''}`,
+    command: `${isKeen ? '\\kr' : '\\wr'} ${count}d10${label ? ` ${label}` : ''}`,
     diceCount: count,
     isKeenRoll: isKeen,
     critThreshold,
@@ -137,13 +137,13 @@ export function rollWodDice(
 
 export function parseWodCommand(content: string): { count: number; isKeen: boolean; label?: string } | null {
   const trimmed = content.trim();
-  // Matches \r, \kr, /r, /kr, !r, !kr
-  const match = trimmed.match(/^([\\/!](?:kr|r))\s+(\d+)(?:d10)?(?:\s+(.*))?$/i);
+  // Matches \wr, \kr, /wr, /kr, !wr, !kr (where \wr is WoD standard, \kr is Keen Roll)
+  const match = trimmed.match(/^([\\/!](?:kr|wr))(?:\s+(\d+)(?:d10)?)?(?:\s+(.*))?$/i);
   if (!match) return null;
 
   const cmdPrefix = match[1].toLowerCase();
   const isKeen = cmdPrefix.includes('kr');
-  const count = parseInt(match[2], 10);
+  const count = match[2] ? parseInt(match[2], 10) : 1;
   const label = match[3]?.trim();
 
   if (isNaN(count) || count <= 0) return null;
