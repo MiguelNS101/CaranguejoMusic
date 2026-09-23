@@ -8,7 +8,8 @@ import {
   Shield,
   ChevronDown,
   CloudRain,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Compass
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { AudioMixerModal } from './AudioMixerModal';
@@ -16,8 +17,8 @@ import { ConfigurationModal } from './ConfigurationModal';
 import { PresetManagerModal } from './PresetManagerModal';
 
 interface HeaderProps {
-  currentTab: 'master' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings';
-  setCurrentTab: (tab: 'master' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings') => void;
+  currentTab: 'master' | 'maps' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings';
+  setCurrentTab: (tab: 'master' | 'maps' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings') => void;
   onOpenDiscordModal: () => void;
   onOpenFolderModal: () => void;
   onOpenSessionModal: () => void;
@@ -113,6 +114,20 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
                 <span>Escudo do Mestre</span>
+              </button>
+
+              {/* Cenários & Mapas */}
+              <button
+                id="tab-maps"
+                onClick={() => setCurrentTab('maps')}
+                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
+                  currentTab === 'maps'
+                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
+                }`}
+              >
+                <Compass className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Cenários & Mapas</span>
               </button>
 
               {/* Músicas */}

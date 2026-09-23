@@ -2,11 +2,27 @@ import express, { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import playdl from 'play-dl';
 import { db, UPLOADS_DIR, MUSIC_DIR, AMBIENCE_DIR, SFX_DIR, NPCS_DIR, SAVES_DIR } from './db.js';
 import { discordBot } from './discordBot.js';
-import { Folder, MusicTrack, AmbienceTrack, SoundboardItem, NPC, DiceRollResult, SoundboardLayout } from '../src/types.js';
+import {
+  Folder,
+  MusicTrack,
+  AmbienceTrack,
+  SoundboardItem,
+  NPC,
+  DiceRollResult,
+  SoundboardLayout,
+  ScenarioMap,
+  MapMarker,
+  AdvancedDiceRollResult,
+  DicePreset,
+  OnlineMediaMeta,
+  PlaylistImportResult
+} from '../src/types.js';
 import { rollWodDice } from './wodDice.js';
 import { parseAndRollDice } from '../src/utils/diceParser.js';
+import { parseAdvancedDiceFormula, rollAdvancedDice } from '../src/utils/advancedDice.js';
 
 const router = Router();
 
@@ -19,6 +35,7 @@ const storage = multer.diskStorage({
     else if (type === 'ambience') targetDir = AMBIENCE_DIR;
     else if (type === 'sfx') targetDir = SFX_DIR;
     else if (type === 'npc') targetDir = NPCS_DIR;
+    else if (type === 'map') targetDir = UPLOADS_DIR;
 
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
@@ -1285,6 +1302,419 @@ NODE_ENV=production
   } catch (err: any) {
     res.status(500).json({ success: false, error: err?.message || 'Erro ao salvar .env' });
   }
+});
+
+// ==========================================
+// ONLINE MEDIA & PLAYLIST IMPORT ENDPOINTS
+// ==========================================
+
+router.post('/media/url-info', async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body;
+    if (!url || typeof url !== 'string') {
+      return res.status(400).json({ error: 'URL é obrigatória.' });
+    }
+
+    const trimmed = url.trim();
+    let meta: OnlineMediaMeta = {
+      title: 'Áudio Online',
+      artist: 'Desconhecido',
+      duration: 180,
+      url: trimmed,
+      platform: 'direct'
+    };
+
+    if (/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)/i.test(trimmed)) {
+      meta.platform = 'youtube';
+      try {
+        const ytInfo = await playdl.video_info(trimmed);
+        meta.title = ytInfo.video_details.title || 'Vídeo do YouTube';
+        meta.artist = ytInfo.video_details.channel?.name || 'YouTube';
+        meta.duration = ytInfo.video_details.durationInSec || 180;
+        meta.coverUrl = ytInfo.video_details.thumbnails?.[0]?.url;
+      } catch (e: any) {
+        console.warn('play-dl video_info error:', e?.message);
+      }
+    } else if (/open\.spotify\.com\/(?:track|album|playlist)\//i.test(trimmed)) {
+      meta.platform = 'spotify';
+      try {
+        const spData: any = await playdl.spotify(trimmed);
+        meta.title = spData.name || 'Faixa do Spotify';
+        meta.artist = spData.artists?.[0]?.name || 'Spotify';
+        meta.duration = spData.durationInSec || 180;
+        meta.coverUrl = spData.thumbnail?.url;
+      } catch (e: any) {
+        console.warn('play-dl spotify error:', e?.message);
+      }
+    } else if (/soundcloud\.com\//i.test(trimmed)) {
+      meta.platform = 'soundcloud';
+      try {
+        const scInfo: any = await playdl.soundcloud(trimmed);
+        meta.title = scInfo.name || 'Faixa do SoundCloud';
+        meta.artist = scInfo.user?.name || 'SoundCloud';
+        meta.duration = scInfo.durationInSec || 180;
+        meta.coverUrl = scInfo.thumbnail;
+      } catch (e: any) {
+        console.warn('play-dl soundcloud error:', e?.message);
+      }
+    } else {
+      const filename = path.basename(trimmed.split('?')[0]);
+      if (filename) {
+        meta.title = formatFileNameToTitle(filename);
+      }
+    }
+
+    res.json({ success: true, meta });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Falha ao inspecionar URL.' });
+  }
+});
+
+router.post('/media/import-playlist', async (req: Request, res: Response) => {
+  try {
+    const { playlistUrl, targetFolderId, trackType } = req.body;
+    if (!playlistUrl) {
+      return res.status(400).json({ error: 'URL da playlist é obrigatória.' });
+    }
+
+    const trimmed = playlistUrl.trim();
+    const importedTracks: Array<MusicTrack | AmbienceTrack> = [];
+    let playlistTitle = 'Playlist Importada';
+
+    // YouTube Playlist
+    if (playdl.yt_validate(trimmed) === 'playlist') {
+      const pl = await playdl.playlist_info(trimmed, { incomplete: true });
+      playlistTitle = pl.title || playlistTitle;
+      const videos = await pl.all_videos();
+      for (const vid of videos) {
+        const itemUrl = vid.url || `https://www.youtube.com/watch?v=${vid.id}`;
+        if (trackType === 'ambience') {
+          const track: AmbienceTrack = {
+            id: `amb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            title: vid.title || 'Faixa de Ambiente',
+            environment: vid.channel?.name || 'YouTube',
+            duration: vid.durationInSec || 300,
+            url: itemUrl,
+            folderId: targetFolderId,
+            tags: ['online', 'youtube'],
+            isLocal: false,
+            coverUrl: vid.thumbnails?.[0]?.url,
+            createdAt: Date.now()
+          };
+          db.addAmbienceTrack(track);
+          importedTracks.push(track);
+        } else {
+          const track: MusicTrack = {
+            id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            title: vid.title || 'Música Online',
+            artist: vid.channel?.name || 'YouTube',
+            duration: vid.durationInSec || 180,
+            url: itemUrl,
+            folderId: targetFolderId,
+            tags: ['online', 'youtube'],
+            isLocal: false,
+            coverUrl: vid.thumbnails?.[0]?.url,
+            createdAt: Date.now()
+          };
+          db.addMusicTrack(track);
+          importedTracks.push(track);
+        }
+      }
+    }
+    // Spotify Playlist or Album
+    else if (/open\.spotify\.com\/(?:playlist|album)\//i.test(trimmed)) {
+      const spData: any = await playdl.spotify(trimmed);
+      playlistTitle = spData.name || playlistTitle;
+      const tracks = await spData.all_tracks();
+      for (const tr of tracks) {
+        const itemUrl = tr.url;
+        if (trackType === 'ambience') {
+          const track: AmbienceTrack = {
+            id: `amb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            title: tr.name || 'Faixa de Ambiente',
+            environment: tr.artists?.[0]?.name || 'Spotify',
+            duration: tr.durationInSec || 300,
+            url: itemUrl,
+            folderId: targetFolderId,
+            tags: ['online', 'spotify'],
+            isLocal: false,
+            coverUrl: tr.thumbnail?.url || spData.thumbnail?.url,
+            createdAt: Date.now()
+          };
+          db.addAmbienceTrack(track);
+          importedTracks.push(track);
+        } else {
+          const track: MusicTrack = {
+            id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            title: tr.name || 'Música Online',
+            artist: tr.artists?.[0]?.name || 'Spotify',
+            duration: tr.durationInSec || 180,
+            url: itemUrl,
+            folderId: targetFolderId,
+            tags: ['online', 'spotify'],
+            isLocal: false,
+            coverUrl: tr.thumbnail?.url || spData.thumbnail?.url,
+            createdAt: Date.now()
+          };
+          db.addMusicTrack(track);
+          importedTracks.push(track);
+        }
+      }
+    } else {
+      // Single Track Online Import
+      let title = formatFileNameToTitle(path.basename(trimmed));
+      let artist = 'Online';
+      let duration = 180;
+      let coverUrl: string | undefined;
+
+      try {
+        if (/(?:youtube\.com|youtu\.be)/i.test(trimmed)) {
+          const info = await playdl.video_info(trimmed);
+          title = info.video_details.title || title;
+          artist = info.video_details.channel?.name || 'YouTube';
+          duration = info.video_details.durationInSec || duration;
+          coverUrl = info.video_details.thumbnails?.[0]?.url;
+        }
+      } catch {}
+
+      if (trackType === 'ambience') {
+        const track: AmbienceTrack = {
+          id: `amb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          title,
+          environment: artist,
+          duration,
+          url: trimmed,
+          folderId: targetFolderId,
+          tags: ['online'],
+          isLocal: false,
+          coverUrl,
+          createdAt: Date.now()
+        };
+        db.addAmbienceTrack(track);
+        importedTracks.push(track);
+      } else {
+        const track: MusicTrack = {
+          id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          title,
+          artist,
+          duration,
+          url: trimmed,
+          folderId: targetFolderId,
+          tags: ['online'],
+          isLocal: false,
+          coverUrl,
+          createdAt: Date.now()
+        };
+        db.addMusicTrack(track);
+        importedTracks.push(track);
+      }
+    }
+
+    res.json({
+      success: true,
+      count: importedTracks.length,
+      playlistTitle,
+      tracks: importedTracks
+    });
+  } catch (err: any) {
+    console.error('Error importing playlist:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao importar playlist online.' });
+  }
+});
+
+// ==========================================
+// SCENARIO MAPS & MARKERS ENDPOINTS
+// ==========================================
+
+router.get('/maps', (req: Request, res: Response) => {
+  const maps = db.getMaps();
+  const currentMapId = db.getCurrentMapId();
+  res.json({ maps, currentMapId });
+});
+
+router.get('/maps/:id', (req: Request, res: Response) => {
+  const map = db.getMapById(req.params.id);
+  if (!map) return res.status(404).json({ error: 'Mapa não encontrado.' });
+  res.json(map);
+});
+
+router.post('/maps', (req: Request, res: Response) => {
+  const { name, description, imageUrl, region, climate, gridSize, isCurrent } = req.body;
+  if (!name || !imageUrl) {
+    return res.status(400).json({ error: 'Nome do mapa e URL da imagem são obrigatórios.' });
+  }
+
+  const newMap: ScenarioMap = {
+    id: `map-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    name,
+    description: description || '',
+    imageUrl,
+    region: region || '',
+    climate: climate || '',
+    gridSize: gridSize || 40,
+    markers: [],
+    isCurrent: !!isCurrent,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const saved = db.saveMap(newMap);
+  res.status(201).json(saved);
+});
+
+router.put('/maps/:id', (req: Request, res: Response) => {
+  const map = db.getMapById(req.params.id);
+  if (!map) return res.status(404).json({ error: 'Mapa não encontrado.' });
+
+  const updated: ScenarioMap = {
+    ...map,
+    ...req.body,
+    id: map.id,
+    updatedAt: Date.now()
+  };
+
+  db.saveMap(updated);
+  res.json(updated);
+});
+
+router.delete('/maps/:id', (req: Request, res: Response) => {
+  const deleted = db.deleteMap(req.params.id);
+  res.json({ success: deleted });
+});
+
+router.post('/maps/:id/current', (req: Request, res: Response) => {
+  db.setCurrentMapId(req.params.id);
+  res.json({ success: true, currentMapId: req.params.id });
+});
+
+router.post('/maps/:id/markers', (req: Request, res: Response) => {
+  const { name, description, x, y, category, icon, color, linkedNpcId, linkedNpcName, linkedItem, isSecret } = req.body;
+  if (!name || typeof x !== 'number' || typeof y !== 'number') {
+    return res.status(400).json({ error: 'Nome e coordenadas (x, y) são obrigatórios.' });
+  }
+
+  const marker: MapMarker = {
+    id: `poi-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    mapId: req.params.id,
+    name,
+    description: description || '',
+    x,
+    y,
+    category: category || 'poi',
+    icon: icon || 'MapPin',
+    color: color || '#f59e0b',
+    linkedNpcId,
+    linkedNpcName,
+    linkedItem,
+    isSecret: !!isSecret,
+    createdAt: Date.now()
+  };
+
+  const added = db.addMarker(req.params.id, marker);
+  if (!added) return res.status(404).json({ error: 'Mapa não encontrado.' });
+  res.status(201).json(added);
+});
+
+router.put('/maps/:id/markers/:markerId', (req: Request, res: Response) => {
+  const updated = db.updateMarker(req.params.id, req.params.markerId, req.body);
+  if (!updated) return res.status(404).json({ error: 'Marcador ou mapa não encontrado.' });
+  res.json(updated);
+});
+
+router.delete('/maps/:id/markers/:markerId', (req: Request, res: Response) => {
+  const deleted = db.deleteMarker(req.params.id, req.params.markerId);
+  res.json({ success: deleted });
+});
+
+router.post('/maps/:id/send-discord', async (req: Request, res: Response) => {
+  const map = db.getMapById(req.params.id);
+  if (!map) return res.status(404).json({ error: 'Mapa não encontrado.' });
+
+  const result = await discordBot.broadcastMap(map, req.body.customChannelId);
+  res.json(result);
+});
+
+router.post('/maps/:id/markers/:markerId/send-discord', async (req: Request, res: Response) => {
+  const map = db.getMapById(req.params.id);
+  if (!map) return res.status(404).json({ error: 'Mapa não encontrado.' });
+
+  const marker = (map.markers || []).find(m => m.id === req.params.markerId);
+  if (!marker) return res.status(404).json({ error: 'Marcador não encontrado.' });
+
+  const result = await discordBot.broadcastMapMarker(map, marker, req.body.customChannelId);
+  res.json(result);
+});
+
+// ==========================================
+// ADVANCED MULTI-DICE ENDPOINTS
+// ==========================================
+
+router.post('/dice/advanced-roll', async (req: Request, res: Response) => {
+  try {
+    const { formula, rollerName, label, broadcastToDiscord, customChannelId } = req.body;
+    if (!formula || typeof formula !== 'string') {
+      return res.status(400).json({ error: 'Fórmula de dados é obrigatória.' });
+    }
+
+    const result = rollAdvancedDice(formula, rollerName || 'Mestre', label);
+    db.addDiceRoll(result);
+
+    let discordSent = false;
+    let discordError: string | undefined;
+
+    if (broadcastToDiscord) {
+      const bc = await discordBot.broadcastAdvancedDiceRoll(result, customChannelId);
+      discordSent = bc.success;
+      if (!bc.success) discordError = bc.error;
+    }
+
+    res.json({
+      success: true,
+      result,
+      discordSent,
+      discordError
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Falha ao rolar dados.' });
+  }
+});
+
+router.get('/dice/history', (req: Request, res: Response) => {
+  res.json(db.getDiceHistory());
+});
+
+router.delete('/dice/history', (req: Request, res: Response) => {
+  db.clearDiceHistory();
+  res.json({ success: true });
+});
+
+router.get('/dice/presets', (req: Request, res: Response) => {
+  res.json(db.getDicePresets());
+});
+
+router.post('/dice/presets', (req: Request, res: Response) => {
+  const { name, formula, description, color, icon, category } = req.body;
+  if (!name || !formula) {
+    return res.status(400).json({ error: 'Nome e fórmula são obrigatórios.' });
+  }
+
+  const preset: DicePreset = {
+    id: `dp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    name,
+    formula,
+    description,
+    color,
+    icon,
+    category
+  };
+
+  const saved = db.saveDicePreset(preset);
+  res.status(201).json(saved);
+});
+
+router.delete('/dice/presets/:id', (req: Request, res: Response) => {
+  const deleted = db.deleteDicePreset(req.params.id);
+  res.json({ success: deleted });
 });
 
 // Graceful System Shutdown - synchronizes closing between UI, .bat, and Node Server

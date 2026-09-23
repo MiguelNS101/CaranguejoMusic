@@ -90,6 +90,8 @@ import { WeatherClockWidget } from './WeatherClockWidget';
 import { ScratchpadWidget } from './ScratchpadWidget';
 import { EncounterGeneratorWidget } from './EncounterGeneratorWidget';
 import { CustomRouletteWidget } from './CustomRouletteWidget';
+import { ScenarioMapManager } from './ScenarioMapManager';
+import { AdvancedDiceRoller } from './AdvancedDiceRoller';
 
 interface MasterScreenProps {
   onOpenMusicTab: () => void;
@@ -316,6 +318,30 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     description: 'Sorteios de eventos, clima, alvos e destinos com porcentagens configuráveis e envio no chat.',
     allowMultiple: true,
     tags: ['roleta', 'sorteio', 'probabilidade', 'porcentagem', 'discord']
+  },
+  {
+    type: 'scenario_maps',
+    name: 'Gerenciador de Cenários & Mapas Interativos',
+    category: 'lore',
+    icon: '🗺️',
+    defaultTitle: 'Gerenciador de Cenários & Mapas Interativos',
+    defaultWidth: 'full',
+    defaultDensity: 'expanded',
+    description: 'Upload de mapas, criação de cenários, marcadores interativos com segredos do mestre e envio 1-clique para o Discord.',
+    allowMultiple: false,
+    tags: ['mapas', 'cenários', 'tático', 'marcadores', 'discord', 'poi']
+  },
+  {
+    type: 'advanced_dice',
+    name: 'Rolador Avançado Multi-Dados (d4 a d100)',
+    category: 'tools',
+    icon: '🎲',
+    defaultTitle: 'Rolador Avançado Multi-Dados (d4 a d100)',
+    defaultWidth: 'half',
+    defaultDensity: 'expanded',
+    description: 'Rolagens com múltiplos dados simultâneos (d4-d100), vantagens/desvantagens, modificadores, predefinições e envio ao Discord.',
+    allowMultiple: false,
+    tags: ['dados', 'd20', 'd100', 'rolagem', 'fórmula', 'crítico', 'discord']
   }
 ];
 
@@ -498,8 +524,8 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
   const [isSendingNarrative, setIsSendingNarrative] = useState(false);
   const [narrativeFeedback, setNarrativeFeedback] = useState<{ status: 'idle' | 'success' | 'error'; msg?: string }>({ status: 'idle' });
 
-  // Dice System Tab: 'standard' | 'wod'
-  const [diceSystem, setDiceSystem] = useState<'standard' | 'wod'>('wod');
+  // Dice System Tab: 'advanced' | 'standard' | 'wod'
+  const [diceSystem, setDiceSystem] = useState<'advanced' | 'standard' | 'wod'>('advanced');
 
   // Standard Dice Roller State
   const [diceSides, setDiceSides] = useState<number>(20);
@@ -1666,6 +1692,14 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-[#141619] p-0.5 rounded-lg border border-[#2D3139]">
                   <button
+                    onClick={() => setDiceSystem('advanced')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                      diceSystem === 'advanced' ? 'bg-indigo-600 text-white' : 'text-[#9E9E9E]'
+                    }`}
+                  >
+                    Multi-Dados
+                  </button>
+                  <button
                     onClick={() => setDiceSystem('wod')}
                     className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
                       diceSystem === 'wod' ? 'bg-indigo-600 text-white' : 'text-[#9E9E9E]'
@@ -1682,13 +1716,13 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                     D&D
                   </button>
                 </div>
-                {!isModal && renderWidgetHeaderControls(widget, diceSystem === 'wod' ? `WoD ${wodDiceCount}d10` : `d${diceSides}`)}
+                {!isModal && renderWidgetHeaderControls(widget, diceSystem === 'advanced' ? 'Multi-Dados' : diceSystem === 'wod' ? `WoD ${wodDiceCount}d10` : `d${diceSides}`)}
               </div>
             </div>
 
             {isMinimized ? (
               <div className="flex items-center justify-between text-xs text-[#9E9E9E]">
-                <span>Sistema ativo: {diceSystem === 'wod' ? 'Mundo das Trevas (d10)' : 'D&D Standard'}</span>
+                <span>Sistema ativo: {diceSystem === 'advanced' ? 'Multi-Dados Avançado (d4-d100)' : diceSystem === 'wod' ? 'Mundo das Trevas (d10)' : 'D&D Standard'}</span>
                 <button
                   type="button"
                   onClick={diceSystem === 'wod' ? handleRollWod : () => handleRollDice()}
@@ -1697,6 +1731,8 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                   Rolar Rápido
                 </button>
               </div>
+            ) : diceSystem === 'advanced' ? (
+              <AdvancedDiceRoller />
             ) : (
               <>
                 {/* Broadcast Checkbox */}
@@ -2435,6 +2471,52 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
               </div>
             ) : (
               <CustomRouletteWidget />
+            )}
+          </div>
+        );
+
+      case 'scenario_maps':
+        return (
+          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 md:p-5 shadow-lg space-y-3">
+            <div className="flex items-center justify-between border-b border-[#2D3139]/60 pb-2">
+              <div className="flex items-center gap-2">
+                <Compass className="w-4 h-4 text-indigo-400" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-[#FFFFFF] font-rpg">
+                  {widget.title || 'Gerenciador de Cenários & Mapas'}
+                </h2>
+              </div>
+              {!isModal && renderWidgetHeaderControls(widget)}
+            </div>
+
+            {isMinimized ? (
+              <div className="text-xs text-[#9E9E9E] italic">
+                Gerenciador de mapas e cenários táticos recolhido.
+              </div>
+            ) : (
+              <ScenarioMapManager isWidgetMode={true} />
+            )}
+          </div>
+        );
+
+      case 'advanced_dice':
+        return (
+          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 md:p-5 shadow-lg space-y-3">
+            <div className="flex items-center justify-between border-b border-[#2D3139]/60 pb-2">
+              <div className="flex items-center gap-2">
+                <Dices className="w-4 h-4 text-indigo-400" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-[#FFFFFF] font-rpg">
+                  {widget.title || 'Rolador Avançado Multi-Dados'}
+                </h2>
+              </div>
+              {!isModal && renderWidgetHeaderControls(widget)}
+            </div>
+
+            {isMinimized ? (
+              <div className="text-xs text-[#9E9E9E] italic">
+                Rolador de múltiplos dados (d4-d100) recolhido.
+              </div>
+            ) : (
+              <AdvancedDiceRoller />
             )}
           </div>
         );

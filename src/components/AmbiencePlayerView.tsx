@@ -30,6 +30,7 @@ import { useAudio } from '../context/AudioContext';
 import { AmbienceTrack } from '../types';
 import { FolderImportModal } from './FolderImportModal';
 import { FolderManagerModal } from './FolderManagerModal';
+import { OnlineMediaModal } from './OnlineMediaModal';
 import { AudioScrubber } from './AudioScrubber';
 import { apiFetch, resolveApiUrl } from '../services/api';
 
@@ -69,6 +70,7 @@ export const AmbiencePlayerView: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [isFolderImportOpen, setIsFolderImportOpen] = useState<boolean>(false);
   const [isFolderManagerOpen, setIsFolderManagerOpen] = useState<boolean>(false);
+  const [isOnlineMediaOpen, setIsOnlineMediaOpen] = useState<boolean>(false);
 
   // New Track Form State
   const [newTitle, setNewTitle] = useState('');
@@ -403,6 +405,16 @@ export const AmbiencePlayerView: React.FC = () => {
               >
                 <FolderUp className="w-4 h-4 text-indigo-400" />
                 <span>Importar Pasta</span>
+              </button>
+
+              {/* Online Stream / Playlist Import */}
+              <button
+                onClick={() => setIsOnlineMediaOpen(true)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#22262B] hover:bg-[#2D3139] text-sky-300 hover:text-white border border-sky-500/30 text-xs font-bold transition-all cursor-pointer shadow-sm"
+                title="Vincular áudio ou playlist online (YouTube, Spotify, SoundCloud)"
+              >
+                <Radio className="w-4 h-4 text-sky-400" />
+                <span>Link Online / Playlist</span>
               </button>
 
               {/* Add Ambience Track Button */}
@@ -870,6 +882,13 @@ export const AmbiencePlayerView: React.FC = () => {
         isOpen={isFolderManagerOpen}
         onClose={() => setIsFolderManagerOpen(false)}
         initialType="ambience"
+      />
+
+      {/* Online Media & Playlist Modal */}
+      <OnlineMediaModal
+        isOpen={isOnlineMediaOpen}
+        onClose={() => setIsOnlineMediaOpen(false)}
+        defaultType="ambience"
       />
     </div>
   );

@@ -1,6 +1,24 @@
 import fs from 'fs';
 import path from 'path';
-import { Folder, MusicTrack, AmbienceTrack, SoundboardItem, NPC, BotConfig, SoundboardLayout, SessionSaveMeta, SessionSave, MediaDirectoriesConfig, NoteTab, TimerItem } from '../src/types.js';
+import {
+  Folder,
+  MusicTrack,
+  AmbienceTrack,
+  SoundboardItem,
+  NPC,
+  BotConfig,
+  SoundboardLayout,
+  SessionSaveMeta,
+  SessionSave,
+  MediaDirectoriesConfig,
+  NoteTab,
+  TimerItem,
+  ScenarioMap,
+  MapMarker,
+  AdvancedDiceRollResult,
+  DicePreset
+} from '../src/types.js';
+import { DEFAULT_DICE_PRESETS } from '../src/utils/advancedDice.js';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -32,6 +50,10 @@ export interface DatabaseSchema {
   volume?: number;
   loopMode?: string;
   mediaDirectories?: MediaDirectoriesConfig;
+  maps?: ScenarioMap[];
+  currentMapId?: string | null;
+  diceHistory?: AdvancedDiceRollResult[];
+  dicePresets?: DicePreset[];
 }
 
 const DEFAULT_FOLDERS: Folder[] = [
@@ -94,6 +116,82 @@ const DEFAULT_BOT_CONFIG: BotConfig = {
   prefix: '!'
 };
 
+const DEFAULT_MAPS: ScenarioMap[] = [
+  {
+    id: 'map-caranguejo-coast',
+    name: 'Costa de Caranguejo & Enseada dos Piratas',
+    description: 'Um litoral repleto de cavernas marítimas, recifes pontiagudos e refúgios piratas esquecidos pela coroa.',
+    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80',
+    region: 'Arquipélago dos Ventos Cortantes',
+    climate: 'Brisa salgada, névoa matinal e trovões distantes',
+    gridEnabled: true,
+    gridSize: 40,
+    isCurrent: true,
+    markers: [
+      {
+        id: 'marker-tavern-1',
+        mapId: 'map-caranguejo-coast',
+        name: 'Taverna do Siri Bêbado',
+        category: 'tavern',
+        description: 'Taverna rústica construída sobre os destroços de um galeão encalhado. Ponto de encontro de marinheiros, contrabandistas e aventureiros.',
+        x: 28.5,
+        y: 62.0,
+        color: '#f59e0b',
+        icon: 'Beer',
+        isSecret: false,
+        linkedItem: 'Rum Especial de Caranguejo (Cura 1d4 PV)',
+        notes: 'O estalajadeiro Capitão Gancho sabe onde fica a caverna secreta e vende mapas duvidosos.',
+        createdAt: Date.now() - 3600000
+      },
+      {
+        id: 'marker-cave-2',
+        mapId: 'map-caranguejo-coast',
+        name: 'Caverna dos Contrabandistas',
+        category: 'danger',
+        description: 'Gruta inundada acessível apenas na maré baixa. Guarda armadilhas de arpão e sentinelas armados da guilda dos corsários.',
+        x: 64.2,
+        y: 41.5,
+        color: '#ef4444',
+        icon: 'AlertTriangle',
+        isSecret: false,
+        notes: 'Armadilha CD 14 para detectar, 2d6 de dano perfurante.',
+        createdAt: Date.now() - 3000000
+      },
+      {
+        id: 'marker-chest-3',
+        mapId: 'map-caranguejo-coast',
+        name: 'Baú dos Reis do Mar',
+        category: 'treasure',
+        description: 'Um baú selado com algas petrificadas e runas arcanas de proteção aquática.',
+        x: 78.0,
+        y: 75.0,
+        color: '#10b981',
+        icon: 'Gem',
+        isSecret: false,
+        linkedItem: 'Amuleto das Marés e 150 Peças de Ouro',
+        notes: 'Fechadura trancada com CD 15 em Ladinagem ou Magia de Abertura.',
+        createdAt: Date.now() - 2500000
+      },
+      {
+        id: 'marker-lighthouse-4',
+        mapId: 'map-caranguejo-coast',
+        name: 'Farol das Almas Perdidas',
+        category: 'location',
+        description: 'Antigo farol de pedra onde queima uma chama fantasmagórica verde que nunca se apaga, servindo de guia contra nevoeiros.',
+        x: 18.0,
+        y: 22.0,
+        color: '#6366f1',
+        icon: 'MapPin',
+        isSecret: false,
+        notes: 'O eremita cego do farol conhece o segredo para acalmar o monstro marinho.',
+        createdAt: Date.now() - 2000000
+      }
+    ],
+    createdAt: Date.now() - 86400000,
+    updatedAt: Date.now() - 3600000
+  }
+];
+
 export class JsonDatabase {
   private data: DatabaseSchema;
 
@@ -130,7 +228,11 @@ export class JsonDatabase {
           currentTrack: parsed.currentTrack || null,
           queue: parsed.queue || [],
           volume: parsed.volume !== undefined ? parsed.volume : 0.8,
-          loopMode: parsed.loopMode || 'queue'
+          loopMode: parsed.loopMode || 'queue',
+          maps: parsed.maps || DEFAULT_MAPS,
+          currentMapId: parsed.currentMapId !== undefined ? parsed.currentMapId : 'map-caranguejo-coast',
+          diceHistory: parsed.diceHistory || [],
+          dicePresets: parsed.dicePresets || DEFAULT_DICE_PRESETS
         };
       }
     } catch (e) {
@@ -151,7 +253,11 @@ export class JsonDatabase {
       currentTrack: null,
       queue: [],
       volume: 0.8,
-      loopMode: 'queue'
+      loopMode: 'queue',
+      maps: DEFAULT_MAPS,
+      currentMapId: 'map-caranguejo-coast',
+      diceHistory: [],
+      dicePresets: DEFAULT_DICE_PRESETS
     };
 
     this.saveData(defaultData);
@@ -460,10 +566,152 @@ export class JsonDatabase {
       customTimers: newState.customTimers !== undefined ? newState.customTimers : this.data.customTimers,
       sessionSeconds: newState.sessionSeconds !== undefined ? newState.sessionSeconds : this.data.sessionSeconds,
       initiativeList: newState.initiativeList || this.data.initiativeList,
-      mediaDirectories: newState.mediaDirectories || this.data.mediaDirectories
+      mediaDirectories: newState.mediaDirectories || this.data.mediaDirectories,
+      maps: newState.maps || this.data.maps,
+      currentMapId: newState.currentMapId !== undefined ? newState.currentMapId : this.data.currentMapId,
+      diceHistory: newState.diceHistory || this.data.diceHistory,
+      dicePresets: newState.dicePresets || this.data.dicePresets
     };
     this.saveData();
     return this.data;
+  }
+
+  // ==========================================
+  // SCENARIOS & MAPS MANAGEMENT
+  // ==========================================
+
+  public getMaps(): ScenarioMap[] {
+    return this.data.maps || [];
+  }
+
+  public getMapById(id: string): ScenarioMap | undefined {
+    return (this.data.maps || []).find(m => m.id === id);
+  }
+
+  public getCurrentMapId(): string | null {
+    return this.data.currentMapId || null;
+  }
+
+  public getCurrentMap(): ScenarioMap | undefined {
+    const maps = this.getMaps();
+    if (this.data.currentMapId) {
+      const found = maps.find(m => m.id === this.data.currentMapId);
+      if (found) return found;
+    }
+    return maps.find(m => m.isCurrent) || maps[0];
+  }
+
+  public setCurrentMapId(id: string | null): void {
+    this.data.currentMapId = id;
+    if (this.data.maps) {
+      this.data.maps.forEach(m => {
+        m.isCurrent = m.id === id;
+      });
+    }
+    this.saveData();
+  }
+
+  public saveMap(map: ScenarioMap): ScenarioMap {
+    if (!this.data.maps) this.data.maps = [];
+    const idx = this.data.maps.findIndex(m => m.id === map.id);
+    if (idx >= 0) {
+      this.data.maps[idx] = { ...this.data.maps[idx], ...map, updatedAt: Date.now() };
+    } else {
+      this.data.maps.push(map);
+    }
+    if (map.isCurrent) {
+      this.setCurrentMapId(map.id);
+    }
+    this.saveData();
+    return map;
+  }
+
+  public deleteMap(id: string): boolean {
+    if (!this.data.maps) return false;
+    const prev = this.data.maps.length;
+    this.data.maps = this.data.maps.filter(m => m.id !== id);
+    if (this.data.currentMapId === id) {
+      this.data.currentMapId = this.data.maps[0]?.id || null;
+    }
+    this.saveData();
+    return this.data.maps.length < prev;
+  }
+
+  public addMarker(mapId: string, marker: MapMarker): MapMarker | null {
+    const map = this.getMapById(mapId);
+    if (!map) return null;
+    if (!map.markers) map.markers = [];
+    map.markers.push(marker);
+    map.updatedAt = Date.now();
+    this.saveData();
+    return marker;
+  }
+
+  public updateMarker(mapId: string, markerId: string, updates: Partial<MapMarker>): MapMarker | null {
+    const map = this.getMapById(mapId);
+    if (!map || !map.markers) return null;
+    const idx = map.markers.findIndex(m => m.id === markerId);
+    if (idx === -1) return null;
+    map.markers[idx] = { ...map.markers[idx], ...updates };
+    map.updatedAt = Date.now();
+    this.saveData();
+    return map.markers[idx];
+  }
+
+  public deleteMarker(mapId: string, markerId: string): boolean {
+    const map = this.getMapById(mapId);
+    if (!map || !map.markers) return false;
+    const prev = map.markers.length;
+    map.markers = map.markers.filter(m => m.id !== markerId);
+    map.updatedAt = Date.now();
+    this.saveData();
+    return map.markers.length < prev;
+  }
+
+  // ==========================================
+  // ADVANCED DICE HISTORY & PRESETS
+  // ==========================================
+
+  public getDiceHistory(): AdvancedDiceRollResult[] {
+    return this.data.diceHistory || [];
+  }
+
+  public addDiceRoll(roll: AdvancedDiceRollResult): void {
+    if (!this.data.diceHistory) this.data.diceHistory = [];
+    this.data.diceHistory.unshift(roll);
+    if (this.data.diceHistory.length > 100) {
+      this.data.diceHistory = this.data.diceHistory.slice(0, 100);
+    }
+    this.saveData();
+  }
+
+  public clearDiceHistory(): void {
+    this.data.diceHistory = [];
+    this.saveData();
+  }
+
+  public getDicePresets(): DicePreset[] {
+    return this.data.dicePresets || DEFAULT_DICE_PRESETS;
+  }
+
+  public saveDicePreset(preset: DicePreset): DicePreset {
+    if (!this.data.dicePresets) this.data.dicePresets = [...DEFAULT_DICE_PRESETS];
+    const idx = this.data.dicePresets.findIndex(p => p.id === preset.id);
+    if (idx >= 0) {
+      this.data.dicePresets[idx] = preset;
+    } else {
+      this.data.dicePresets.push(preset);
+    }
+    this.saveData();
+    return preset;
+  }
+
+  public deleteDicePreset(id: string): boolean {
+    if (!this.data.dicePresets) return false;
+    const prev = this.data.dicePresets.length;
+    this.data.dicePresets = this.data.dicePresets.filter(p => p.id !== id);
+    this.saveData();
+    return this.data.dicePresets.length < prev;
   }
 
   // ==========================================

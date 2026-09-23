@@ -3,6 +3,7 @@ import { AudioProvider } from './context/AudioContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Header } from './components/Header';
 import { MasterScreen } from './components/MasterScreen';
+import { ScenarioMapManager } from './components/ScenarioMapManager';
 import { MusicPlayerView } from './components/MusicPlayerView';
 import { AmbiencePlayerView } from './components/AmbiencePlayerView';
 import { SoundboardView } from './components/SoundboardView';
@@ -19,10 +20,10 @@ import { AudioMixerModal } from './components/AudioMixerModal';
 import { ActionLogFooter } from './components/ActionLogFooter';
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<'master' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings'>(() => {
+  const [currentTab, setCurrentTab] = useState<'master' | 'maps' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings'>(() => {
     try {
       const saved = localStorage.getItem('caranguejo_active_tab');
-      if (saved && ['master', 'music', 'ambience', 'soundboard', 'npcs', 'chat', 'settings'].includes(saved)) {
+      if (saved && ['master', 'maps', 'music', 'ambience', 'soundboard', 'npcs', 'chat', 'settings'].includes(saved)) {
         return saved as any;
       }
     } catch {}
@@ -83,6 +84,23 @@ export default function App() {
                 onOpenChatTab={() => setCurrentTab('chat')}
                 onOpenSessionModal={() => setIsSessionModalOpen(true)}
               />
+            )}
+
+            {currentTab === 'maps' && (
+              <div className="max-w-7xl mx-auto space-y-4">
+                <div className="flex items-center justify-between border-b border-[#282C34] pb-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-white font-rpg flex items-center gap-2">
+                      <span>🗺️</span>
+                      <span>Módulo de Gerenciamento de Cenários & Mapas</span>
+                    </h2>
+                    <p className="text-xs text-zinc-400">
+                      Upload e links de mapas, pontos de interesse interativos, NPCs vinculados e exibição no Discord.
+                    </p>
+                  </div>
+                </div>
+                <ScenarioMapManager isWidgetMode={false} />
+              </div>
             )}
 
             {currentTab === 'music' && <MusicPlayerView />}

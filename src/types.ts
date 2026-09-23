@@ -348,6 +348,8 @@ export type WidgetType =
   | 'timers'
   | 'notepad'
   | 'dice_roller'
+  | 'advanced_dice'
+  | 'scenario_maps'
   | 'initiative'
   | 'soundboard'
   | 'narrative'
@@ -503,6 +505,141 @@ export interface PlayerColorConfig {
   color: string;
   label?: string;
 }
+
+// ==========================================
+// SCENARIOS & MAPS MODULE
+// ==========================================
+
+export type MarkerCategory =
+  | 'location'     // Cidade, vila, ponto geográfico
+  | 'poi'          // Ponto de interesse geral
+  | 'tavern'       // Taverna, estalagem, comércio
+  | 'danger'       // Perigo, armadilha, emboscada
+  | 'treasure'     // Tesouro, baú, recompensa
+  | 'npc'          // Personagem, NPC, aliado
+  | 'monster'      // Monstro, covil, criatura
+  | 'quest'        // Missão, mistério, objetivo
+  | 'custom';
+
+export interface MapMarker {
+  id: string;
+  mapId: string;
+  name: string;
+  category: MarkerCategory;
+  description: string;
+  x: number; // percentage (0 - 100)
+  y: number; // percentage (0 - 100)
+  color?: string; // hex
+  icon?: string; // lucide icon name
+  isSecret?: boolean; // only DM sees it, hidden from public Discord summary
+  linkedNpcId?: string; // ID of an NPC in the table
+  linkedNpcName?: string;
+  linkedItem?: string; // Item / loot name or description
+  tags?: string[];
+  notes?: string; // Private DM notes
+  createdAt: number;
+}
+
+export interface ScenarioMap {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl: string; // File upload path or online URL
+  thumbnailUrl?: string;
+  region?: string; // e.g. "Continente de Tormenta", "Reino de Aethelgard"
+  climate?: string; // e.g. "Tempestuoso e frio", "Masmorra úmida"
+  gridEnabled?: boolean;
+  gridSize?: number; // size in pixels or cells
+  gridColor?: string;
+  gridOpacity?: number;
+  isCurrent?: boolean;
+  markers: MapMarker[];
+  tags?: string[];
+  suggestedMusicTrackId?: string;
+  suggestedAmbienceTrackId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// ==========================================
+// ADVANCED MULTI-DICE SYSTEM
+// ==========================================
+
+export interface AdvancedDiceGroupResult {
+  notation: string; // e.g. "2d20kh1", "3d6"
+  count: number;
+  sides: number;
+  keepMode?: 'kh' | 'kl';
+  keepCount?: number;
+  allRolls: number[];
+  keptRolls: number[];
+  droppedRolls: number[];
+  subtotal: number;
+  isCriticalSuccess?: boolean; // natural 20 or max on highest die
+  isCriticalFail?: boolean; // natural 1 on lowest die
+}
+
+export interface AdvancedDiceRollResult {
+  id: string;
+  formula: string; // e.g. "2d20kh1 + 2d6 + 5"
+  cleanFormula: string;
+  rollerName: string;
+  label?: string; // e.g. "Ataque com Machado", "Iniciativa"
+  groups: AdvancedDiceGroupResult[];
+  modifier: number;
+  total: number;
+  breakdown: string; // e.g. "[18] + [4, 5] + 5 = 32"
+  isCriticalSuccess: boolean;
+  isCriticalFail: boolean;
+  timestamp: number;
+  source: 'web' | 'discord';
+  channelId?: string;
+}
+
+export interface DicePreset {
+  id: string;
+  name: string;
+  formula: string; // e.g. "1d20+5", "2d20kh1+3", "8d6"
+  description?: string;
+  color?: string;
+  icon?: string;
+  category?: 'attack' | 'damage' | 'check' | 'save' | 'custom';
+}
+
+// ==========================================
+// ONLINE MEDIA & PLAYLIST IMPORT
+// ==========================================
+
+export interface OnlineMediaMeta {
+  url: string;
+  title: string;
+  artist?: string;
+  duration?: number;
+  coverUrl?: string;
+  platform: 'youtube' | 'spotify' | 'soundcloud' | 'direct' | 'unknown';
+  isPlaylist?: boolean;
+  playlistCount?: number;
+}
+
+export interface PlaylistImportItem {
+  title: string;
+  artist?: string;
+  duration: number;
+  url: string;
+  coverUrl?: string;
+}
+
+export interface PlaylistImportResult {
+  success: boolean;
+  playlistTitle?: string;
+  platform: 'youtube' | 'spotify' | 'soundcloud' | 'm3u' | 'direct';
+  importedCount: number;
+  folderId?: string;
+  folderName?: string;
+  tracks: PlaylistImportItem[];
+  error?: string;
+}
+
 
 
 

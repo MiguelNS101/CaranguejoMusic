@@ -29,9 +29,24 @@ import prism from 'prism-media';
 import { spawn } from 'child_process';
 import { createRequire } from 'module';
 import ffmpegStatic from 'ffmpeg-static';
+import playdl from 'play-dl';
 import { db } from './db.js';
-import { BotStatus, DiscordGuild, DiscordMessagePayload, NPC, DiceRollResult, WodDiceRollResult, DiagnosticLog, VoiceDiagnostics, GeneratedEncounter } from '../src/types.js';
+import {
+  BotStatus,
+  DiscordGuild,
+  DiscordMessagePayload,
+  NPC,
+  DiceRollResult,
+  WodDiceRollResult,
+  DiagnosticLog,
+  VoiceDiagnostics,
+  GeneratedEncounter,
+  ScenarioMap,
+  MapMarker,
+  AdvancedDiceRollResult
+} from '../src/types.js';
 import { rollWodDice, parseWodCommand } from './wodDice.js';
+import { parseAdvancedDiceFormula, rollAdvancedDice } from '../src/utils/advancedDice.js';
 
 function loadCaranguejoCuriosities(): Array<{ id: number; title: string; fact: string; category?: string; rpg_hook?: string }> {
   try {
@@ -599,6 +614,106 @@ export class DiscordBotService {
         return;
       }
 
+      // Check for !mapa or !cenario or !map
+      const isMapCmd = /^[!/\\](?:mapa|cenario|map)(?:\s+(.*))?$/i.exec(content);
+      if (isMapCmd) {
+        const query = isMapCmd[1]?.trim();
+        const maps = db.getMaps();
+        let targetMap: ScenarioMap | undefined;
+        if (query) {
+          targetMap = maps.find(m => m.name.toLowerCase().includes(query.toLowerCase()) || m.region?.toLowerCase().includes(query.toLowerCase()));
+          if (!targetMap) {
+            await message.reply(`❌ Nenhum mapa encontrado com o termo "**${query}**". Mapas disponíveis: ${maps.map(m => `\`${m.name}\``).join(', ')}`);
+            return;
+          }
+        } else {
+          targetMap = db.getCurrentMap();
+          if (!targetMap) {
+            await message.reply('🗺️ Nenhum mapa ativo no momento. O Mestre pode selecionar um mapa no painel web do CaranguejoRPG!');
+            return;
+          }
+        }
+
+        const embed = this.createScenarioMapEmbed(targetMap);
+        await message.reply({ embeds: [embed] });
+        return;
+      }
+
+      // Check for !mapas (list all scenarios)
+      if (/^[!/\\](?:mapas|cenarios|maps)$/i.test(content)) {
+        const maps = db.getMaps();
+        if (maps.length === 0) {
+          await message.reply('🗺️ Nenhum mapa cadastrado ainda.');
+          return;
+        }
+        const current = db.getCurrentMap();
+        const listStr = maps.map(m => `• **${m.name}** ${m.id === current?.id ? '⭐ *(Mapa Atual)*' : ''}\n  *${m.description || 'Sem descrição'}* (${m.markers.filter(x => !x.isSecret).length} pontos de interesse públicos)`).join('\n\n');
+        const embed = new EmbedBuilder()
+          .setColor('#3b82f6')
+          .setTitle('🗺️ Mapas & Cenários da Mesa')
+          .setDescription(listStr)
+          .setFooter({ text: 'Digite !mapa [nome] para inspecionar um cenário' });
+        await message.reply({ embeds: [embed] });
+        return;
+      }
+
+      // Check for !marcador, !poi, !local
+      const isMarkerCmd = /^[!/\\](?:marcador|poi|local|ponto)(?:\s+(.+))?$/i.exec(content);
+      if (isMarkerCmd) {
+        const query = isMarkerCmd[1]?.trim();
+        if (!query) {
+          await message.reply('ℹ️ Digite o nome do marcador que deseja inspecionar. Ex: `!marcador Taverna do Siri`');
+          return;
+        }
+        const maps = db.getMaps();
+        const currentMap = db.getCurrentMap();
+        let matched: { map: ScenarioMap; marker: MapMarker } | null = null;
+        if (currentMap) {
+          const m = currentMap.markers.find(x => !x.isSecret && x.name.toLowerCase().includes(query.toLowerCase()));
+          if (m) matched = { map: currentMap, marker: m };
+        }
+        if (!matched) {
+          for (const mp of maps) {
+            const m = mp.markers.find(x => !x.isSecret && x.name.toLowerCase().includes(query.toLowerCase()));
+            if (m) {
+              matched = { map: mp, marker: m };
+              break;
+            }
+          }
+        }
+
+        if (!matched) {
+          await message.reply(`❌ Marcador público "**${query}**" não encontrado nos mapas ativos.`);
+          return;
+        }
+
+        const embed = this.createMapMarkerEmbed(matched.map, matched.marker);
+        await message.reply({ embeds: [embed] });
+        return;
+      }
+
+      // Check for Advanced Multi-Dice Roll commands:
+      // Commands: !roll <formula> [motivo], !r <formula> [motivo], or shorthand !d20, !2d6+3, !1d100, etc.
+      const rollMatch = /^[!/\\](?:roll|r)\s+(.+)$/i.exec(content) || /^[!/\\](d\d+|[0-9]+d[0-9]+.*)$/i.exec(content);
+      if (rollMatch) {
+        const fullExpr = rollMatch[1].trim();
+        const formulaMatch = fullExpr.match(/^((?:[+-]?\s*(?:\d*d\d+(?:kh\d+|kl\d+)?|\d+)\s*)+)(.*)$/i);
+        if (formulaMatch && formulaMatch[1].trim()) {
+          const formulaStr = formulaMatch[1].trim();
+          const labelStr = formulaMatch[2]?.trim() || undefined;
+          const parsed = parseAdvancedDiceFormula(formulaStr);
+          if (parsed) {
+            const rollerName = message.member?.displayName || message.author.username;
+            const result = rollAdvancedDice(formulaStr, rollerName, labelStr);
+            result.source = 'discord';
+            db.addDiceRoll(result);
+            const embed = this.createAdvancedDiceEmbed(result);
+            await message.reply({ embeds: [embed] });
+            return;
+          }
+        }
+      }
+
       // Other prefix commands
       const prefix = db.getBotConfig().prefix || '!';
       if (content.startsWith(prefix + 'ping')) {
@@ -814,6 +929,203 @@ export class DiscordBotService {
       if (!channel || !channel.isTextBased()) return { success: false, error: 'Canal inválido.' };
 
       const embed = this.createWodEmbed(result);
+      await (channel as TextChannel).send({ embeds: [embed] });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message };
+    }
+  }
+
+  public createAdvancedDiceEmbed(result: AdvancedDiceRollResult): EmbedBuilder {
+    let color: ColorResolvable = '#6366f1';
+    let critText = '';
+    if (result.isCriticalSuccess) {
+      color = '#10b981'; // Green for nat 20 / crit
+      critText = ' 🌟 **CRÍTICO SUPREMO (NAT 20)!**';
+    } else if (result.isCriticalFail) {
+      color = '#ef4444'; // Red for nat 1
+      critText = ' 💀 **FALHA CRÍTICA (NAT 1)!**';
+    }
+
+    const titlePrefix = result.isCriticalSuccess ? '✨' : result.isCriticalFail ? '💥' : '🎲';
+    const embed = new EmbedBuilder()
+      .setColor(color)
+      .setTitle(`${titlePrefix} Rolagem: \`${result.cleanFormula}\`${result.label ? ` • ${result.label}` : ''}`)
+      .setDescription(
+        `**Rolado por:** ${result.rollerName || 'Jogador/Mestre'}\n` +
+        (result.label ? `**Ação / Motivo:** *${result.label}*\n` : '') +
+        `**Resultado Total:** 💥 **\`${result.total}\`**${critText}\n\n` +
+        `📝 **Detalhamento:** \`${result.breakdown}\``
+      )
+      .setTimestamp();
+
+    result.groups.forEach(g => {
+      let valStr = `\`[ ${g.keptRolls.join(', ')} ]\``;
+      if (g.droppedRolls && g.droppedRolls.length > 0) {
+        valStr += `\n*(Descartados: [ ${g.droppedRolls.join(', ')} ])*`;
+      }
+      valStr += `\n**Subtotal:** ${g.subtotal}`;
+      embed.addFields({
+        name: `🎲 Grupo ${g.notation}`,
+        value: valStr,
+        inline: true
+      });
+    });
+
+    if (result.modifier !== 0) {
+      embed.addFields({
+        name: '⚖️ Modificador',
+        value: `\`${result.modifier > 0 ? `+${result.modifier}` : result.modifier}\``,
+        inline: true
+      });
+    }
+
+    embed.setFooter({ text: 'CaranguejoRPG • Rolador Avançado Multi-Dados (d4, d6, d8, d10, d12, d20, d100)' });
+    return embed;
+  }
+
+  public async broadcastAdvancedDiceRoll(result: AdvancedDiceRollResult, customChannelId?: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.client?.isReady()) {
+      return { success: false, error: 'Bot offline. A rolagem foi salva no painel do navegador.' };
+    }
+
+    const config = db.getBotConfig();
+    const targetChannelId = customChannelId || config.textChannelId;
+    if (!targetChannelId) return { success: false, error: 'Nenhum canal de texto do Discord configurado.' };
+
+    try {
+      const channel = await this.client.channels.fetch(targetChannelId);
+      if (!channel || !channel.isTextBased()) return { success: false, error: 'Canal de texto inválido.' };
+
+      const embed = this.createAdvancedDiceEmbed(result);
+      await (channel as TextChannel).send({ embeds: [embed] });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message };
+    }
+  }
+
+  public createScenarioMapEmbed(map: ScenarioMap): EmbedBuilder {
+    const embed = new EmbedBuilder()
+      .setColor('#3b82f6')
+      .setTitle(`🗺️ Cenário & Mapa: ${map.name}`)
+      .setDescription(
+        `${map.description || 'Explore as terras deste cenário detalhado!'}\n\n` +
+        (map.region ? `🌍 **Região:** ${map.region}\n` : '') +
+        (map.climate ? `🌤️ **Clima & Atmosfera:** ${map.climate}\n` : '')
+      )
+      .setTimestamp();
+
+    if (map.imageUrl && (map.imageUrl.startsWith('http://') || map.imageUrl.startsWith('https://'))) {
+      embed.setImage(map.imageUrl);
+    }
+
+    const publicMarkers = (map.markers || []).filter(m => !m.isSecret);
+    if (publicMarkers.length > 0) {
+      const categoryEmojiMap: Record<string, string> = {
+        tavern: '🍺',
+        danger: '⚠️',
+        treasure: '💎',
+        npc: '👤',
+        monster: '👹',
+        quest: '📜',
+        location: '📍',
+        poi: '🔍',
+        custom: '⭐'
+      };
+
+      const markersSummary = publicMarkers.slice(0, 10).map(m => {
+        const emoji = categoryEmojiMap[m.category] || '📍';
+        const descPreview = m.description ? `— ${m.description.slice(0, 60)}${m.description.length > 60 ? '...' : ''}` : '';
+        return `${emoji} **${m.name}** ${descPreview}`;
+      }).join('\n');
+
+      embed.addFields({
+        name: `📍 Pontos de Interesse Conhecidos (${publicMarkers.length})`,
+        value: markersSummary + (publicMarkers.length > 10 ? `\n*...e mais ${publicMarkers.length - 10} pontos de interesse.*` : ''),
+        inline: false
+      });
+    }
+
+    embed.setFooter({
+      text: 'CaranguejoRPG • Digite !marcador [nome] para inspecionar um local detalhado'
+    });
+
+    return embed;
+  }
+
+  public async broadcastMap(map: ScenarioMap, customChannelId?: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.client?.isReady()) {
+      return { success: false, error: 'Bot do Discord desconectado. Inicie o bot no menu superior.' };
+    }
+
+    const config = db.getBotConfig();
+    const targetChannelId = customChannelId || config.textChannelId;
+    if (!targetChannelId) return { success: false, error: 'Nenhum canal de texto do Discord configurado.' };
+
+    try {
+      const channel = await this.client.channels.fetch(targetChannelId);
+      if (!channel || !channel.isTextBased()) return { success: false, error: 'Canal de texto inválido.' };
+
+      const embed = this.createScenarioMapEmbed(map);
+      await (channel as TextChannel).send({ embeds: [embed] });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message };
+    }
+  }
+
+  public createMapMarkerEmbed(map: ScenarioMap, marker: MapMarker): EmbedBuilder {
+    const categoryEmojiMap: Record<string, string> = {
+      tavern: '🍺 Taverna & Comércio',
+      danger: '⚠️ Perigo & Armadilha',
+      treasure: '💎 Tesouro & Recompensa',
+      npc: '👤 Personagem & Aliado',
+      monster: '👹 Monstro & Covil',
+      quest: '📜 Missão & Objetivo',
+      location: '📍 Localidade Geográfica',
+      poi: '🔍 Ponto de Interesse',
+      custom: '⭐ Ponto Especial'
+    };
+
+    const categoryTitle = categoryEmojiMap[marker.category] || '📍 Ponto de Interesse';
+    const embed = new EmbedBuilder()
+      .setColor((marker.color as ColorResolvable) || '#f59e0b')
+      .setTitle(`${categoryTitle}: ${marker.name}`)
+      .setDescription(
+        `${marker.description || 'Nenhuma descrição detalhada disponível.'}\n\n` +
+        (marker.linkedItem ? `🎒 **Item / Loot Vinculado:** ${marker.linkedItem}\n` : '') +
+        (marker.linkedNpcName ? `👤 **NPC Vinculado:** ${marker.linkedNpcName}\n` : '') +
+        `🧭 **Coordenadas:** X: \`${marker.x.toFixed(1)}%\`, Y: \`${marker.y.toFixed(1)}%\`\n` +
+        `🗺️ **Cenário:** \`${map.name}\``
+      )
+      .setTimestamp();
+
+    if (map.imageUrl && (map.imageUrl.startsWith('http://') || map.imageUrl.startsWith('https://'))) {
+      embed.setThumbnail(map.imageUrl);
+    }
+
+    embed.setFooter({
+      text: 'CaranguejoRPG • Mapeamento Tático & Interativo'
+    });
+
+    return embed;
+  }
+
+  public async broadcastMapMarker(map: ScenarioMap, marker: MapMarker, customChannelId?: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.client?.isReady()) {
+      return { success: false, error: 'Bot do Discord desconectado. Inicie o bot no menu superior.' };
+    }
+
+    const config = db.getBotConfig();
+    const targetChannelId = customChannelId || config.textChannelId;
+    if (!targetChannelId) return { success: false, error: 'Nenhum canal de texto do Discord configurado.' };
+
+    try {
+      const channel = await this.client.channels.fetch(targetChannelId);
+      if (!channel || !channel.isTextBased()) return { success: false, error: 'Canal de texto inválido.' };
+
+      const embed = this.createMapMarkerEmbed(map, marker);
       await (channel as TextChannel).send({ embeds: [embed] });
       return { success: true };
     } catch (err: any) {
@@ -1274,7 +1586,51 @@ export class DiscordBotService {
       this.logDiagnostic('info', 'audio', `Carregando recurso de áudio "${trackLabel}"${offsetStr} (Volume: ${Math.round(volume * 100)}%)...`);
 
       let resource: any;
-      if (seekSeconds && seekSeconds > 0) {
+      const isOnlineUrl = urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://');
+      const isYoutube = isOnlineUrl && /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)/i.test(urlOrPath);
+      const isSoundcloud = isOnlineUrl && /soundcloud\.com\//i.test(urlOrPath);
+      const isSpotify = isOnlineUrl && /open\.spotify\.com\/(?:track|album|playlist)\//i.test(urlOrPath);
+
+      if (isYoutube || isSoundcloud) {
+        try {
+          this.logDiagnostic('info', 'audio', `Iniciando streaming online de ${isYoutube ? 'YouTube' : 'SoundCloud'}: ${urlOrPath}`);
+          const stream = await playdl.stream(urlOrPath, {
+            quality: 2,
+            seek: seekSeconds && seekSeconds > 0 ? Math.floor(seekSeconds) : undefined
+          });
+          resource = createAudioResource(stream.stream, {
+            inputType: stream.type,
+            inlineVolume: true
+          });
+        } catch (streamErr: any) {
+          this.logDiagnostic('warn', 'audio', `play-dl falhou ao extrair stream direto (${streamErr?.message}), tentando stream padrão via ffmpeg/prism...`);
+          resource = createAudioResource(resolvedPath, { inlineVolume: true });
+        }
+      } else if (isSpotify) {
+        try {
+          this.logDiagnostic('info', 'audio', `Resolvendo faixa do Spotify: ${urlOrPath}`);
+          const spData: any = await playdl.spotify(urlOrPath);
+          const searchQuery = `${spData.name} ${spData.artists?.[0]?.name || ''}`;
+          this.logDiagnostic('info', 'audio', `Buscando stream equivalente no YouTube para "${searchQuery}"...`);
+          const searchResults = await playdl.search(searchQuery, { limit: 1 });
+          if (searchResults && searchResults.length > 0) {
+            const stream = await playdl.stream(searchResults[0].url, {
+              quality: 2,
+              seek: seekSeconds && seekSeconds > 0 ? Math.floor(seekSeconds) : undefined
+            });
+            resource = createAudioResource(stream.stream, {
+              inputType: stream.type,
+              inlineVolume: true
+            });
+            trackLabel = `${spData.name} - ${spData.artists?.[0]?.name || ''}`;
+          } else {
+            throw new Error('Nenhum stream encontrado para a faixa do Spotify.');
+          }
+        } catch (spErr: any) {
+          this.logDiagnostic('error', 'audio', `Erro ao reproduzir faixa do Spotify: ${spErr?.message}`);
+          return { success: false, error: `Falha ao reproduzir faixa do Spotify: ${spErr?.message}` };
+        }
+      } else if (seekSeconds && seekSeconds > 0) {
         try {
           const sourceStream = await this.getAudioReadableStream(resolvedPath);
           const ffmpeg = new prism.FFmpeg({

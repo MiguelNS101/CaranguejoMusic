@@ -29,6 +29,7 @@ import {
 import { useAudio } from '../context/AudioContext';
 import { MusicTrack, LoopMode } from '../types';
 import { FolderImportModal } from './FolderImportModal';
+import { OnlineMediaModal } from './OnlineMediaModal';
 import { AudioScrubber } from './AudioScrubber';
 import { apiFetch, resolveApiUrl } from '../services/api';
 
@@ -72,6 +73,7 @@ export const MusicPlayerView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [isFolderImportOpen, setIsFolderImportOpen] = useState<boolean>(false);
+  const [isOnlineMediaOpen, setIsOnlineMediaOpen] = useState<boolean>(false);
 
   // New Track Form State
   const [newTitle, setNewTitle] = useState('');
@@ -386,6 +388,16 @@ export const MusicPlayerView: React.FC = () => {
               >
                 <FolderUp className="w-4 h-4" />
                 Importar Pasta
+              </button>
+
+              {/* Online Stream / Playlist Import */}
+              <button
+                onClick={() => setIsOnlineMediaOpen(true)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#242830] hover:bg-[#2D3139] text-amber-300 border border-amber-500/30 text-xs font-semibold transition-colors cursor-pointer"
+                title="Vincular áudio ou playlist online (YouTube, Spotify, SoundCloud)"
+              >
+                <Radio className="w-4 h-4 text-amber-400" />
+                Link Online / Playlist
               </button>
 
               {/* Add Track Button */}
@@ -788,6 +800,12 @@ export const MusicPlayerView: React.FC = () => {
         isOpen={isFolderImportOpen}
         onClose={() => setIsFolderImportOpen(false)}
         defaultCategory="music"
+      />
+      {/* Online Media & Playlist Modal */}
+      <OnlineMediaModal
+        isOpen={isOnlineMediaOpen}
+        onClose={() => setIsOnlineMediaOpen(false)}
+        defaultType="music"
       />
     </div>
   );
