@@ -80,7 +80,7 @@ export async function checkBackendHealth(): Promise<boolean> {
   const check = async (url: string) => {
     try {
       const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), 1200);
+      const timeout = setTimeout(() => ctrl.abort(), 1500);
       const res = await fetch(url, { signal: ctrl.signal });
       clearTimeout(timeout);
       if (res.ok) {
@@ -93,23 +93,23 @@ export async function checkBackendHealth(): Promise<boolean> {
     }
   };
 
-  if (await check('http://localhost:3000/api/health')) {
-    lastPingLatency = Math.round(performance.now() - start);
-    lastHealthCheckTime = Date.now();
-    setWorkingBaseUrl('http://localhost:3000');
-    if (!isBackendHealthy) {
-      addDesktopLog('success', `Motor local verificado em http://localhost:3000 (${lastPingLatency}ms)`);
-    }
-    isBackendHealthy = true;
-    return true;
-  }
-
   if (await check('http://127.0.0.1:3000/api/health')) {
     lastPingLatency = Math.round(performance.now() - start);
     lastHealthCheckTime = Date.now();
     setWorkingBaseUrl('http://127.0.0.1:3000');
     if (!isBackendHealthy) {
       addDesktopLog('success', `Motor local verificado em http://127.0.0.1:3000 (${lastPingLatency}ms)`);
+    }
+    isBackendHealthy = true;
+    return true;
+  }
+
+  if (await check('http://localhost:3000/api/health')) {
+    lastPingLatency = Math.round(performance.now() - start);
+    lastHealthCheckTime = Date.now();
+    setWorkingBaseUrl('http://localhost:3000');
+    if (!isBackendHealthy) {
+      addDesktopLog('success', `Motor local verificado em http://localhost:3000 (${lastPingLatency}ms)`);
     }
     isBackendHealthy = true;
     return true;

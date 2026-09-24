@@ -10,7 +10,7 @@ let cachedWorkingBase: string | null = null;
 
 export function getLocalBaseUrl(): string {
   if (cachedWorkingBase) return cachedWorkingBase;
-  return 'http://localhost:3000';
+  return 'http://127.0.0.1:3000';
 }
 
 export function setWorkingBaseUrl(base: string) {
@@ -136,12 +136,15 @@ export async function safeFetchJson<T = any>(
 
     const isTimeout = err?.name === 'AbortError';
 
-    // If primary localhost failed, try 127.0.0.1 fallback
-    if (isDesktopEnv && primaryUrl.includes('localhost:3000') && !isTimeout) {
+    // If primary local URL failed or timed out, try the alternative local loopback address
+    if (isDesktopEnv && (primaryUrl.includes('localhost:3000') || primaryUrl.includes('127.0.0.1:3000'))) {
       try {
+        const altUrl = primaryUrl.includes('localhost:3000')
+          ? primaryUrl.replace('localhost:3000', '127.0.0.1:3000')
+          : primaryUrl.replace('127.0.0.1:3000', 'localhost:3000');
+
         const altCtrl = new AbortController();
-        const altTimeout = setTimeout(() => altCtrl.abort(), 4000);
-        const altUrl = primaryUrl.replace('localhost:3000', '127.0.0.1:3000');
+        const altTimeout = setTimeout(() => altCtrl.abort(), 3500);
 
         const altRes = await fetch(altUrl, {
           ...options,
@@ -169,7 +172,9 @@ export async function safeFetchJson<T = any>(
           return { success: false, data: altData, error: errMsg, status: altRes.status };
         }
 
-        setWorkingBaseUrl('http://127.0.0.1:3000');
+        const workingBase = altUrl.includes('127.0.0.1:3000') ? 'http://127.0.0.1:3000' : 'http://localhost:3000';
+        setWorkingBaseUrl(workingBase);
+
         return {
           success: altData ? (altData.success !== false) : true,
           data: altData as T,
@@ -181,14 +186,19 @@ export async function safeFetchJson<T = any>(
 
     let fallbackMsg: string;
     if (isTimeout) {
-      fallbackMsg = 'Tempo limite excedido na requisição com o servidor local (timeout 12s).';
-      addDesktopLog('error', `Timeout na requisição ${url}`, undefined, 'network');
+      fallbackMsg = `Tempo limite excedido na requisição com o servidor local (timeout ${Math.round(timeoutMs / 1000)}s).`;
+      const now = Date.now();
+      const lastTimeoutLog = (window as any)[`_last_timeout_log_${url}`] || 0;
+      if (now - lastTimeoutLog > 15000) {
+        (window as any)[`_last_timeout_log_${url}`] = now;
+        addDesktopLog('warn', `Timeout na requisição ${url}`, undefined, 'network');
+      }
     } else if (isDesktopEnv) {
       fallbackMsg = 'O motor local de som e bot (porta 3000) não está respondendo. Verifique se Iniciar-CaranguejoRPG.bat está rodando ou use a aba Diagnóstico.';
       // Throttle network log to prevent spamming the log console every polling cycle
       const now = Date.now();
       const lastLog = (window as any)[`_last_log_${url}`] || 0;
-      if (now - lastLog > 10000) {
+      if (now - lastLog > 15000) {
         (window as any)[`_last_log_${url}`] = now;
         addDesktopLog('warn', `Aguardando servidor local responder em ${url}...`, undefined, 'network');
       }

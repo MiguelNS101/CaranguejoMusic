@@ -731,25 +731,36 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const isRefreshingBotStatusRef = useRef(false);
+  const isRefreshingGuildsRef = useRef(false);
+
   const refreshBotStatus = async () => {
+    if (isRefreshingBotStatusRef.current) return;
+    isRefreshingBotStatusRef.current = true;
     try {
-      const res = await safeFetchJson<BotStatus>('/api/bot/status');
+      const res = await safeFetchJson<BotStatus>('/api/bot/status', undefined, 4500);
       if (res.success && res.data) {
         setBotStatus(res.data);
       }
     } catch (err) {
       console.error('Error fetching bot status:', err);
+    } finally {
+      isRefreshingBotStatusRef.current = false;
     }
   };
 
   const refreshGuilds = async () => {
+    if (isRefreshingGuildsRef.current) return;
+    isRefreshingGuildsRef.current = true;
     try {
-      const res = await safeFetchJson<DiscordGuild[]>('/api/bot/guilds');
+      const res = await safeFetchJson<DiscordGuild[]>('/api/bot/guilds', undefined, 4500);
       if (res.success && res.data) {
         setDiscordGuilds(res.data || []);
       }
     } catch (err) {
       console.error('Error fetching guilds:', err);
+    } finally {
+      isRefreshingGuildsRef.current = false;
     }
   };
 
@@ -769,6 +780,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.addEventListener('desktop-backend-ready', onBackendReady);
 
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       refreshBotStatus();
     }, 6000);
 

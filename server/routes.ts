@@ -86,11 +86,13 @@ router.get('/state', (req: Request, res: Response) => {
 
 // BOT ENDPOINTS
 router.get('/bot/status', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const status = discordBot.getStatus();
   res.json(status);
 });
 
 router.get('/bot/guilds', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   const guilds = discordBot.getGuilds();
   res.json(guilds);
 });
