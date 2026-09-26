@@ -80,7 +80,9 @@ export const AmbiencePlayerView: React.FC = () => {
   const [newTags, setNewTags] = useState('');
   const [newCoverUrl, setNewCoverUrl] = useState('');
   const [newIsLoop, setNewIsLoop] = useState(true);
+  const [newDuration, setNewDuration] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDraggingUpload, setIsDraggingUpload] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -104,6 +106,19 @@ export const AmbiencePlayerView: React.FC = () => {
   const uploadAudioFile = async (file: File) => {
     if (!file) return;
     setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const blobUrl = URL.createObjectURL(file);
+      const probeAudio = new Audio(blobUrl);
+      probeAudio.addEventListener('loadedmetadata', () => {
+        if (isFinite(probeAudio.duration) && probeAudio.duration > 0) {
+          setNewDuration(Math.round(probeAudio.duration));
+        }
+        URL.revokeObjectURL(blobUrl);
+      }, { once: true });
+    } catch {}
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -113,15 +128,21 @@ export const AmbiencePlayerView: React.FC = () => {
         body: formData
       });
       const data = await res.json();
-      if (data.url) {
+      if (res.ok && data.url) {
         setNewUrl(data.url);
+        if (data.duration && data.duration > 0) {
+          setNewDuration(data.duration);
+        }
         if (!newTitle) {
-          const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ');
+          const cleanName = data.cleanTitle || file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ');
           setNewTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
         }
+      } else {
+        setUploadError(data.error || 'Erro ao enviar arquivo.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload failed:', err);
+      setUploadError(err?.message || 'Falha ao conectar com o servidor.');
     } finally {
       setIsUploading(false);
     }
@@ -144,6 +165,7 @@ export const AmbiencePlayerView: React.FC = () => {
     await createAmbienceTrack({
       title: newTitle.trim(),
       url: newUrl.trim(),
+      duration: newDuration > 0 ? newDuration : undefined,
       folderId: newFolderId || (ambienceFolders.length > 0 ? ambienceFolders[0].id : undefined),
       tags: tagsArray,
       isLoop: newIsLoop,
@@ -156,15 +178,18 @@ export const AmbiencePlayerView: React.FC = () => {
     setNewFolderId('');
     setNewTags('');
     setNewCoverUrl('');
+    setNewDuration(0);
     setNewIsLoop(true);
     setIsAddModalOpen(false);
   };
 
   const toggleLoop = () => {
-    if (ambienceLoopMode === 'none' || !ambienceLoopMode) {
+    if (ambienceLoopMode === 'off') {
       setAmbienceLoopMode('track');
+    } else if (ambienceLoopMode === 'track') {
+      setAmbienceLoopMode('queue');
     } else {
-      setAmbienceLoopMode('none');
+      setAmbienceLoopMode('off');
     }
   };
 
@@ -282,15 +307,18 @@ export const AmbiencePlayerView: React.FC = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={toggleLoop}
-                className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                  ambienceLoopMode === 'track'
+                className={`p-2 rounded-lg transition-colors cursor-pointer relative ${
+                  ambienceLoopMode !== 'off'
                     ? 'text-indigo-400 bg-indigo-500/15 border border-indigo-500/30'
                     : 'text-[#9E9E9E] hover:text-[#FFFFFF]'
                 }`}
-                title={`Loop Contínuo de Ambiente: ${ambienceLoopMode === 'track' ? 'Ativo (Recomendado para BG)' : 'Desligado'}`}
+                title={`Repetição de Ambiente: ${
+                  ambienceLoopMode === 'track' ? 'Repetir Faixa Atual (1)' : ambienceLoopMode === 'queue' ? 'Repetir Lista Contínua (∞)' : 'Desligada'
+                }`}
               >
                 <Repeat className="w-4 h-4" />
-                {ambienceLoopMode === 'track' && <span className="text-[8px] absolute font-bold font-mono">∞</span>}
+                {ambienceLoopMode === 'track' && <span className="text-[8px] absolute -top-1 -right-1 font-bold font-mono bg-sky-600 text-white rounded-full px-1">1</span>}
+                {ambienceLoopMode === 'queue' && <span className="text-[8px] absolute -top-1 -right-1 font-bold font-mono bg-sky-600 text-white rounded-full px-1">∞</span>}
               </button>
 
               <button
@@ -551,11 +579,9 @@ export const AmbiencePlayerView: React.FC = () => {
                           {track.isLoop !== false ? 'Loop ∞' : '1x'}
                         </button>
 
-                        {track.duration && track.duration > 0 && (
-                          <span className="text-xs font-mono text-[#9E9E9E] w-12 text-right hidden sm:inline-block">
-                            {formatTime(track.duration)}
-                          </span>
-                        )}
+                        <span className="text-xs font-mono text-[#9E9E9E] w-12 text-right hidden sm:inline-block">
+                          {formatTime(isCurrent && ambienceDuration > 0 ? ambienceDuration : (track.duration || 0))}
+                        </span>
 
                         <button
                           onClick={() => addToAmbienceQueue(track)}

@@ -17,6 +17,7 @@ import {
   CloudRain
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
+import { Button } from './Button';
 
 interface AudioMixerModalProps {
   isOpen: boolean;
@@ -118,13 +119,13 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
               </p>
             </div>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
-            className="text-zinc-400 hover:text-white p-2 rounded-lg hover:bg-[#22262B] transition-colors"
+            icon={<X className="w-4 h-4" />}
             title="Fechar"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          />
         </div>
 
         {/* Content */}
@@ -142,17 +143,13 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant={isMuted ? 'danger' : 'secondary'}
+                  size="icon-xs"
                   onClick={toggleMute}
-                  className={`p-1.5 rounded-lg border transition-all ${
-                    isMuted
-                      ? 'bg-rose-950/40 text-rose-300 border-rose-500/30 hover:bg-rose-900/40'
-                      : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:text-white hover:bg-zinc-700'
-                  }`}
+                  icon={isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                   title={isMuted ? 'Desmutar Geral' : 'Mutar Geral'}
-                >
-                  {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4" />}
-                </button>
+                />
                 <span className="text-xs font-mono font-bold text-indigo-300 w-10 text-right">
                   {Math.round((isMuted ? 0 : volume) * 100)}%
                 </span>
@@ -187,17 +184,13 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button
+                  <Button
+                    variant={isMusicMuted ? 'danger' : 'secondary'}
+                    size="icon-xs"
                     onClick={toggleMusicMute}
-                    className={`p-1 rounded-md border transition-all ${
-                      isMusicMuted
-                        ? 'bg-rose-950/40 text-rose-300 border-rose-500/30'
-                        : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:text-white'
-                    }`}
+                    icon={isMusicMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                     title={isMusicMuted ? 'Desmutar Música' : 'Mutar Música'}
-                  >
-                    {isMusicMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
+                  />
                   <span className="text-[11px] font-mono font-bold text-amber-300 w-8 text-right">
                     {Math.round((isMusicMuted ? 0 : musicVolume) * 100)}%
                   </span>
@@ -233,17 +226,13 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button
+                  <Button
+                    variant={isAmbienceMuted ? 'danger' : 'secondary'}
+                    size="icon-xs"
                     onClick={toggleAmbienceMute}
-                    className={`p-1 rounded-md border transition-all ${
-                      isAmbienceMuted
-                        ? 'bg-rose-950/40 text-rose-300 border-rose-500/30'
-                        : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:text-white'
-                    }`}
+                    icon={isAmbienceMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                     title={isAmbienceMuted ? 'Desmutar Ambientação' : 'Mutar Ambientação'}
-                  >
-                    {isAmbienceMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
+                  />
                   <span className="text-[11px] font-mono font-bold text-teal-300 w-8 text-right">
                     {Math.round((isAmbienceMuted ? 0 : ambienceVolume) * 100)}%
                   </span>
@@ -279,17 +268,13 @@ export const AudioMixerModal: React.FC<AudioMixerModalProps> = ({ isOpen, onClos
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button
+                  <Button
+                    variant={isSfxMuted ? 'danger' : 'secondary'}
+                    size="icon-xs"
                     onClick={toggleSfxMute}
-                    className={`p-1 rounded-md border transition-all ${
-                      isSfxMuted
-                        ? 'bg-rose-950/40 text-rose-300 border-rose-500/30'
-                        : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:text-white'
-                    }`}
+                    icon={isSfxMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                     title={isSfxMuted ? 'Desmutar Efeitos' : 'Mutar Efeitos'}
-                  >
-                    {isSfxMuted ? <VolumeX className="w-3.5 h-3.5 text-rose-400" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
+                  />
                   <span className="text-[11px] font-mono font-bold text-emerald-300 w-8 text-right">
                     {Math.round((isSfxMuted ? 0 : sfxVolume) * 100)}%
                   </span>

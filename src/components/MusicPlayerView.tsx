@@ -82,7 +82,9 @@ export const MusicPlayerView: React.FC = () => {
   const [newFolderId, setNewFolderId] = useState('');
   const [newTags, setNewTags] = useState('');
   const [newCoverUrl, setNewCoverUrl] = useState('');
+  const [newDuration, setNewDuration] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatTime = (secs: number) => {
@@ -109,6 +111,20 @@ export const MusicPlayerView: React.FC = () => {
     if (!file) return;
 
     setIsUploading(true);
+    setUploadError(null);
+
+    // Immediate client-side audio duration probe
+    try {
+      const probeUrl = URL.createObjectURL(file);
+      const probeAudio = new Audio(probeUrl);
+      probeAudio.addEventListener('loadedmetadata', () => {
+        if (isFinite(probeAudio.duration) && probeAudio.duration > 0) {
+          setNewDuration(Math.round(probeAudio.duration));
+        }
+        URL.revokeObjectURL(probeUrl);
+      }, { once: true });
+    } catch {}
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -118,14 +134,20 @@ export const MusicPlayerView: React.FC = () => {
         body: formData
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setNewUrl(data.url);
-        if (!newTitle) {
-          setNewTitle(file.name.replace(/\.[^/.]+$/, ''));
+        if (data.duration && data.duration > 0) {
+          setNewDuration(data.duration);
         }
+        if (!newTitle) {
+          setNewTitle(data.cleanTitle || file.name.replace(/\.[^/.]+$/, ''));
+        }
+      } else {
+        setUploadError(data.error || 'Erro ao enviar arquivo.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('File upload error:', err);
+      setUploadError(err?.message || 'Falha ao conectar com o servidor.');
     } finally {
       setIsUploading(false);
     }
@@ -146,6 +168,7 @@ export const MusicPlayerView: React.FC = () => {
       title: newTitle.trim(),
       artist: newArtist.trim() || 'Mestre da Mesa',
       url: newUrl.trim(),
+      duration: newDuration > 0 ? newDuration : undefined,
       folderId: newFolderId || undefined,
       tags: tagsArray,
       isLocal: newUrl.startsWith('/media/'),
@@ -159,6 +182,7 @@ export const MusicPlayerView: React.FC = () => {
     setNewFolderId('');
     setNewTags('');
     setNewCoverUrl('');
+    setNewDuration(0);
   };
 
   const toggleLoop = () => {
@@ -508,7 +532,7 @@ export const MusicPlayerView: React.FC = () => {
                         ))}
 
                         <span className="text-xs font-mono text-[#9E9E9E] w-12 text-right">
-                          {formatTime(track.duration)}
+                          {formatTime(isCurrent && duration > 0 ? duration : track.duration)}
                         </span>
 
                         <button
@@ -680,9 +704,14 @@ export const MusicPlayerView: React.FC = () => {
                     {isUploading ? 'Enviando arquivo...' : 'Arraste o áudio aqui ou clique para selecionar'}
                   </p>
                   <p className="text-[10px] text-[#9E9E9E] mt-0.5">
-                    Salva diretamente na pasta local persistente de músicas
+                    Salva diretamente na pasta local persistente de músicas (suporta arquivos grandes de várias horas)
                   </p>
                 </div>
+                {uploadError && (
+                  <p className="text-xs text-rose-400 mt-2 bg-rose-950/40 p-2 rounded-lg border border-rose-500/30">
+                    ⚠️ {uploadError}
+                  </p>
+                )}
               </div>
 
               {/* Or Direct URL */}

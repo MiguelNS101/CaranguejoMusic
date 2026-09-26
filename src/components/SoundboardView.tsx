@@ -121,10 +121,10 @@ export const SoundboardView: React.FC = () => {
         body: formData
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setNewUrl(data.url);
         if (!newName) {
-          setNewName(file.name.replace(/\.[^/.]+$/, ''));
+          setNewName(data.cleanTitle || file.name.replace(/\.[^/.]+$/, ''));
         }
       }
     } catch (err) {

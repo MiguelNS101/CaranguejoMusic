@@ -1592,20 +1592,29 @@ export class DiscordBotService {
     try {
       let resolvedPath = urlOrPath;
       let trackLabel = urlOrPath;
-      if (urlOrPath.startsWith('/api/media/file?path=')) {
+
+      if (urlOrPath.includes('/api/media/file?path=')) {
         const rawParam = urlOrPath.split('path=')[1];
         resolvedPath = decodeURIComponent(rawParam.split('&')[0]);
         trackLabel = path.basename(resolvedPath);
-      } else if (urlOrPath.startsWith('/media/music/')) {
-        const fileName = urlOrPath.replace('/media/music/', '');
+      } else if (urlOrPath.includes('/media/music/')) {
+        const fileName = urlOrPath.split('/media/music/')[1].split('?')[0];
         resolvedPath = path.join(process.cwd(), 'data', 'music', fileName);
         trackLabel = fileName;
-      } else if (urlOrPath.startsWith('/media/sfx/')) {
-        const fileName = urlOrPath.replace('/media/sfx/', '');
+      } else if (urlOrPath.includes('/media/ambience/')) {
+        const fileName = urlOrPath.split('/media/ambience/')[1].split('?')[0];
+        resolvedPath = path.join(process.cwd(), 'data', 'ambience', fileName);
+        trackLabel = fileName;
+      } else if (urlOrPath.includes('/media/sfx/')) {
+        const fileName = urlOrPath.split('/media/sfx/')[1].split('?')[0];
         resolvedPath = path.join(process.cwd(), 'data', 'sfx', fileName);
         trackLabel = `SFX: ${fileName}`;
-      } else if (urlOrPath.startsWith('/media/uploads/')) {
-        const fileName = urlOrPath.replace('/media/uploads/', '');
+      } else if (urlOrPath.includes('/media/npcs/')) {
+        const fileName = urlOrPath.split('/media/npcs/')[1].split('?')[0];
+        resolvedPath = path.join(process.cwd(), 'data', 'npcs', fileName);
+        trackLabel = `NPC: ${fileName}`;
+      } else if (urlOrPath.includes('/media/uploads/')) {
+        const fileName = urlOrPath.split('/media/uploads/')[1].split('?')[0];
         resolvedPath = path.join(process.cwd(), 'data', 'uploads', fileName);
         trackLabel = fileName;
       } else if (path.isAbsolute(urlOrPath)) {
@@ -1645,8 +1654,8 @@ export class DiscordBotService {
             inlineVolume: true
           });
         } catch (streamErr: any) {
-          this.logDiagnostic('warn', 'audio', `play-dl falhou ao extrair stream direto (${streamErr?.message}), tentando stream padrão via ffmpeg/prism...`);
-          resource = createAudioResource(resolvedPath, { inlineVolume: true });
+          this.logDiagnostic('error', 'audio', `play-dl falhou ao extrair stream direto (${streamErr?.message})`);
+          return { success: false, error: `Falha ao transmitir stream online (${streamErr?.message || 'Erro desconhecido'}).` };
         }
       } else if (isSpotify) {
         try {
@@ -1692,11 +1701,13 @@ export class DiscordBotService {
             inlineVolume: true
           });
         } catch (seekErr: any) {
-          console.warn('Prism FFmpeg seek error, falling back to standard createAudioResource:', seekErr);
-          resource = createAudioResource(resolvedPath, { inlineVolume: true });
+          console.warn('Prism FFmpeg seek error, falling back to direct stream:', seekErr);
+          const sourceStream = await this.getAudioReadableStream(resolvedPath);
+          resource = createAudioResource(sourceStream, { inlineVolume: true });
         }
       } else {
-        resource = createAudioResource(resolvedPath, { inlineVolume: true });
+        const sourceStream = await this.getAudioReadableStream(resolvedPath);
+        resource = createAudioResource(sourceStream, { inlineVolume: true });
       }
 
       if (resource.volume) {

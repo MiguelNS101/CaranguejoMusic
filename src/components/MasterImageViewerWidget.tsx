@@ -69,7 +69,7 @@ export const MasterImageViewerWidget: React.FC<MasterImageViewerWidgetProps> = (
 
   const combinedGallery = [...gallery, ...npcImages.filter(ni => !gallery.some(g => g.url === ni.url))];
 
-  const [activeImageId, setActiveImageId] = useState<string>(() => combinedGallery[0]?.id || 'img-map-1');
+  const [activeImageId, setActiveImageId] = useState<string>(() => combinedGallery[0]?.id || '');
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [showSecret, setShowSecret] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);

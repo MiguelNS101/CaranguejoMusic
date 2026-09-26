@@ -1,7 +1,9 @@
-import express, { Router, Request, Response } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { spawnSync } from 'child_process';
+import ffmpegStatic from 'ffmpeg-static';
 import playdl from 'play-dl';
 import { db, UPLOADS_DIR, MUSIC_DIR, AMBIENCE_DIR, SFX_DIR, NPCS_DIR, SAVES_DIR } from './db.js';
 import { discordBot } from './discordBot.js';
@@ -52,8 +54,27 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 } // 100MB
+  limits: { fileSize: 4 * 1024 * 1024 * 1024 } // 4GB - allows very large audio files (hours long)
 });
+
+// Helper to probe real audio duration in seconds using ffmpeg-static
+function probeAudioDuration(filePath: string): number {
+  try {
+    if (!ffmpegStatic || !fs.existsSync(filePath)) return 0;
+    const result = spawnSync(ffmpegStatic as string, ['-i', filePath], { encoding: 'utf8', timeout: 6000 });
+    const output = (result.stderr || '') + (result.stdout || '');
+    const match = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+    if (match) {
+      const hours = parseFloat(match[1]);
+      const minutes = parseFloat(match[2]);
+      const seconds = parseFloat(match[3]);
+      return Math.round(hours * 3600 + minutes * 60 + seconds);
+    }
+  } catch (e) {
+    console.warn('Could not probe audio duration for:', filePath, e);
+  }
+  return 0;
+}
 
 // Helper to clean audio/image filenames into human-readable titles
 function formatFileNameToTitle(fileName: string): string {
@@ -176,6 +197,26 @@ router.post('/discord/send-message', handleSendMessage);
 router.post('/bot/send-message', handleSendMessage);
 router.post('/discord/message', handleSendMessage);
 router.post('/bot/message', handleSendMessage);
+router.post('/discord/broadcast', handleSendMessage);
+router.post('/bot/broadcast', handleSendMessage);
+
+const handleGetChannels = (req: Request, res: Response) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, no-cache');
+    const guilds = discordBot.getGuilds();
+    const channels: Array<{ id: string; name: string; type: 'text' | 'voice'; guildId: string; isVoiceWithChat?: boolean }> = [];
+    guilds.forEach(g => {
+      if (g.channels) {
+        channels.push(...g.channels);
+      }
+    });
+    res.json({ success: true, channels });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao listar canais do Discord.' });
+  }
+};
+router.get('/discord/channels', handleGetChannels);
+router.get('/bot/channels', handleGetChannels);
 
 const handleGetChannelMessages = async (req: Request, res: Response) => {
   try {
@@ -468,7 +509,7 @@ router.post('/music', (req: Request, res: Response) => {
     id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     title,
     artist: artist || 'Desconhecido',
-    duration: duration || 120,
+    duration: duration ? Math.round(duration) : 0,
     url,
     folderId,
     tags: Array.isArray(tags) ? tags : [],
@@ -508,7 +549,7 @@ router.post('/ambience', (req: Request, res: Response) => {
     id: `amb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     title,
     environment: environment || 'Ambiente',
-    duration: duration || 300,
+    duration: duration ? Math.round(duration) : 0,
     url,
     folderId,
     tags: Array.isArray(tags) ? tags : [],
@@ -850,7 +891,7 @@ router.post('/library/scan-folder', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Caminho da pasta é obrigatório.' });
   }
 
-  const targetCategory = (category as 'music' | 'sfx' | 'npc') || 'music';
+  const targetCategory = (category as 'music' | 'ambience' | 'sfx' | 'npc') || 'music';
   const targetFolderType = targetCategory === 'sfx' ? 'soundboard' : targetCategory;
 
   const resolvedPath = path.isAbsolute(folderPath) ? folderPath : path.resolve(process.cwd(), folderPath);
@@ -909,6 +950,7 @@ router.post('/library/scan-folder', (req: Request, res: Response) => {
     existingFolders.forEach(f => folderCache.set(f.name.toLowerCase().trim(), f));
 
     const newMusicTracks: MusicTrack[] = [];
+    const newAmbienceTracks: AmbienceTrack[] = [];
     const newSfxItems: SoundboardItem[] = [];
     const newNpcs: NPC[] = [];
 
@@ -943,12 +985,16 @@ router.post('/library/scan-folder', (req: Request, res: Response) => {
         itemFolderId = matched.id;
       }
 
+      const probedSecs = targetCategory !== 'npc' ? probeAudioDuration(item.fullPath) : 0;
+      const defaultDuration = targetCategory === 'ambience' ? 300 : (targetCategory === 'sfx' ? 4 : 180);
+      const audioDuration = probedSecs > 0 ? probedSecs : defaultDuration;
+
       if (targetCategory === 'music') {
         const track: MusicTrack = {
           id: `m-ref-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
           title: cleanTitle,
           artist: item.subfolder || 'Pasta Local',
-          duration: 180,
+          duration: audioDuration,
           url: streamUrl,
           folderId: itemFolderId,
           tags: autoTags,
@@ -956,6 +1002,20 @@ router.post('/library/scan-folder', (req: Request, res: Response) => {
           createdAt: Date.now()
         };
         newMusicTracks.push(track);
+      } else if (targetCategory === 'ambience') {
+        const track: AmbienceTrack = {
+          id: `amb-ref-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+          title: cleanTitle,
+          environment: item.subfolder || 'Pasta Local',
+          duration: audioDuration,
+          url: streamUrl,
+          folderId: itemFolderId,
+          tags: autoTags,
+          isLoop: true,
+          isLocal: true,
+          createdAt: Date.now()
+        };
+        newAmbienceTracks.push(track);
       } else if (targetCategory === 'sfx') {
         const sfx: SoundboardItem = {
           id: `sfx-ref-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
@@ -963,7 +1023,7 @@ router.post('/library/scan-folder', (req: Request, res: Response) => {
           emoji: '🔊',
           color: '#6366f1',
           url: streamUrl,
-          duration: 4,
+          duration: audioDuration,
           folderId: itemFolderId,
           tags: autoTags,
           volume: 90,
@@ -988,6 +1048,7 @@ router.post('/library/scan-folder', (req: Request, res: Response) => {
     }
 
     if (newMusicTracks.length > 0) db.addMusicTracksBulk(newMusicTracks);
+    if (newAmbienceTracks.length > 0) db.addAmbienceTracksBulk(newAmbienceTracks);
     if (newSfxItems.length > 0) db.addSoundboardItemsBulk(newSfxItems);
     if (newNpcs.length > 0) db.addNpcsBulk(newNpcs);
 
@@ -1007,26 +1068,38 @@ router.post('/library/scan-folder', (req: Request, res: Response) => {
 // FILE & FOLDER IMPORT HANDLER
 // ==========================================
 
-router.post('/upload', upload.single('file'), (req: Request, res: Response) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
-  }
+router.post('/upload', (req: Request, res: Response) => {
+  upload.single('file')(req, res, (err: any) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ success: false, error: 'O arquivo excede o limite máximo permitido (4GB).' });
+      }
+      return res.status(400).json({ success: false, error: `Erro no envio do arquivo: ${err.message}` });
+    }
 
-  const type = req.query.type as string;
-  let relativePath = `/media/uploads/${req.file.filename}`;
-  if (type === 'music') relativePath = `/media/music/${req.file.filename}`;
-  else if (type === 'ambience') relativePath = `/media/ambience/${req.file.filename}`;
-  else if (type === 'sfx') relativePath = `/media/sfx/${req.file.filename}`;
-  else if (type === 'npc') relativePath = `/media/npcs/${req.file.filename}`;
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Nenhum arquivo enviado.' });
+    }
 
-  res.json({
-    success: true,
-    filename: req.file.filename,
-    originalName: req.file.originalname,
-    cleanTitle: formatFileNameToTitle(req.file.originalname),
-    size: req.file.size,
-    mimetype: req.file.mimetype,
-    url: relativePath
+    const type = req.query.type as string;
+    let relativePath = `/media/uploads/${req.file.filename}`;
+    if (type === 'music') relativePath = `/media/music/${req.file.filename}`;
+    else if (type === 'ambience') relativePath = `/media/ambience/${req.file.filename}`;
+    else if (type === 'sfx') relativePath = `/media/sfx/${req.file.filename}`;
+    else if (type === 'npc') relativePath = `/media/npcs/${req.file.filename}`;
+
+    const probedDuration = probeAudioDuration(req.file.path);
+
+    res.json({
+      success: true,
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      cleanTitle: formatFileNameToTitle(req.file.originalname),
+      size: req.file.size,
+      mimetype: req.file.mimetype,
+      url: relativePath,
+      duration: probedDuration > 0 ? probedDuration : undefined
+    });
   });
 });
 
@@ -1048,163 +1121,174 @@ function getFolderIcon(name: string, type: string): string {
 }
 
 // BULK FOLDER IMPORT: Imports an entire folder / batch of files with automatic names & subfolder organization
-router.post('/upload/bulk', upload.array('files', 150), (req: Request, res: Response) => {
-  const files = (req.files as Express.Multer.File[]) || [];
-  if (files.length === 0) {
-    return res.status(400).json({ error: 'Nenhum arquivo recebido para importação em lote.' });
-  }
-
-  const targetCategory = (req.query.type as string) || 'music';
-  const isImageCategory = targetCategory === 'image' || req.body.isGeneralImage === 'true';
-  const folderType = targetCategory === 'sfx' ? 'soundboard' : targetCategory === 'ambience' ? 'ambience' : targetCategory === 'music' ? 'music' : 'npc';
-  let targetFolderId = (req.body.folderId as string) || (req.query.folderId as string) || undefined;
-  const autoCreateItems = req.body.autoCreateItems !== 'false';
-
-  // Parse relative paths if sent from frontend
-  let relativePaths: string[] = [];
-  try {
-    if (req.body.paths) {
-      relativePaths = typeof req.body.paths === 'string' ? JSON.parse(req.body.paths) : req.body.paths;
+router.post('/upload/bulk', (req: Request, res: Response) => {
+  upload.array('files', 150)(req, res, (err: any) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'Um ou mais arquivos excedem o limite de 4GB.' });
+      }
+      return res.status(400).json({ error: `Erro no upload em lote: ${err.message}` });
     }
-  } catch (e) {
-    relativePaths = [];
-  }
 
-  const importedResults: any[] = [];
-  const newMusicTracks: MusicTrack[] = [];
-  const newAmbienceTracks: AmbienceTrack[] = [];
-  const newSfxItems: SoundboardItem[] = [];
-  const newNpcs: NPC[] = [];
+    const files = (req.files as Express.Multer.File[]) || [];
+    if (files.length === 0) {
+      return res.status(400).json({ error: 'Nenhum arquivo recebido para importação em lote.' });
+    }
 
-  // Cache newly created folders in this request
-  const folderCache = new Map<string, Folder>();
-  const existingFolders = db.getFolders(folderType);
-  existingFolders.forEach(f => folderCache.set(f.name.toLowerCase().trim(), f));
+    const targetCategory = (req.query.type as string) || 'music';
+    const isImageCategory = targetCategory === 'image' || req.body.isGeneralImage === 'true';
+    const folderType = targetCategory === 'sfx' ? 'soundboard' : targetCategory === 'ambience' ? 'ambience' : targetCategory === 'music' ? 'music' : 'npc';
+    let targetFolderId = (req.body.folderId as string) || (req.query.folderId as string) || undefined;
+    const autoCreateItems = req.body.autoCreateItems !== 'false';
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const relPath = relativePaths[i] || file.originalname;
-    const cleanTitle = formatFileNameToTitle(file.originalname);
-    let relativeUrl = `/media/uploads/${file.filename}`;
+    // Parse relative paths if sent from frontend
+    let relativePaths: string[] = [];
+    try {
+      if (req.body.paths) {
+        relativePaths = typeof req.body.paths === 'string' ? JSON.parse(req.body.paths) : req.body.paths;
+      }
+    } catch (e) {
+      relativePaths = [];
+    }
 
-    // Extract subfolders from relative path: e.g. "Combate/Chefes/dragao.mp3" -> ["Combate", "Chefes"]
-    const pathParts = relPath.replace(/\\/g, '/').split('/').filter(p => Boolean(p.trim()));
-    let itemFolderId = targetFolderId;
-    const autoTags: string[] = ['Importado', 'Local'];
+    const importedResults: any[] = [];
+    const newMusicTracks: MusicTrack[] = [];
+    const newAmbienceTracks: AmbienceTrack[] = [];
+    const newSfxItems: SoundboardItem[] = [];
+    const newNpcs: NPC[] = [];
 
-    if (pathParts.length > 1) {
-      // There are subfolders! e.g. "Musicas/Combate/dragao.mp3" or "Combate/dragao.mp3"
-      const subfolderNames = pathParts.slice(0, -1);
-      // Main folder is the most descriptive folder (last folder before filename or top folder)
-      const primaryFolderName = subfolderNames[subfolderNames.length - 1];
+    // Cache newly created folders in this request
+    const folderCache = new Map<string, Folder>();
+    const existingFolders = db.getFolders(folderType);
+    existingFolders.forEach(f => folderCache.set(f.name.toLowerCase().trim(), f));
 
-      // Add all folder names as tags
-      subfolderNames.forEach(name => {
-        if (!autoTags.includes(name)) autoTags.push(name);
-      });
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const relPath = relativePaths[i] || file.originalname;
+      const cleanTitle = formatFileNameToTitle(file.originalname);
+      let relativeUrl = `/media/uploads/${file.filename}`;
 
-      // Auto-create folder if not existing
-      const key = primaryFolderName.toLowerCase().trim();
-      let matchedFolder = folderCache.get(key);
+      // Extract subfolders from relative path: e.g. "Combate/Chefes/dragao.mp3" -> ["Combate", "Chefes"]
+      const pathParts = relPath.replace(/\\/g, '/').split('/').filter(p => Boolean(p.trim()));
+      let itemFolderId = targetFolderId;
+      const autoTags: string[] = ['Importado', 'Local'];
 
-      if (!matchedFolder) {
-        const colorIdx = (folderCache.size + Math.floor(Math.random() * 5)) % FOLDER_COLORS.length;
-        const newFolder: Folder = {
-          id: `f-${targetCategory[0]}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          name: primaryFolderName,
-          type: folderType,
-          color: FOLDER_COLORS[colorIdx],
-          icon: getFolderIcon(primaryFolderName, targetCategory),
-          createdAt: Date.now()
-        };
-        db.addFolder(newFolder);
-        folderCache.set(key, newFolder);
-        matchedFolder = newFolder;
+      if (pathParts.length > 1) {
+        // There are subfolders! e.g. "Musicas/Combate/dragao.mp3" or "Combate/dragao.mp3"
+        const subfolderNames = pathParts.slice(0, -1);
+        // Main folder is the most descriptive folder (last folder before filename or top folder)
+        const primaryFolderName = subfolderNames[subfolderNames.length - 1];
+
+        // Add all folder names as tags
+        subfolderNames.forEach(name => {
+          if (!autoTags.includes(name)) autoTags.push(name);
+        });
+
+        // Auto-create folder if not existing
+        const key = primaryFolderName.toLowerCase().trim();
+        let matchedFolder = folderCache.get(key);
+
+        if (!matchedFolder) {
+          const colorIdx = (folderCache.size + Math.floor(Math.random() * 5)) % FOLDER_COLORS.length;
+          const newFolder: Folder = {
+            id: `f-${targetCategory[0]}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            name: primaryFolderName,
+            type: folderType,
+            color: FOLDER_COLORS[colorIdx],
+            icon: getFolderIcon(primaryFolderName, targetCategory),
+            createdAt: Date.now()
+          };
+          db.addFolder(newFolder);
+          folderCache.set(key, newFolder);
+          matchedFolder = newFolder;
+        }
+
+        itemFolderId = matchedFolder.id;
       }
 
-      itemFolderId = matchedFolder.id;
+      const probedSecs = targetCategory !== 'npc' && targetCategory !== 'image' ? probeAudioDuration(file.path) : 0;
+
+      if (targetCategory === 'music') {
+        relativeUrl = `/media/music/${file.filename}`;
+        const track: MusicTrack = {
+          id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+          title: cleanTitle,
+          artist: 'Arquivo Local Importado',
+          duration: probedSecs > 0 ? probedSecs : 180,
+          url: relativeUrl,
+          folderId: itemFolderId,
+          tags: autoTags,
+          isLocal: true,
+          createdAt: Date.now()
+        };
+        newMusicTracks.push(track);
+        importedResults.push(track);
+      } else if (targetCategory === 'ambience') {
+        relativeUrl = `/media/ambience/${file.filename}`;
+        const ambience: AmbienceTrack = {
+          id: `amb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+          title: cleanTitle,
+          category: 'Importado',
+          duration: probedSecs > 0 ? probedSecs : 300,
+          url: relativeUrl,
+          folderId: itemFolderId,
+          tags: autoTags,
+          isLocal: true,
+          isLoop: true,
+          createdAt: Date.now()
+        };
+        newAmbienceTracks.push(ambience);
+        importedResults.push(ambience);
+      } else if (targetCategory === 'sfx') {
+        relativeUrl = `/media/sfx/${file.filename}`;
+        const sfx: SoundboardItem = {
+          id: `sfx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+          name: cleanTitle,
+          emoji: '🔊',
+          color: '#6366f1',
+          url: relativeUrl,
+          duration: probedSecs > 0 ? probedSecs : 4,
+          folderId: itemFolderId,
+          tags: autoTags,
+          volume: 90,
+          isLocal: true,
+          createdAt: Date.now()
+        };
+        newSfxItems.push(sfx);
+        importedResults.push(sfx);
+      } else if (targetCategory === 'npc' || targetCategory === 'image') {
+        relativeUrl = `/media/npcs/${file.filename}`;
+        const npc: NPC = {
+          id: `npc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
+          name: cleanTitle,
+          title: isImageCategory ? 'Imagem / Cenário' : 'NPC / Criatura',
+          description: '',
+          imageUrl: relativeUrl,
+          folderId: itemFolderId,
+          tags: autoTags.filter(t => t !== 'Local'),
+          isGeneralImage: isImageCategory,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        newNpcs.push(npc);
+        importedResults.push(npc);
+      }
     }
 
-    if (targetCategory === 'music') {
-      relativeUrl = `/media/music/${file.filename}`;
-      const track: MusicTrack = {
-        id: `m-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
-        title: cleanTitle,
-        artist: 'Arquivo Local Importado',
-        duration: 180,
-        url: relativeUrl,
-        folderId: itemFolderId,
-        tags: autoTags,
-        isLocal: true,
-        createdAt: Date.now()
-      };
-      newMusicTracks.push(track);
-      importedResults.push(track);
-    } else if (targetCategory === 'ambience') {
-      relativeUrl = `/media/ambience/${file.filename}`;
-      const ambience: AmbienceTrack = {
-        id: `amb-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
-        title: cleanTitle,
-        category: 'Importado',
-        duration: 300,
-        url: relativeUrl,
-        folderId: itemFolderId,
-        tags: autoTags,
-        isLocal: true,
-        isLoop: true,
-        createdAt: Date.now()
-      };
-      newAmbienceTracks.push(ambience);
-      importedResults.push(ambience);
-    } else if (targetCategory === 'sfx') {
-      relativeUrl = `/media/sfx/${file.filename}`;
-      const sfx: SoundboardItem = {
-        id: `sfx-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
-        name: cleanTitle,
-        emoji: '🔊',
-        color: '#6366f1',
-        url: relativeUrl,
-        duration: 4,
-        folderId: itemFolderId,
-        tags: autoTags,
-        volume: 90,
-        isLocal: true,
-        createdAt: Date.now()
-      };
-      newSfxItems.push(sfx);
-      importedResults.push(sfx);
-    } else if (targetCategory === 'npc' || targetCategory === 'image') {
-      relativeUrl = `/media/npcs/${file.filename}`;
-      const npc: NPC = {
-        id: `npc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-${i}`,
-        name: cleanTitle,
-        title: isImageCategory ? 'Imagem / Cenário' : 'NPC / Criatura',
-        description: '',
-        imageUrl: relativeUrl,
-        folderId: itemFolderId,
-        tags: autoTags.filter(t => t !== 'Local'),
-        isGeneralImage: isImageCategory,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
-      newNpcs.push(npc);
-      importedResults.push(npc);
+    if (autoCreateItems) {
+      if (newMusicTracks.length > 0) db.addMusicTracksBulk(newMusicTracks);
+      if (newAmbienceTracks.length > 0) db.addAmbienceTracksBulk(newAmbienceTracks);
+      if (newSfxItems.length > 0) db.addSoundboardItemsBulk(newSfxItems);
+      if (newNpcs.length > 0) db.addNpcsBulk(newNpcs);
     }
-  }
 
-  if (autoCreateItems) {
-    if (newMusicTracks.length > 0) db.addMusicTracksBulk(newMusicTracks);
-    if (newAmbienceTracks.length > 0) db.addAmbienceTracksBulk(newAmbienceTracks);
-    if (newSfxItems.length > 0) db.addSoundboardItemsBulk(newSfxItems);
-    if (newNpcs.length > 0) db.addNpcsBulk(newNpcs);
-  }
-
-  res.json({
-    success: true,
-    totalFiles: files.length,
-    category: targetCategory,
-    items: importedResults,
-    state: db.getFullState()
+    res.json({
+      success: true,
+      totalFiles: files.length,
+      category: targetCategory,
+      items: importedResults,
+      state: db.getFullState()
+    });
   });
 });
 

@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { Header } from './components/Header';
 import { MasterScreen } from './components/MasterScreen';
 import { ScenarioMapManager } from './components/ScenarioMapManager';
+import { AudioUnifiedView } from './components/AudioUnifiedView';
 import { MusicPlayerView } from './components/MusicPlayerView';
 import { AmbiencePlayerView } from './components/AmbiencePlayerView';
 import { SoundboardView } from './components/SoundboardView';
@@ -18,12 +19,13 @@ import { PresetManagerModal } from './components/PresetManagerModal';
 import { ConfigurationModal } from './components/ConfigurationModal';
 import { AudioMixerModal } from './components/AudioMixerModal';
 import { ActionLogFooter } from './components/ActionLogFooter';
+import { Button } from './components/Button';
 
 export default function App() {
-  const [currentTab, setCurrentTab] = useState<'master' | 'maps' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings'>(() => {
+  const [currentTab, setCurrentTab] = useState<'master' | 'maps' | 'audio' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'images' | 'chat' | 'settings'>(() => {
     try {
       const saved = localStorage.getItem('caranguejo_active_tab');
-      if (saved && ['master', 'maps', 'music', 'ambience', 'soundboard', 'npcs', 'chat', 'settings'].includes(saved)) {
+      if (saved && ['master', 'maps', 'audio', 'music', 'ambience', 'soundboard', 'npcs', 'images', 'chat', 'settings'].includes(saved)) {
         return saved as any;
       }
     } catch {}
@@ -79,6 +81,7 @@ export default function App() {
             {currentTab === 'master' && (
               <MasterScreen
                 onOpenMusicTab={() => setCurrentTab('music')}
+                onOpenAmbienceTab={() => setCurrentTab('ambience')}
                 onOpenSoundboardTab={() => setCurrentTab('soundboard')}
                 onOpenNpcTab={() => setCurrentTab('npcs')}
                 onOpenChatTab={() => setCurrentTab('chat')}
@@ -103,14 +106,25 @@ export default function App() {
               </div>
             )}
 
-            {currentTab === 'music' && <MusicPlayerView />}
-
-            {currentTab === 'ambience' && <AmbiencePlayerView />}
-
-            {currentTab === 'soundboard' && <SoundboardView />}
-
+            {(currentTab === 'audio' || currentTab === 'music' || currentTab === 'ambience' || currentTab === 'soundboard') && (
+              <AudioUnifiedView
+                initialSubTab={
+                  currentTab === 'ambience'
+                    ? 'ambience'
+                    : currentTab === 'soundboard'
+                    ? 'soundboard'
+                    : 'music'
+                }
+                onSubTabChange={(tab) => setCurrentTab(tab)}
+              />
+            )}
+ 
             <div className={currentTab === 'npcs' ? 'block' : 'hidden'}>
-              <NpcView />
+              <NpcView mode="npcs" />
+            </div>
+
+            <div className={currentTab === 'images' ? 'block' : 'hidden'}>
+              <NpcView mode="images" />
             </div>
 
             {currentTab === 'chat' && <ChatMessengerView />}
@@ -123,36 +137,41 @@ export default function App() {
                     Gerencie o bot do Discord, áudio mixer, customização visual com CSS, guias e predefinições.
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={() => setIsDiscordModalOpen(true)}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow"
                     >
                       Discord Bot & Docker
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => setIsMixerModalOpen(true)}
-                      className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-bold transition-all border border-zinc-700"
                     >
                       Mixer de Áudio
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => setIsThemeModalOpen(true)}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all shadow"
                     >
                       Temas & CSS
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="warning"
+                      size="sm"
                       onClick={() => setIsPresetModalOpen(true)}
-                      className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold transition-all shadow"
                     >
                       Predefinições (JSON)
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="success"
+                      size="sm"
                       onClick={() => setIsTutorialModalOpen(true)}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow"
                     >
                       Manual & Guia
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

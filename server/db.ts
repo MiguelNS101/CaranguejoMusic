@@ -116,81 +116,7 @@ const DEFAULT_BOT_CONFIG: BotConfig = {
   prefix: '!'
 };
 
-const DEFAULT_MAPS: ScenarioMap[] = [
-  {
-    id: 'map-caranguejo-coast',
-    name: 'Costa de Caranguejo & Enseada dos Piratas',
-    description: 'Um litoral repleto de cavernas marítimas, recifes pontiagudos e refúgios piratas esquecidos pela coroa.',
-    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1600&q=80',
-    region: 'Arquipélago dos Ventos Cortantes',
-    climate: 'Brisa salgada, névoa matinal e trovões distantes',
-    gridEnabled: true,
-    gridSize: 40,
-    isCurrent: true,
-    markers: [
-      {
-        id: 'marker-tavern-1',
-        mapId: 'map-caranguejo-coast',
-        name: 'Taverna do Siri Bêbado',
-        category: 'tavern',
-        description: 'Taverna rústica construída sobre os destroços de um galeão encalhado. Ponto de encontro de marinheiros, contrabandistas e aventureiros.',
-        x: 28.5,
-        y: 62.0,
-        color: '#f59e0b',
-        icon: 'Beer',
-        isSecret: false,
-        linkedItem: 'Rum Especial de Caranguejo (Cura 1d4 PV)',
-        notes: 'O estalajadeiro Capitão Gancho sabe onde fica a caverna secreta e vende mapas duvidosos.',
-        createdAt: Date.now() - 3600000
-      },
-      {
-        id: 'marker-cave-2',
-        mapId: 'map-caranguejo-coast',
-        name: 'Caverna dos Contrabandistas',
-        category: 'danger',
-        description: 'Gruta inundada acessível apenas na maré baixa. Guarda armadilhas de arpão e sentinelas armados da guilda dos corsários.',
-        x: 64.2,
-        y: 41.5,
-        color: '#ef4444',
-        icon: 'AlertTriangle',
-        isSecret: false,
-        notes: 'Armadilha CD 14 para detectar, 2d6 de dano perfurante.',
-        createdAt: Date.now() - 3000000
-      },
-      {
-        id: 'marker-chest-3',
-        mapId: 'map-caranguejo-coast',
-        name: 'Baú dos Reis do Mar',
-        category: 'treasure',
-        description: 'Um baú selado com algas petrificadas e runas arcanas de proteção aquática.',
-        x: 78.0,
-        y: 75.0,
-        color: '#10b981',
-        icon: 'Gem',
-        isSecret: false,
-        linkedItem: 'Amuleto das Marés e 150 Peças de Ouro',
-        notes: 'Fechadura trancada com CD 15 em Ladinagem ou Magia de Abertura.',
-        createdAt: Date.now() - 2500000
-      },
-      {
-        id: 'marker-lighthouse-4',
-        mapId: 'map-caranguejo-coast',
-        name: 'Farol das Almas Perdidas',
-        category: 'location',
-        description: 'Antigo farol de pedra onde queima uma chama fantasmagórica verde que nunca se apaga, servindo de guia contra nevoeiros.',
-        x: 18.0,
-        y: 22.0,
-        color: '#6366f1',
-        icon: 'MapPin',
-        isSecret: false,
-        notes: 'O eremita cego do farol conhece o segredo para acalmar o monstro marinho.',
-        createdAt: Date.now() - 2000000
-      }
-    ],
-    createdAt: Date.now() - 86400000,
-    updatedAt: Date.now() - 3600000
-  }
-];
+const DEFAULT_MAPS: ScenarioMap[] = [];
 
 export class JsonDatabase {
   private data: DatabaseSchema;
@@ -229,8 +155,8 @@ export class JsonDatabase {
           queue: parsed.queue || [],
           volume: parsed.volume !== undefined ? parsed.volume : 0.8,
           loopMode: parsed.loopMode || 'queue',
-          maps: parsed.maps || DEFAULT_MAPS,
-          currentMapId: parsed.currentMapId !== undefined ? parsed.currentMapId : 'map-caranguejo-coast',
+          maps: parsed.maps || [],
+          currentMapId: parsed.currentMapId !== undefined ? parsed.currentMapId : null,
           diceHistory: parsed.diceHistory || [],
           dicePresets: parsed.dicePresets || DEFAULT_DICE_PRESETS
         };
@@ -254,8 +180,8 @@ export class JsonDatabase {
       queue: [],
       volume: 0.8,
       loopMode: 'queue',
-      maps: DEFAULT_MAPS,
-      currentMapId: 'map-caranguejo-coast',
+      maps: [],
+      currentMapId: null,
       diceHistory: [],
       dicePresets: DEFAULT_DICE_PRESETS
     };

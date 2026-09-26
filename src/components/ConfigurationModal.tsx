@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { useTheme } from '../context/ThemeContext';
+import { Button } from './Button';
 
 interface ConfigurationModalProps {
   isOpen: boolean;
@@ -139,123 +140,101 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
             </div>
           </div>
 
-          <button
+          <Button
+            variant="ghost"
+            size="icon-sm"
             onClick={onClose}
-            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-colors cursor-pointer"
+            icon={<X className="w-5 h-5 text-zinc-400 hover:text-white" />}
             title="Fechar"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          />
         </div>
 
         {/* Navigation Tabs */}
         <div className="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 bg-[#121417] border-b border-[#282C34] overflow-x-auto no-scrollbar shrink-0">
-          <button
-            type="button"
+          <Button
+            variant="tab"
+            size="sm"
+            isActive={activeTab === 'discord'}
             onClick={() => setActiveTab('discord')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-              activeTab === 'discord'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-            }`}
+            icon={
+              <div className="relative">
+                <Bot className="w-4 h-4" />
+                <span className={`absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full ${botStatus.isOnline ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
+              </div>
+            }
           >
-            <div className="relative">
-              <Bot className="w-4 h-4" />
-              <span className={`absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full ${botStatus.isOnline ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
-            </div>
             <span>Discord Bot & Docker</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="tab"
+            size="sm"
+            isActive={activeTab === 'mixer'}
             onClick={() => setActiveTab('mixer')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-              activeTab === 'mixer'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-            }`}
+            icon={<SlidersHorizontal className="w-4 h-4 text-cyan-400" />}
           >
-            <SlidersHorizontal className="w-4 h-4 text-cyan-400" />
             <span>Mixer de Áudio</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="tab"
+            size="sm"
+            isActive={activeTab === 'folders'}
             onClick={() => setActiveTab('folders')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-              activeTab === 'folders'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-            }`}
+            icon={<FolderOpen className="w-4 h-4 text-amber-400" />}
           >
-            <FolderOpen className="w-4 h-4 text-amber-400" />
             <span>Pastas ({folders.length})</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="tab"
+            size="sm"
+            isActive={activeTab === 'saves'}
             onClick={() => setActiveTab('saves')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-              activeTab === 'saves'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-            }`}
+            icon={<HardDrive className="w-4 h-4 text-indigo-400" />}
           >
-            <HardDrive className="w-4 h-4 text-indigo-400" />
             <span>Saves & Sessões ({savedSessions.length})</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="tab"
+            size="sm"
+            isActive={activeTab === 'themes'}
             onClick={() => setActiveTab('themes')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-              activeTab === 'themes'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-            }`}
+            icon={<Palette className="w-4 h-4 text-purple-400" />}
           >
-            <Palette className="w-4 h-4 text-purple-400" />
             <span>Temas & CSS</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="tab"
+            size="sm"
+            isActive={activeTab === 'presets'}
             onClick={() => setActiveTab('presets')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-              activeTab === 'presets'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-            }`}
+            icon={<Sparkles className="w-4 h-4 text-amber-400" />}
           >
-            <Sparkles className="w-4 h-4 text-amber-400" />
             <span>Predefinições (JSON)</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="tab"
+            size="sm"
+            isActive={activeTab === 'playerColors'}
             onClick={() => setActiveTab('playerColors')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-              activeTab === 'playerColors'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-            }`}
+            icon={<Palette className="w-4 h-4 text-pink-400" />}
           >
-            <Palette className="w-4 h-4 text-pink-400" />
             <span>Cores dos Jogadores ({Object.keys(configPlayerColors).length})</span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="tab"
+            size="sm"
+            isActive={activeTab === 'guide'}
             onClick={() => setActiveTab('guide')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 cursor-pointer ${
-              activeTab === 'guide'
-                ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-            }`}
+            icon={<HelpCircle className="w-4 h-4 text-emerald-400" />}
           >
-            <HelpCircle className="w-4 h-4 text-emerald-400" />
             <span>Guia & Manual</span>
-          </button>
+          </Button>
         </div>
 
         {/* Content Body */}

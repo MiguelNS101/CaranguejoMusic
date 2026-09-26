@@ -31,7 +31,11 @@ import { FolderImportModal } from './FolderImportModal';
 import { DrawingPaintStudio } from './DrawingPaintStudio';
 import { apiFetch, resolveApiUrl } from '../services/api';
 
-export const NpcView: React.FC = () => {
+export interface NpcViewProps {
+  mode?: 'npcs' | 'images' | 'all';
+}
+
+export const NpcView: React.FC<NpcViewProps> = ({ mode = 'all' }) => {
   const {
     npcs,
     folders,
@@ -43,7 +47,19 @@ export const NpcView: React.FC = () => {
   } = useAudio();
 
   // Top Sub-Tabs: 'npcs' | 'general' | 'paint'
-  const [activeSubTab, setActiveSubTab] = useState<'npcs' | 'general' | 'paint'>('npcs');
+  const [activeSubTab, setActiveSubTab] = useState<'npcs' | 'general' | 'paint'>(() => {
+    if (mode === 'images') return 'general';
+    return 'npcs';
+  });
+
+  // Keep subtab in sync if mode prop changes
+  React.useEffect(() => {
+    if (mode === 'images' && activeSubTab === 'npcs') {
+      setActiveSubTab('general');
+    } else if (mode === 'npcs' && activeSubTab !== 'npcs') {
+      setActiveSubTab('npcs');
+    }
+  }, [mode]);
 
   const [selectedFolderId, setSelectedFolderId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -256,66 +272,134 @@ export const NpcView: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-16">
-      {/* Top Navigation Sub-Tabs: NPCs vs Imagens em Geral */}
-      <div className="flex items-center justify-between border-b border-[#2D3139] pb-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              setActiveSubTab('npcs');
-              setSelectedFolderId('all');
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-              activeSubTab === 'npcs'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'bg-[#1A1D21] text-zinc-400 hover:text-white border border-[#2D3139]'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>NPCs & Criaturas</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/30">
-              {npcList.length}
-            </span>
-          </button>
+      {/* Top Header / Sub-Tabs */}
+      {mode === 'npcs' ? (
+        <div className="flex items-center justify-between border-b border-[#2D3139] pb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white font-rpg">
+                  NPCs & Criaturas da Campanha
+                </h2>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  {npcList.length} {npcList.length === 1 ? 'personagem' : 'personagens'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Organize fichas de monstros, aliados e vilões, HP, CA, segredos do mestre e envie retratos com 1-clique para o Discord.
+              </p>
+            </div>
+          </div>
 
-          <button
-            onClick={() => {
-              setActiveSubTab('general');
-              setSelectedFolderId('all');
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-              activeSubTab === 'general'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'bg-[#1A1D21] text-zinc-400 hover:text-white border border-[#2D3139]'
-            }`}
-          >
-            <ImageIcon className="w-4 h-4" />
-            <span>Imagens em Geral (Mapas & Cenários)</span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/30">
-              {generalImageList.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveSubTab('paint');
-            }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-              activeSubTab === 'paint'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                : 'text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B]'
-            }`}
-          >
-            <Paintbrush className="w-4 h-4" />
-            <span>Desenhar & Paint</span>
-          </button>
+          <div className="hidden sm:flex items-center gap-2 text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-zinc-400 font-medium">Postagem no Discord Ativa</span>
+          </div>
         </div>
+      ) : mode === 'images' ? (
+        <div className="flex items-center justify-between border-b border-[#2D3139] pb-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setActiveSubTab('general');
+                setSelectedFolderId('all');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeSubTab === 'general'
+                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/30'
+                  : 'bg-[#1A1D21] text-zinc-400 hover:text-white border border-[#2D3139]'
+              }`}
+            >
+              <ImageIcon className="w-4 h-4 text-cyan-300" />
+              <span>Galeria de Imagens (Cenários & Pistas)</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/30">
+                {generalImageList.length}
+              </span>
+            </button>
 
-        {/* Discord Bot Status Indicator */}
-        <div className="hidden sm:flex items-center gap-2 text-xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-zinc-400 font-medium">Postagem com 1-Clique no Discord Ativa</span>
+            <button
+              onClick={() => {
+                setActiveSubTab('paint');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeSubTab === 'paint'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'bg-[#1A1D21] text-zinc-400 hover:text-white border border-[#2D3139]'
+              }`}
+            >
+              <Paintbrush className="w-4 h-4 text-indigo-300" />
+              <span>Estúdio de Desenho & Paint</span>
+            </button>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-zinc-400 font-medium">Transmissão para Discord Ativa</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between border-b border-[#2D3139] pb-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setActiveSubTab('npcs');
+                setSelectedFolderId('all');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeSubTab === 'npcs'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'bg-[#1A1D21] text-zinc-400 hover:text-white border border-[#2D3139]'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>NPCs & Criaturas</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/30">
+                {npcList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveSubTab('general');
+                setSelectedFolderId('all');
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeSubTab === 'general'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'bg-[#1A1D21] text-zinc-400 hover:text-white border border-[#2D3139]'
+              }`}
+            >
+              <ImageIcon className="w-4 h-4" />
+              <span>Imagens em Geral (Mapas & Cenários)</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-black/30">
+                {generalImageList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveSubTab('paint');
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeSubTab === 'paint'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-[#9E9E9E] hover:text-[#FFFFFF] hover:bg-[#22262B]'
+              }`}
+            >
+              <Paintbrush className="w-4 h-4" />
+              <span>Desenhar & Paint</span>
+            </button>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-zinc-400 font-medium">Postagem com 1-Clique no Discord Ativa</span>
+          </div>
+        </div>
+      )}
 
       {/* Paint Studio Sub-Tab - Kept mounted to preserve drawing canvas & layers */}
       <div className={activeSubTab === 'paint' ? 'block' : 'hidden'}>

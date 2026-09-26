@@ -1,24 +1,27 @@
 import React, { useState } from 'react';
 import {
   Bot,
-  Sparkles,
   Music,
   Users,
   MessageSquare,
   Shield,
-  ChevronDown,
   CloudRain,
   Image as ImageIcon,
-  Compass
+  Compass,
+  Save,
+  FolderOpen,
+  Settings,
+  Sparkles
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { AudioMixerModal } from './AudioMixerModal';
 import { ConfigurationModal } from './ConfigurationModal';
 import { PresetManagerModal } from './PresetManagerModal';
+import { Button } from './Button';
 
 interface HeaderProps {
-  currentTab: 'master' | 'maps' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings';
-  setCurrentTab: (tab: 'master' | 'maps' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'chat' | 'settings') => void;
+  currentTab: 'master' | 'maps' | 'audio' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'images' | 'chat' | 'settings';
+  setCurrentTab: (tab: 'master' | 'maps' | 'audio' | 'music' | 'ambience' | 'soundboard' | 'npcs' | 'images' | 'chat' | 'settings') => void;
   onOpenDiscordModal: () => void;
   onOpenFolderModal: () => void;
   onOpenSessionModal: () => void;
@@ -61,190 +64,185 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-[#121417]/95 backdrop-blur-md border-b border-[#282C34] px-3 sm:px-5 py-2.5 transition-colors shadow-lg shadow-black/30">
-        <div className="w-full max-w-[1600px] mx-auto flex items-center justify-between gap-2 sm:gap-4">
+      <header className="sticky top-0 z-40 bg-[#121417]/95 backdrop-blur-md border-b border-[#282C34] px-2 sm:px-4 py-2 transition-colors shadow-lg shadow-black/30">
+        <div className="w-full max-w-[1700px] mx-auto flex items-center justify-between gap-1.5 sm:gap-3">
           {/* Brand & Logo */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 border border-orange-500/30 p-1 shadow-md shadow-orange-500/10 flex items-center justify-center">
-                <img
-                  src="/icon.png"
-                  alt="CaranguejoRPG"
-                  className="w-full h-full object-contain drop-shadow"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLElement).style.display = 'none';
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 border border-orange-500/30 p-1 shadow-md shadow-orange-500/10 flex items-center justify-center shrink-0">
+              <img
+                src="/icon.png"
+                alt="CaranguejoRPG"
+                className="w-full h-full object-contain drop-shadow"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+            </div>
+            <div className="hidden sm:block">
+              <div className="flex items-center gap-1.5">
+                <h1 className="text-xs sm:text-sm font-bold tracking-wide text-white font-rpg leading-tight">
+                  CaranguejoRPG
+                </h1>
+                <span
+                  className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md border"
+                  style={{
+                    backgroundColor: 'var(--rpg-accent-muted)',
+                    color: 'var(--rpg-accent-primary)',
+                    borderColor: 'var(--rpg-accent-primary)'
                   }}
-                />
+                >
+                  Mesa
+                </span>
               </div>
-              <div className="hidden sm:block">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-sm font-bold tracking-wide text-white font-rpg leading-tight">
-                    CaranguejoRPG
-                  </h1>
-                  <span
-                    className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md border"
-                    style={{
-                      backgroundColor: 'var(--rpg-accent-muted)',
-                      color: 'var(--rpg-accent-primary)',
-                      borderColor: 'var(--rpg-accent-primary)'
-                    }}
-                  >
-                    Mesa
-                  </span>
-                </div>
-                <p className="text-[10px] text-zinc-400 leading-none mt-0.5">
-                  Bot Discord & Painel do Mestre
-                </p>
-              </div>
+              <p className="text-[10px] text-zinc-400 leading-none mt-0.5 hidden md:block">
+                Bot Discord & Painel do Mestre
+              </p>
             </div>
           </div>
 
-          {/* Navigation Tabs - Only 6 core buttons: Escudo do Mestre, Músicas, Ambientação, Soundboard, NPCs, Chat */}
-          <div className="flex-1 min-w-0 flex items-center justify-center px-1 sm:px-2">
-            <nav className="flex items-center justify-center gap-1 sm:gap-1.5 md:gap-2 py-1 px-1.5 sm:px-2 rounded-2xl bg-[#16181D]/90 border border-[#2D3139] shadow-inner max-w-full">
+          {/* Navigation Tabs - 6 Core Modules with Unified Audio */}
+          <div className="flex-1 min-w-0 flex items-center justify-center px-1">
+            <nav className="flex items-center gap-1 sm:gap-1.5 p-1 rounded-2xl bg-[#14171D]/90 border border-[#262A33] shadow-inner shadow-black/40 overflow-x-auto scrollbar-none max-w-full touch-pan-x [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {/* Escudo do Mestre */}
-              <button
+              <Button
                 id="tab-master-screen"
+                variant="tab"
+                size="sm"
+                isActive={currentTab === 'master'}
                 onClick={() => setCurrentTab('master')}
-                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  currentTab === 'master'
-                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
-                }`}
+                icon={<Shield className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                title="Escudo do Mestre: Iniciativa, Anotações, Dados e Resumo da Sessão"
               >
-                <Shield className="w-4 h-4 text-indigo-400 shrink-0" />
-                <span>Escudo do Mestre</span>
-              </button>
+                <span className="hidden xl:inline">Escudo do </span>
+                <span>Mestre</span>
+              </Button>
 
               {/* Cenários & Mapas */}
-              <button
+              <Button
                 id="tab-maps"
+                variant="tab"
+                size="sm"
+                isActive={currentTab === 'maps'}
                 onClick={() => setCurrentTab('maps')}
-                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  currentTab === 'maps'
-                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
-                }`}
+                icon={<Compass className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                title="Cenários & Mapas Interativos com Marcadores e Transmissão para Discord"
               >
-                <Compass className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Cenários & Mapas</span>
-              </button>
+                <span>Mapas</span>
+              </Button>
 
-              {/* Músicas */}
-              <button
-                id="tab-music"
-                onClick={() => setCurrentTab('music')}
-                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  currentTab === 'music'
-                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
-                }`}
+              {/* Central de Áudio (Músicas, Ambiente e Soundboard unificados) */}
+              <Button
+                id="tab-audio"
+                variant="tab"
+                size="sm"
+                isActive={currentTab === 'audio' || currentTab === 'music' || currentTab === 'ambience' || currentTab === 'soundboard'}
+                onClick={() => setCurrentTab('audio')}
+                icon={<Music className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                title="Central de Áudio: Músicas, Ambientação e Soundboard em 3 sub-abas"
               >
-                <Music className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Músicas</span>
-                {playbackState === 'playing' && (
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <span>Áudio</span>
+                {(playbackState === 'playing' || ambiencePlaybackState === 'playing' || activeSfxIds.length > 0) && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse ml-0.5" />
                 )}
-              </button>
+              </Button>
 
-              {/* Ambientação */}
-              <button
-                id="tab-ambience"
-                onClick={() => setCurrentTab('ambience')}
-                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  currentTab === 'ambience'
-                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
-                }`}
-              >
-                <CloudRain className="w-4 h-4 text-sky-400 shrink-0" />
-                <span>Ambientação</span>
-                {ambiencePlaybackState === 'playing' && (
-                  <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse shrink-0" />
-                )}
-              </button>
-
-              {/* Soundboard */}
-              <button
-                id="tab-soundboard"
-                onClick={() => setCurrentTab('soundboard')}
-                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  currentTab === 'soundboard'
-                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
-                }`}
-              >
-                <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Soundboard</span>
-                {activeSfxIds.length > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 shrink-0">
-                    {activeSfxIds.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Imagens (NPCs e Gerais) */}
-              <button
+              {/* NPCs & Criaturas */}
+              <Button
                 id="tab-npcs"
+                variant="tab"
+                size="sm"
+                isActive={currentTab === 'npcs'}
                 onClick={() => setCurrentTab('npcs')}
-                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  currentTab === 'npcs'
-                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
-                }`}
+                icon={<Users className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
+                title="Catálogo de NPCs, Monstros, Fichas de Combate e Segredos do Mestre"
               >
-                <ImageIcon className="w-4 h-4 text-cyan-400 shrink-0" />
-                <span>Imagens</span>
-              </button>
+                <span>NPCs</span>
+              </Button>
 
-              {/* Chat */}
-              <button
-                id="tab-chat"
-                onClick={() => setCurrentTab('chat')}
-                className={`shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  currentTab === 'chat'
-                    ? 'bg-indigo-600/35 text-indigo-100 border border-indigo-500/60 shadow-md shadow-indigo-500/25 font-bold'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/70'
-                }`}
+              {/* Imagens & Paint */}
+              <Button
+                id="tab-images"
+                variant="tab"
+                size="sm"
+                isActive={currentTab === 'images'}
+                onClick={() => setCurrentTab('images')}
+                icon={<ImageIcon className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                title="Galeria de Imagens de Cenário, Pistas e Estúdio de Desenho & Paint"
               >
-                <MessageSquare className="w-4 h-4 text-violet-400 shrink-0" />
+                <span>Imagens</span>
+              </Button>
+
+              {/* Chat Discord */}
+              <Button
+                id="tab-chat"
+                variant="tab"
+                size="sm"
+                isActive={currentTab === 'chat'}
+                onClick={() => setCurrentTab('chat')}
+                icon={<MessageSquare className="w-3.5 h-3.5 text-violet-400 shrink-0" />}
+                title="Chat Discord ao Vivo e Mensageiro do Mestre"
+              >
                 <span>Chat</span>
-              </button>
+              </Button>
             </nav>
           </div>
 
-          {/* Right Controls: Unified Configuration Button with Bot Status Icon */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              id="btn-open-configuration-tab"
-              onClick={handleOpenConfig}
-              className={`flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-sm ${
-                botStatus.isOnline
-                  ? 'bg-emerald-950/30 text-emerald-200 border-emerald-500/40 hover:bg-emerald-900/40 hover:border-emerald-400 shadow-emerald-500/10'
-                  : 'bg-[#181B20] text-zinc-200 border-[#282C34] hover:border-indigo-500/50 hover:bg-[#20242B]'
-              }`}
-              title="Painel de Configuração (Pastas, Saves, Discord Bot, Áudio Mixer, Guia, Temas & Predefinições)"
+          {/* Right Action Buttons - Unified Button Component */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Discord Bot Button */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onOpenDiscordModal}
+              icon={
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      botStatus.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'
+                    }`}
+                  />
+                  <Bot className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                </div>
+              }
+              title={botStatus.isOnline ? `Discord Bot Online (${botStatus.username || 'Conectado'}) - Clique para Gerenciar` : 'Configurar Bot Discord'}
             >
-              {/* Bot status icon with pulsing indicator */}
-              <div className="relative flex items-center justify-center">
-                <Bot className="w-4 h-4 text-indigo-400" />
-                <span
-                  className={`absolute -top-1 -right-1 w-2 h-2 rounded-full ${
-                    botStatus.isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'
-                  }`}
-                />
-              </div>
+              <span className="hidden md:inline">
+                {botStatus.isOnline ? 'Discord' : 'Conectar Bot'}
+              </span>
+            </Button>
 
-              <div className="flex flex-col items-start leading-tight">
-                <span className="text-xs font-bold text-white flex items-center gap-1">
-                  Configurações
-                  <ChevronDown className="w-3 h-3 text-zinc-400" />
-                </span>
-                <span className="text-[10px] text-zinc-400 truncate max-w-[110px] font-normal hidden sm:inline">
-                  {botStatus.isOnline ? (botStatus.username || 'Discord Online') : 'Discord Offline'}
-                </span>
-              </div>
-            </button>
+            {/* Sessão & Saves */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onOpenSessionModal}
+              icon={<Save className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+              title="Gerenciador de Saves, Carregamento de Sessão e Backup"
+            >
+              <span className="hidden md:inline">Sessão</span>
+            </Button>
+
+            {/* Pastas de Mídia */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onOpenFolderModal}
+              icon={<FolderOpen className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+              title="Gerenciador de Pastas de Mídia e Categorias"
+            >
+              <span className="hidden md:inline">Pastas</span>
+            </Button>
+
+            {/* Configurações Gerais */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleOpenConfig}
+              icon={<Settings className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+              title="Painel de Configuração (Mixer de Áudio, Guia, Temas & Predefinições)"
+            >
+              <span className="hidden md:inline">Config</span>
+            </Button>
           </div>
         </div>
       </header>

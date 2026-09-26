@@ -592,8 +592,7 @@ export const ScenarioMapManager: React.FC<ScenarioMapManagerProps> = ({
                     alt={activeMap.name}
                     className="max-h-[380px] sm:max-h-[480px] w-auto object-contain rounded-xl shadow-2xl pointer-events-auto block"
                     onError={e => {
-                      (e.currentTarget as HTMLImageElement).src =
-                        'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80';
+                      (e.currentTarget as HTMLImageElement).style.opacity = '0.3';
                     }}
                   />
 

@@ -3,7 +3,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import routes from './server/routes.js';
-import { UPLOADS_DIR, MUSIC_DIR, SFX_DIR, NPCS_DIR } from './server/db.js';
+import { UPLOADS_DIR, MUSIC_DIR, AMBIENCE_DIR, SFX_DIR, NPCS_DIR } from './server/db.js';
 
 // Load .env or config.env if present
 dotenv.config();
@@ -30,12 +30,13 @@ async function startServer() {
   });
 
   // JSON & URL-encoded parsers
-  app.use(express.json({ limit: '20mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+  app.use(express.json({ limit: '100mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
   // Static media directories for local files
   app.use('/media/uploads', express.static(UPLOADS_DIR));
   app.use('/media/music', express.static(MUSIC_DIR));
+  app.use('/media/ambience', express.static(AMBIENCE_DIR));
   app.use('/media/sfx', express.static(SFX_DIR));
   app.use('/media/npcs', express.static(NPCS_DIR));
 

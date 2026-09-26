@@ -144,5 +144,7 @@
   "currentTrack": null,
   "queue": [],
   "volume": 0.8,
-  "loopMode": "queue"
+  "loopMode": "queue",
+  "maps": [],
+  "currentMapId": null
 }

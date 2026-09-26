@@ -284,13 +284,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [ambiencePlaybackState, setAmbiencePlaybackState] = useState<PlaybackState>('idle');
   const [ambienceCurrentTime, setAmbienceCurrentTime] = useState<number>(0);
   const [ambienceDuration, setAmbienceDuration] = useState<number>(0);
-  const [ambienceLoopMode, setAmbienceLoopMode] = useState<LoopMode>('loop');
+  const [ambienceLoopMode, setAmbienceLoopMode] = useState<LoopMode>('track');
   const [ambienceTracks, setAmbienceTracks] = useState<AmbienceTrack[]>([]);
   const [ambienceQueue, setAmbienceQueue] = useState<AmbienceQueueItem[]>([]);
-  const ambienceQueueRef = useRef<AmbienceQueueItem[]>([]);
-  ambienceQueueRef.current = ambienceQueue;
-  const currentAmbienceTrackRef = useRef<AmbienceTrack | null>(null);
-  currentAmbienceTrackRef.current = currentAmbienceTrack;
 
   // Ambience Stream Volume (0-1)
   const [ambienceVolume, setAmbienceVolumeState] = useState<number>(() => {
@@ -491,6 +487,123 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const lastAmbienceSeekTimestampRef = useRef<number>(0);
   const isAmbienceSeekingRef = useRef<boolean>(false);
 
+  // Fresh State Refs to prevent stale closure issues in audio event listeners
+  const currentTrackRef = useRef<MusicTrack | null>(null);
+  const loopModeRef = useRef<LoopMode>(loopMode);
+  const queueRef = useRef<QueueItem[]>(queue);
+  const musicTracksRef = useRef<MusicTrack[]>([]);
+  const playbackStateRef = useRef<PlaybackState>(playbackState);
+  const effectiveMusicVolumeRef = useRef<number>(effectiveMusicVolume);
+
+  const currentAmbienceTrackRef = useRef<AmbienceTrack | null>(null);
+  const ambienceLoopModeRef = useRef<LoopMode>(ambienceLoopMode);
+  const ambienceQueueRef = useRef<AmbienceQueueItem[]>(ambienceQueue);
+  const ambienceTracksRef = useRef<AmbienceTrack[]>([]);
+  const effectiveAmbienceVolumeRef = useRef<number>(effectiveAmbienceVolume);
+
+  useEffect(() => { currentTrackRef.current = currentTrack; }, [currentTrack]);
+  useEffect(() => { loopModeRef.current = loopMode; }, [loopMode]);
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+  useEffect(() => { musicTracksRef.current = musicTracks; }, [musicTracks]);
+  useEffect(() => { playbackStateRef.current = playbackState; }, [playbackState]);
+  useEffect(() => { effectiveMusicVolumeRef.current = effectiveMusicVolume; }, [effectiveMusicVolume]);
+
+  useEffect(() => { currentAmbienceTrackRef.current = currentAmbienceTrack; }, [currentAmbienceTrack]);
+  useEffect(() => { ambienceLoopModeRef.current = ambienceLoopMode; }, [ambienceLoopMode]);
+  useEffect(() => { ambienceQueueRef.current = ambienceQueue; }, [ambienceQueue]);
+  useEffect(() => { ambienceTracksRef.current = ambienceTracks; }, [ambienceTracks]);
+  useEffect(() => { effectiveAmbienceVolumeRef.current = effectiveAmbienceVolume; }, [effectiveAmbienceVolume]);
+
+  // Synchronize real audio file duration with track state and backend db
+  const syncMusicDuration = (dur: number) => {
+    if (!isNaN(dur) && isFinite(dur) && dur > 0) {
+      const rounded = Math.round(dur);
+      setDuration(rounded);
+      const cur = currentTrackRef.current;
+      if (cur) {
+        if (!cur.duration || cur.duration === 120 || Math.abs(cur.duration - rounded) > 1) {
+          cur.duration = rounded;
+          setCurrentTrack({ ...cur, duration: rounded });
+          setMusicTracks(prev => prev.map(t => (t.id === cur.id || (cur.url && t.url === cur.url)) ? { ...t, duration: rounded } : t));
+          safeFetchJson(`/api/music/${cur.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ duration: rounded })
+          }).catch(() => {});
+        }
+      }
+    }
+  };
+
+  const syncAmbienceDuration = (dur: number) => {
+    if (!isNaN(dur) && isFinite(dur) && dur > 0) {
+      const rounded = Math.round(dur);
+      setAmbienceDuration(rounded);
+      const cur = currentAmbienceTrackRef.current;
+      if (cur) {
+        if (!cur.duration || cur.duration === 180 || cur.duration === 300 || cur.duration === 120 || Math.abs(cur.duration - rounded) > 1) {
+          cur.duration = rounded;
+          setCurrentAmbienceTrack({ ...cur, duration: rounded });
+          setAmbienceTracks(prev => prev.map(t => (t.id === cur.id || (cur.url && t.url === cur.url)) ? { ...t, duration: rounded } : t));
+          safeFetchJson(`/api/ambience/${cur.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ duration: rounded })
+          }).catch(() => {});
+        }
+      }
+    }
+  };
+
+  // Background resolver: calculate accurate duration for tracks loaded without metadata
+  useEffect(() => {
+    const unmeasuredMusic = musicTracks.filter(t => !t.duration || t.duration <= 0 || t.duration === 120);
+    if (unmeasuredMusic.length > 0) {
+      unmeasuredMusic.slice(0, 10).forEach(track => {
+        try {
+          const tempAudio = new Audio(resolveApiUrl(track.url));
+          tempAudio.preload = 'metadata';
+          const onMeta = () => {
+            if (isFinite(tempAudio.duration) && tempAudio.duration > 0) {
+              const rounded = Math.round(tempAudio.duration);
+              setMusicTracks(prev => prev.map(t => t.id === track.id ? { ...t, duration: rounded } : t));
+              safeFetchJson(`/api/music/${track.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ duration: rounded })
+              }).catch(() => {});
+            }
+            tempAudio.removeEventListener('loadedmetadata', onMeta);
+          };
+          tempAudio.addEventListener('loadedmetadata', onMeta, { once: true });
+        } catch {}
+      });
+    }
+
+    const unmeasuredAmb = ambienceTracks.filter(t => !t.duration || t.duration <= 0 || t.duration === 120 || t.duration === 180 || t.duration === 300);
+    if (unmeasuredAmb.length > 0) {
+      unmeasuredAmb.slice(0, 10).forEach(track => {
+        try {
+          const tempAudio = new Audio(resolveApiUrl(track.url));
+          tempAudio.preload = 'metadata';
+          const onMeta = () => {
+            if (isFinite(tempAudio.duration) && tempAudio.duration > 0) {
+              const rounded = Math.round(tempAudio.duration);
+              setAmbienceTracks(prev => prev.map(t => t.id === track.id ? { ...t, duration: rounded } : t));
+              safeFetchJson(`/api/ambience/${track.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ duration: rounded })
+              }).catch(() => {});
+            }
+            tempAudio.removeEventListener('loadedmetadata', onMeta);
+          };
+          tempAudio.addEventListener('loadedmetadata', onMeta, { once: true });
+        } catch {}
+      });
+    }
+  }, [musicTracks.length, ambienceTracks.length]);
+
   // Initialize HTML5 Audio Element for web player (Music)
   useEffect(() => {
     const audio = new Audio();
@@ -507,9 +620,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!isNaN(audio.currentTime) && isFinite(audio.currentTime)) {
         setCurrentTime(audio.currentTime);
       }
-      if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
-        setDuration(audio.duration);
-      }
+      syncMusicDuration(audio.duration);
     };
 
     const handleSeeked = () => {
@@ -520,9 +631,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const handleDurationChange = () => {
-      if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
-        setDuration(audio.duration);
-      }
+      syncMusicDuration(audio.duration);
     };
 
     const handleEnded = () => {
@@ -533,14 +642,10 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const handlePause = () => setPlaybackState('paused');
     const handleWaiting = () => setPlaybackState('buffering');
     const handleLoadedMetadata = () => {
-      if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
-        setDuration(audio.duration);
-      }
+      syncMusicDuration(audio.duration);
     };
     const handleCanPlay = () => {
-      if (!isNaN(audio.duration) && isFinite(audio.duration) && audio.duration > 0) {
-        setDuration(audio.duration);
-      }
+      syncMusicDuration(audio.duration);
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
@@ -571,7 +676,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     const ambAudio = new Audio();
     ambAudio.preload = 'auto';
-    ambAudio.loop = true; // Ambience tracks default to continuous loop
+    ambAudio.loop = false; // Keep false so ended event triggers accurately
     ambienceAudioRef.current = ambAudio;
 
     const handleAmbTimeUpdate = () => {
@@ -581,9 +686,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!isNaN(ambAudio.currentTime) && isFinite(ambAudio.currentTime)) {
         setAmbienceCurrentTime(ambAudio.currentTime);
       }
-      if (!isNaN(ambAudio.duration) && isFinite(ambAudio.duration) && ambAudio.duration > 0) {
-        setAmbienceDuration(ambAudio.duration);
-      }
+      syncAmbienceDuration(ambAudio.duration);
     };
 
     const handleAmbSeeked = () => {
@@ -594,27 +697,59 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const handleAmbEnded = () => {
-      const isTrackLoop = currentAmbienceTrackRef.current?.isLoop !== false;
-      if (isTrackLoop && (ambienceLoopMode === 'track' || ambienceLoopMode === 'queue' || ambienceLoopMode === 'loop')) {
-        ambAudio.currentTime = 0;
-        ambAudio.play().catch(() => {});
-      } else if (ambienceQueueRef.current.length > 0) {
-        const nextItem = ambienceQueueRef.current[0];
-        setAmbienceQueue(prev => prev.slice(1));
-        playAmbienceTrack(nextItem.track, true, 0);
-      } else {
-        setAmbiencePlaybackState('idle');
-        setAmbienceCurrentTime(0);
+      const curAmb = currentAmbienceTrackRef.current;
+      const currentLoop = ambienceLoopModeRef.current;
+      const currentQueue = ambienceQueueRef.current;
+      const allAmb = ambienceTracksRef.current;
+
+      if (!curAmb) {
+        stopAmbienceTrack();
+        return;
       }
+
+      // If loop single track is active
+      const isLoopTrack = currentLoop === 'track' || (curAmb.isLoop !== false && currentLoop !== 'off' && currentLoop !== 'queue');
+      if (isLoopTrack) {
+        playAmbienceTrack(curAmb, true, 0, true);
+        return;
+      }
+
+      // If queue has items
+      if (currentQueue.length > 0) {
+        const nextItem = currentQueue[0];
+        setAmbienceQueue(prev => prev.slice(1));
+        playAmbienceTrack(nextItem.track, true, 0, true);
+        return;
+      }
+
+      // Advance playlist
+      if (allAmb.length > 0) {
+        const currentIdx = allAmb.findIndex(t => t.id === curAmb.id || (curAmb.url && t.url === curAmb.url));
+        const validIdx = currentIdx !== -1 ? currentIdx : 0;
+
+        if (currentLoop === 'queue') {
+          const nextTrack = allAmb[(validIdx + 1) % allAmb.length];
+          playAmbienceTrack(nextTrack, true, 0, true);
+          return;
+        } else if (currentIdx !== -1 && currentIdx + 1 < allAmb.length) {
+          // Loop off: advance to next until end of list
+          const nextTrack = allAmb[currentIdx + 1];
+          playAmbienceTrack(nextTrack, true, 0, true);
+          return;
+        } else if (currentIdx === -1 && allAmb.length > 1) {
+          playAmbienceTrack(allAmb[1], true, 0, true);
+          return;
+        }
+      }
+
+      stopAmbienceTrack();
     };
 
     const handleAmbPlay = () => setAmbiencePlaybackState('playing');
     const handleAmbPause = () => setAmbiencePlaybackState('paused');
     const handleAmbWaiting = () => setAmbiencePlaybackState('buffering');
     const handleAmbLoadedMetadata = () => {
-      if (!isNaN(ambAudio.duration) && isFinite(ambAudio.duration) && ambAudio.duration > 0) {
-        setAmbienceDuration(ambAudio.duration);
-      }
+      syncAmbienceDuration(ambAudio.duration);
     };
 
     ambAudio.addEventListener('timeupdate', handleAmbTimeUpdate);
@@ -635,7 +770,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       ambAudio.removeEventListener('pause', handleAmbPause);
       ambAudio.removeEventListener('waiting', handleAmbWaiting);
     };
-  }, [ambienceLoopMode]);
+  }, []);
 
   // Sync volume with HTML5 audio element and manage local mute (Music)
   useEffect(() => {
@@ -790,9 +925,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  const playTrack = (track: MusicTrack, immediate: boolean = true, startOffset: number = 0) => {
+  const playTrack = (track: MusicTrack, immediate: boolean = true, startOffset: number = 0, forcePlay: boolean = false) => {
     // If clicking on the track that is ALREADY playing and no seek offset requested, toggle pause!
-    if (currentTrack?.id === track.id && playbackState === 'playing' && startOffset === 0) {
+    if (!forcePlay && currentTrack?.id === track.id && playbackState === 'playing' && startOffset === 0) {
       togglePlayPause();
       return;
     }
@@ -813,6 +948,12 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       audioRef.current.muted = !isLocalAudioEnabled || isMuted || isMusicMuted;
       audioRef.current.volume = effectiveMusicVolume;
 
+      try {
+        audioRef.current.currentTime = startOffset;
+      } catch (e) {
+        console.warn('Set currentTime error:', e);
+      }
+
       if (startOffset > 0) {
         isSeekingRef.current = true;
         lastSeekTimestampRef.current = Date.now();
@@ -830,8 +971,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else {
           audioRef.current.addEventListener('loadedmetadata', applySeek, { once: true });
         }
-      } else if (!isSameSrc) {
-        audioRef.current.currentTime = 0;
       }
 
       if (immediate) {
@@ -978,8 +1117,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   // Ambience Playback Engine
-  const playAmbienceTrack = (track: AmbienceTrack, immediate: boolean = true, startOffset: number = 0) => {
-    if (currentAmbienceTrack?.id === track.id && ambiencePlaybackState === 'playing' && startOffset === 0) {
+  const playAmbienceTrack = (track: AmbienceTrack, immediate: boolean = true, startOffset: number = 0, forcePlay: boolean = false) => {
+    if (!forcePlay && currentAmbienceTrack?.id === track.id && ambiencePlaybackState === 'playing' && startOffset === 0) {
       toggleAmbiencePlayPause();
       return;
     }
@@ -999,8 +1138,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       ambienceAudioRef.current.muted = !isLocalAudioEnabled || isMuted || isAmbienceMuted;
       ambienceAudioRef.current.volume = effectiveAmbienceVolume;
-      const isTrackLoop = track.isLoop !== false;
-      ambienceAudioRef.current.loop = isTrackLoop && (ambienceLoopMode === 'track' || ambienceLoopMode === 'queue' || ambienceLoopMode === 'loop');
+      ambienceAudioRef.current.loop = false;
+
+      try {
+        ambienceAudioRef.current.currentTime = startOffset;
+      } catch (e) {
+        console.warn('Set ambience currentTime error:', e);
+      }
 
       if (startOffset > 0) {
         isAmbienceSeekingRef.current = true;
@@ -1019,8 +1163,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } else {
           ambienceAudioRef.current.addEventListener('loadedmetadata', applySeek, { once: true });
         }
-      } else if (!isSameSrc) {
-        ambienceAudioRef.current.currentTime = 0;
       }
 
       if (immediate) {
@@ -1296,24 +1438,51 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const handleTrackEnded = () => {
-    if (loopMode === 'track') {
-      if (currentTrack) {
-        playTrack(currentTrack, true);
-      }
+    const curTrack = currentTrackRef.current;
+    const currentLoop = loopModeRef.current;
+    const currentQueue = queueRef.current;
+    const allTracks = musicTracksRef.current;
+
+    if (!curTrack) {
+      stopTrack();
       return;
     }
 
-    if (queue.length > 0) {
-      const nextItem = queue[0];
-      setQueue(prev => prev.slice(1));
-      playTrack(nextItem.track, true);
-    } else if (loopMode === 'queue' && musicTracks.length > 0) {
-      const currentIdx = musicTracks.findIndex(t => t.id === currentTrack?.id);
-      const nextTrack = musicTracks[(currentIdx + 1) % musicTracks.length];
-      playTrack(nextTrack, true);
-    } else {
-      stopTrack();
+    // Single track loop
+    if (currentLoop === 'track') {
+      playTrack(curTrack, true, 0, true);
+      return;
     }
+
+    // Play next item in queue
+    if (currentQueue.length > 0) {
+      const nextItem = currentQueue[0];
+      setQueue(prev => prev.slice(1));
+      playTrack(nextItem.track, true, 0, true);
+      return;
+    }
+
+    // Advance playlist
+    if (allTracks.length > 0) {
+      const currentIdx = allTracks.findIndex(t => t.id === curTrack.id || (curTrack.url && t.url === curTrack.url));
+      const validIdx = currentIdx !== -1 ? currentIdx : 0;
+
+      if (currentLoop === 'queue') {
+        const nextTrack = allTracks[(validIdx + 1) % allTracks.length];
+        playTrack(nextTrack, true, 0, true);
+        return;
+      } else if (currentIdx !== -1 && currentIdx + 1 < allTracks.length) {
+        // Loop is off: advance to next track until end of list
+        const nextTrack = allTracks[currentIdx + 1];
+        playTrack(nextTrack, true, 0, true);
+        return;
+      } else if (currentIdx === -1 && allTracks.length > 1) {
+        playTrack(allTracks[1], true, 0, true);
+        return;
+      }
+    }
+
+    stopTrack();
   };
 
   const skipNext = () => {

@@ -1073,7 +1073,7 @@ export const DrawingPaintStudio: React.FC = () => {
 
     try {
       const dataUrl = canvas.toDataURL('image/png');
-      const res = await safeFetchJson<{ success: boolean; error?: string }>('/api/bot/broadcast', {
+      let res = await safeFetchJson<{ success: boolean; error?: string }>('/api/bot/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1084,6 +1084,20 @@ export const DrawingPaintStudio: React.FC = () => {
           attachmentName: 'desenho_mestre.png'
         })
       });
+
+      if (!res.success) {
+        res = await safeFetchJson<{ success: boolean; error?: string }>('/api/bot/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channelId: selectedChannelId || undefined,
+            type: 'narrative',
+            content: discordCaption.trim() || '🎨 Esboço de Cena enviado pelo Mestre',
+            base64Image: dataUrl,
+            attachmentName: 'desenho_mestre.png'
+          })
+        });
+      }
 
       if (res.success && res.data?.success) {
         logAction('Desenho enviado para o canal do Discord', 'drawing');
