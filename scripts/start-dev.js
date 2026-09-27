@@ -30,6 +30,13 @@ if (!fs.existsSync(expressPath) || !fs.existsSync(vitePath)) {
   console.log('\n[✓] Dependências configuradas com sucesso!\n');
 }
 
+// Clean up any stale ffmpeg from previous crashed sessions before starting
+if (process.platform === 'win32') {
+  try {
+    execSync('taskkill /F /IM ffmpeg.exe >nul 2>&1', { stdio: 'ignore' });
+  } catch {}
+}
+
 let serverChild = null;
 let appChild = null;
 let isExiting = false;
@@ -38,21 +45,40 @@ function cleanupAndExit() {
   if (isExiting) return;
   isExiting = true;
   console.log('\n[i] Sincronizando encerramento: fechando servidor e executável...');
-  
-  if (appChild && !appChild.killed) {
-    try { appChild.kill(); } catch {}
-  }
-  if (serverChild && !serverChild.killed) {
-    try { serverChild.kill(); } catch {}
-  }
 
+  // 1. Send clean shutdown signal via HTTP first
+  try {
+    const req = http.request({ hostname: '127.0.0.1', port: 3000, path: '/api/system/shutdown', method: 'POST', timeout: 400 });
+    req.on('error', () => {});
+    req.end();
+  } catch {}
+
+  // 2. Terminate child processes and trees
   if (process.platform === 'win32') {
+    if (serverChild && serverChild.pid) {
+      try {
+        execSync(`taskkill /F /T /PID ${serverChild.pid} >nul 2>&1`, { stdio: 'ignore' });
+      } catch {}
+    }
+    if (appChild && appChild.pid) {
+      try {
+        execSync(`taskkill /F /T /PID ${appChild.pid} >nul 2>&1`, { stdio: 'ignore' });
+      } catch {}
+    }
     try {
       execSync('taskkill /F /IM CaranguejoRPG.exe >nul 2>&1', { stdio: 'ignore' });
       execSync('taskkill /F /IM CaranguejoRPG-win_x64.exe >nul 2>&1', { stdio: 'ignore' });
+      execSync('taskkill /F /IM ffmpeg.exe >nul 2>&1', { stdio: 'ignore' });
     } catch {}
+  } else {
+    if (appChild && !appChild.killed) {
+      try { appChild.kill(); } catch {}
+    }
+    if (serverChild && !serverChild.killed) {
+      try { serverChild.kill(); } catch {}
+    }
   }
-  
+
   process.exit(0);
 }
 

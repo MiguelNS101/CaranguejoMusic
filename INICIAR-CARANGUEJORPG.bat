@@ -35,12 +35,16 @@ if %errorlevel% neq 0 (
 echo [i] Iniciando CaranguejoRPG com sincronização de processos...
 echo.
 
+:: Limpeza preventiva de processos órfãos de execuções anteriores
+taskkill /F /IM ffmpeg.exe >nul 2>&1
+
 :: 2. Executar o script de inicialização inteligente
 %NODE_CMD% scripts/start-dev.js
 
 :: 3. Garantir limpeza de processos caso a janela seja fechada ou encerrada
 taskkill /F /IM CaranguejoRPG.exe >nul 2>&1
 taskkill /F /IM CaranguejoRPG-win_x64.exe >nul 2>&1
+taskkill /F /IM ffmpeg.exe >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq CaranguejoRPG-Server*" >nul 2>&1
 
 if %errorlevel% neq 0 (

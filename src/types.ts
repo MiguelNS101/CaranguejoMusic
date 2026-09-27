@@ -152,6 +152,7 @@ export interface DiagnosticLog {
 
 export interface AudioPerformanceDiagnostics {
   bufferStallCount: number;
+  stallRecoveryCount?: number;
   lastBufferingTimestamp?: string;
   voicePingWs?: number;
   voicePingUdp?: number;

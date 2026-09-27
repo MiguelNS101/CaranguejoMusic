@@ -268,17 +268,25 @@ export async function initDesktopBackend() {
 // Request server shutdown on app close
 export function requestServerShutdown() {
   try {
-    const endpoint = 'http://localhost:3000/api/system/shutdown';
-    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      navigator.sendBeacon(endpoint, new Blob(['{}'], { type: 'application/json' }));
-    } else {
-      fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-        keepalive: true
-      }).catch(() => {});
-    }
+    const endpoints = [
+      'http://127.0.0.1:3000/api/system/shutdown',
+      'http://localhost:3000/api/system/shutdown'
+    ];
+    endpoints.forEach(url => {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon(url, new Blob(['{}'], { type: 'application/json' }));
+        }
+      } catch {}
+      try {
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'clientClose' }),
+          keepalive: true
+        }).catch(() => {});
+      } catch {}
+    });
   } catch {}
 }
 
@@ -290,15 +298,26 @@ try {
     });
 
     Neutralino.events.on('windowClose', async () => {
+      addDesktopLog('info', 'Janela fechada. Solicitando encerramento sincronizado do servidor...');
       requestServerShutdown();
-      try {
-        await Neutralino.app.exit();
-      } catch {}
+      // Give server 350ms to release ports, terminate ffmpeg and disconnect Discord cleanly
+      setTimeout(async () => {
+        try {
+          await Neutralino.app.exit();
+        } catch {
+          window.close();
+        }
+      }, 350);
     });
   }
 
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', () => {
+      if (isDesktopEnvironment()) {
+        requestServerShutdown();
+      }
+    });
+    window.addEventListener('pagehide', () => {
       if (isDesktopEnvironment()) {
         requestServerShutdown();
       }

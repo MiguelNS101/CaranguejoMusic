@@ -237,6 +237,8 @@ async function main() {
     'echo ========================================================',
     'echo.',
     '',
+    'taskkill /F /IM ffmpeg.exe >nul 2>&1',
+    '',
     'echo [1/2] Iniciando servidor do bot e motor de som local (porta 3000)...',
     'if exist "%~dp0node.exe" (',
     '    start "CaranguejoRPG-Server" /min "%~dp0node.exe" "%~dp0dist\\server.cjs"',
@@ -257,8 +259,12 @@ async function main() {
     '',
     'echo.',
     'echo [i] Janela fechada. Encerrando servidor e processos em segundo plano...',
-    'taskkill /F /FI "WINDOWTITLE eq CaranguejoRPG-Server*" >nul 2>&1',
     'powershell -Command "try { Invoke-RestMethod -Uri http://localhost:3000/api/system/shutdown -Method POST -TimeoutSec 1 } catch {}" >nul 2>&1',
+    'powershell -Command "try { Invoke-RestMethod -Uri http://127.0.0.1:3000/api/system/shutdown -Method POST -TimeoutSec 1 } catch {}" >nul 2>&1',
+    'taskkill /F /IM CaranguejoRPG.exe >nul 2>&1',
+    'taskkill /F /IM CaranguejoRPG-win_x64.exe >nul 2>&1',
+    'taskkill /F /IM ffmpeg.exe >nul 2>&1',
+    'taskkill /F /FI "WINDOWTITLE eq CaranguejoRPG-Server*" >nul 2>&1',
     'exit'
   ].join('\r\n');
 

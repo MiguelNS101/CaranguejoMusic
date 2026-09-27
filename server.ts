@@ -2,13 +2,53 @@ import dotenv from 'dotenv';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
 import routes from './server/routes.js';
 import { UPLOADS_DIR, MUSIC_DIR, AMBIENCE_DIR, SFX_DIR, NPCS_DIR } from './server/db.js';
+import { discordBot } from './server/discordBot.js';
 
 // Load .env or config.env if present
 dotenv.config();
 if (fs.existsSync(path.join(process.cwd(), 'config.env'))) {
   dotenv.config({ path: path.join(process.cwd(), 'config.env') });
+}
+
+let isShuttingDown = false;
+let activeServer: http.Server | null = null;
+
+async function cleanExit(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\n[i] Sinal ${signal} recebido. Encerrando servidor e liberando conexões...`);
+
+  try {
+    await discordBot.stop();
+  } catch (err) {
+    console.error('Erro ao parar bot no encerramento:', err);
+  }
+
+  if (process.platform === 'win32') {
+    try {
+      const { execSync } = await import('child_process');
+      execSync('taskkill /F /IM ffmpeg.exe >nul 2>&1', { stdio: 'ignore' });
+    } catch {}
+  }
+
+  if (activeServer) {
+    activeServer.close(() => {
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 1000).unref();
+  } else {
+    process.exit(0);
+  }
+}
+
+process.on('SIGINT', () => cleanExit('SIGINT'));
+process.on('SIGTERM', () => cleanExit('SIGTERM'));
+process.on('SIGHUP', () => cleanExit('SIGHUP'));
+if (process.platform === 'win32') {
+  process.on('SIGBREAK' as any, () => cleanExit('SIGBREAK'));
 }
 
 async function startServer() {
@@ -94,7 +134,29 @@ async function startServer() {
     }
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = http.createServer(app);
+  activeServer = server;
+
+  server.on('error', async (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[!] Porta ${PORT} já está ocupada. Solicitando liberação de instância anterior...`);
+      try {
+        const req = http.request({ hostname: '127.0.0.1', port: PORT, path: '/api/system/shutdown', method: 'POST', timeout: 800 });
+        req.on('error', () => {});
+        req.end();
+      } catch {}
+
+      setTimeout(() => {
+        server.listen(PORT, '0.0.0.0', () => {
+          console.log(`🏰 RPG Bot & Escudo do Mestre rodando em http://0.0.0.0:${PORT}`);
+        });
+      }, 1200);
+    } else {
+      console.error('Erro no servidor HTTP:', err);
+    }
+  });
+
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`🏰 RPG Bot & Escudo do Mestre rodando em http://0.0.0.0:${PORT}`);
   });
 }

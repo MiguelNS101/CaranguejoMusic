@@ -1806,11 +1806,17 @@ router.delete('/dice/presets/:id', (req: Request, res: Response) => {
 // Graceful System Shutdown - synchronizes closing between UI, .bat, and Node Server
 router.post('/system/shutdown', async (req: Request, res: Response) => {
   res.json({ success: true, message: 'Encerrando servidor CaranguejoRPG...' });
-  console.log('\n[i] Sinal de encerramento recebido da interface. Finalizando processo Node.js...');
+  console.log('\n[i] Sinal de encerramento recebido da interface. Finalizando processo Node.js e limpando subprocessos...');
   setTimeout(async () => {
     try {
       await discordBot.stop();
     } catch {}
+    if (process.platform === 'win32') {
+      try {
+        const { execSync } = await import('child_process');
+        execSync('taskkill /F /IM ffmpeg.exe >nul 2>&1', { stdio: 'ignore' });
+      } catch {}
+    }
     process.exit(0);
   }, 350);
 });

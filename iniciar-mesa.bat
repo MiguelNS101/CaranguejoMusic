@@ -31,11 +31,14 @@ if %errorlevel% neq 0 (
     )
 )
 
+taskkill /F /IM ffmpeg.exe >nul 2>&1
+
 %NODE_CMD% scripts/start-dev.js
 
 :: Garantir encerramento mútuo do executável e servidor
 taskkill /F /IM CaranguejoRPG.exe >nul 2>&1
 taskkill /F /IM CaranguejoRPG-win_x64.exe >nul 2>&1
+taskkill /F /IM ffmpeg.exe >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq CaranguejoRPG-Server*" >nul 2>&1
 
 echo.

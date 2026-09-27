@@ -752,13 +752,13 @@ DICAS PARA O MESTRE/USUÁRIO:
                 {diagnostics?.audioPerformance?.bufferStallCount || 0}
               </span>
               <span className="text-[10px] text-[#6E7681]">
-                stalls registrados
+                stalls {(diagnostics?.audioPerformance?.stallRecoveryCount || 0) > 0 ? `(${diagnostics?.audioPerformance?.stallRecoveryCount} recuperados)` : ''}
               </span>
             </div>
             <p className="text-[10px] text-[#6E7681] truncate">
               {diagnostics?.audioPerformance?.lastBufferingTimestamp
-                ? `Último stall às ${diagnostics.audioPerformance.lastBufferingTimestamp}`
-                : 'Nenhum travamento detectado'}
+                ? `Último stall às ${diagnostics.audioPerformance.lastBufferingTimestamp} (Watchdog ativo)`
+                : 'Proteção watchdog contra travamentos ativa'}
             </p>
           </div>
 

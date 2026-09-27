@@ -18,7 +18,10 @@ import {
   AudioPlayerStatus,
   VoiceConnection,
   AudioPlayer,
-  VoiceConnectionStatus
+  VoiceConnectionStatus,
+  VoiceConnectionDisconnectReason,
+  entersState,
+  NoSubscriberBehavior
 } from '@discordjs/voice';
 import path from 'path';
 import fs from 'fs';
@@ -113,6 +116,43 @@ export class DiscordBotService {
   private lastBufferingTimestamp?: string;
   private voiceDisconnectCount: number = 0;
   private lastHighPingLoggedAt: number = 0;
+
+  // Active audio stream & transcode process tracking (leak prevention)
+  private currentAudioStream: Readable | null = null;
+  private activeTranscodeProcess: any | null = null;
+  private bufferWatchdogTimer: NodeJS.Timeout | null = null;
+  private bufferingStartTime: number | null = null;
+  private stallRecoveryCount: number = 0;
+  private isRecoveringBuffer: boolean = false;
+
+  private cleanupCurrentAudio(): void {
+    if (this.bufferWatchdogTimer) {
+      clearTimeout(this.bufferWatchdogTimer);
+      this.bufferWatchdogTimer = null;
+    }
+    this.bufferingStartTime = null;
+
+    if (this.activeTranscodeProcess) {
+      try {
+        this.activeTranscodeProcess.kill('SIGKILL');
+      } catch {}
+      this.activeTranscodeProcess = null;
+    }
+
+    if (this.currentAudioStream) {
+      try {
+        this.currentAudioStream.destroy();
+      } catch {}
+      this.currentAudioStream = null;
+    }
+
+    if (this.currentResource) {
+      try {
+        this.currentResource.playStream?.destroy?.();
+      } catch {}
+      this.currentResource = null;
+    }
+  }
 
   constructor() {
     this.logDiagnostic('info', 'system', 'Inicializando serviço DiscordBot do CaranguejoRPG...', `Node ${process.version} em ${process.platform} (${process.arch})`);
@@ -326,6 +366,7 @@ export class DiscordBotService {
 
     const audioPerformance = {
       bufferStallCount: this.bufferStallCount,
+      stallRecoveryCount: this.stallRecoveryCount,
       lastBufferingTimestamp: this.lastBufferingTimestamp,
       voicePingWs: voicePing,
       voicePingUdp: (this.voiceConnection as any)?.ping?.udp,
@@ -518,7 +559,16 @@ export class DiscordBotService {
   }
 
   public async stop(): Promise<void> {
-    this.logDiagnostic('info', 'bot', 'Desligando bot do Discord e limpando conexões ativas...');
+    this.logDiagnostic('info', 'bot', 'Desligando bot do Discord e liberando conexões e processos de áudio...');
+    this.cleanupCurrentAudio();
+    if (this.audioPlayer) {
+      try {
+        this.audioPlayer.stop(true);
+      } catch {
+        // ignore
+      }
+      this.audioPlayer = null;
+    }
     if (this.voiceConnection) {
       try {
         this.voiceConnection.destroy();
@@ -526,14 +576,6 @@ export class DiscordBotService {
         // ignore
       }
       this.voiceConnection = null;
-    }
-    if (this.audioPlayer) {
-      try {
-        this.audioPlayer.stop();
-      } catch {
-        // ignore
-      }
-      this.audioPlayer = null;
     }
     if (this.client) {
       try {
@@ -544,7 +586,10 @@ export class DiscordBotService {
       this.client = null;
     }
     this.lastError = null;
-    this.logDiagnostic('info', 'bot', 'Bot do Discord desligado com sucesso.');
+    this.isPlayingVoice = false;
+    this.currentTrackName = null;
+    this.currentTrackUrl = null;
+    this.logDiagnostic('info', 'bot', 'Bot do Discord desligado com sucesso e recursos liberados.');
   }
 
   private setupEventHandlers() {
@@ -1461,7 +1506,7 @@ export class DiscordBotService {
         });
 
         // Monitor Voice Connection State & Network Lag
-        this.voiceConnection.on('stateChange', (oldState, newState) => {
+        this.voiceConnection.on('stateChange', async (oldState, newState) => {
           const isReconnecting = newState.status === VoiceConnectionStatus.Signalling || newState.status === VoiceConnectionStatus.Connecting;
           if (isReconnecting && oldState.status === VoiceConnectionStatus.Ready) {
             this.voiceDisconnectCount++;
@@ -1471,6 +1516,52 @@ export class DiscordBotService {
               `[ALERTA DE REDE/LAG] Canal de voz perdeu estado Ready e está reconectando: ${oldState.status} -> ${newState.status}. O áudio foi interrompido temporariamente.`,
               `Possível causa: oscilação na rota UDP, perda de pacotes da internet ou troca de região de voz pelo Discord.`
             );
+          } else if (newState.status === VoiceConnectionStatus.Disconnected) {
+            // Disconnect handling with automatic reconnection
+            const isWebSocketClose = (newState as any).reason === VoiceConnectionDisconnectReason.WebSocketClose;
+            const closeCode = (newState as any).closeCode;
+            if (isWebSocketClose && closeCode === 4014) {
+              // 4014: Moved channels or kicked from channel
+              try {
+                await entersState(this.voiceConnection!, VoiceConnectionStatus.Connecting, 5_000);
+                this.logDiagnostic('info', 'voice', 'Bot restabeleceu conexão após mudança de canal de voz.');
+              } catch {
+                this.logDiagnostic('warn', 'voice', 'Bot foi desconectado da sala de voz no Discord.');
+                this.cleanupCurrentAudio();
+                if (this.voiceConnection) {
+                  try { this.voiceConnection.destroy(); } catch {}
+                  this.voiceConnection = null;
+                }
+              }
+            } else if (this.voiceConnection && (this.voiceConnection as any).rejoinAttempts < 5) {
+              this.voiceDisconnectCount++;
+              const attempt = ((this.voiceConnection as any).rejoinAttempts || 0) + 1;
+              this.logDiagnostic(
+                'warn',
+                'voice',
+                `[RECONEXÃO AUTOMÁTICA] Queda no socket UDP do canal de voz (tentativa ${attempt}/5). Reconectando...`,
+                `O Discord reiniciou a conexão de voz. Reconectando sem interromper o aplicativo...`
+              );
+              await new Promise(r => setTimeout(r, attempt * 500));
+              if (this.voiceConnection && this.voiceConnection.state.status !== VoiceConnectionStatus.Destroyed) {
+                this.voiceConnection.rejoin();
+              }
+            } else {
+              this.logDiagnostic('error', 'voice', 'Limite de reconexões imediatas atingido. Reiniciando sessão de voz com o canal...');
+              this.cleanupCurrentAudio();
+              if (this.voiceConnection) {
+                try { this.voiceConnection.destroy(); } catch {}
+                this.voiceConnection = null;
+              }
+              // Auto-reconnect cleanly
+              setTimeout(async () => {
+                const reconnected = await this.ensureVoiceConnection();
+                if (reconnected.success && this.currentTrackUrl) {
+                  this.logDiagnostic('success', 'voice', 'Canal de voz restaurado com sucesso! Retomando reprodução...');
+                  this.playVoiceAudio(this.currentTrackUrl, this.currentTrackVolume);
+                }
+              }, 2000);
+            }
           } else {
             this.logDiagnostic(
               newState.status === VoiceConnectionStatus.Ready ? 'success' : 'info',
@@ -1486,27 +1577,78 @@ export class DiscordBotService {
         });
 
         if (!this.audioPlayer) {
-          this.audioPlayer = createAudioPlayer();
+          this.audioPlayer = createAudioPlayer({
+            behaviors: {
+              noSubscriber: NoSubscriberBehavior.Play,
+              maxMissedFrames: 30
+            }
+          });
           
           this.audioPlayer.on(AudioPlayerStatus.Idle, (oldState) => {
             this.isPlayingVoice = false;
+            this.cleanupCurrentAudio();
             this.logDiagnostic('info', 'audio', 'Audio Player ocioso (reprodução terminada ou em espera).');
           });
 
           this.audioPlayer.on(AudioPlayerStatus.Playing, () => {
             this.isPlayingVoice = true;
+            if (this.bufferWatchdogTimer) {
+              clearTimeout(this.bufferWatchdogTimer);
+              this.bufferWatchdogTimer = null;
+            }
+            if (this.bufferingStartTime) {
+              const stallDuration = Date.now() - this.bufferingStartTime;
+              this.bufferingStartTime = null;
+              if (stallDuration > 200) {
+                this.logDiagnostic(
+                  'info',
+                  'audio',
+                  `[ÁUDIO RESTABELECIDO] O fluxo de som normalizou após ${stallDuration}ms. Reprodução contínua.`
+                );
+              }
+            }
             this.logDiagnostic('success', 'audio', `Reproduzindo áudio no Discord: ${this.currentTrackName || 'Faixa de áudio'}`);
           });
 
           this.audioPlayer.on(AudioPlayerStatus.Buffering, () => {
             this.bufferStallCount++;
             this.lastBufferingTimestamp = new Date().toLocaleTimeString('pt-BR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            this.bufferingStartTime = Date.now();
+
+            const mem = process.memoryUsage();
+            const memMB = Math.round(mem.rss / (1024 * 1024));
+            const heapMB = Math.round(mem.heapUsed / (1024 * 1024));
+            const voicePing = (this.voiceConnection as any)?.ping?.ws;
+            const pingStr = typeof voicePing === 'number' ? `${voicePing}ms` : 'medindo...';
+            const voiceState = this.voiceConnection?.state?.status || 'Desconhecido';
+
             this.logDiagnostic(
               'warn',
               'audio',
-              `[PERFORMANCE] Buffer stall #${this.bufferStallCount} detectado (player entrou em Buffering). O áudio pode ter travado ou gaguejado.`,
-              `Horário: ${this.lastBufferingTimestamp} | Causa provável: oscilação UDP com Discord, leitura lenta de disco ou pico de uso de CPU.`
+              `[PERFORMANCE] Buffer stall #${this.bufferStallCount} na faixa "${this.currentTrackName || 'Áudio'}".`,
+              `Diagnóstico em tempo real: Ping Discord: ${pingStr} | RAM do Processo: ${memMB}MB (Heap: ${heapMB}MB) | Conexão Voz: ${voiceState}. Aguardando preenchimento do buffer...`
             );
+
+            // Watchdog: If player stays buffering for > 3.5s, auto-recover stream
+            if (this.bufferWatchdogTimer) clearTimeout(this.bufferWatchdogTimer);
+            this.bufferWatchdogTimer = setTimeout(async () => {
+              if (this.audioPlayer?.state.status === AudioPlayerStatus.Buffering && !this.isRecoveringBuffer) {
+                this.isRecoveringBuffer = true;
+                this.stallRecoveryCount++;
+                this.logDiagnostic(
+                  'warn',
+                  'audio',
+                  `[AUTO-RECUPERAÇÃO #${this.stallRecoveryCount}] O buffer congelou por 3.5s na faixa "${this.currentTrackName}". O stream travou na fonte. Restaurando fluxo automaticamente...`
+                );
+                try {
+                  if (this.currentTrackUrl) {
+                    await this.playVoiceAudio(this.currentTrackUrl, this.currentTrackVolume);
+                  }
+                } finally {
+                  this.isRecoveringBuffer = false;
+                }
+              }
+            }, 3500);
           });
 
           this.audioPlayer.on(AudioPlayerStatus.Paused, () => {
@@ -1518,6 +1660,7 @@ export class DiscordBotService {
             this.logDiagnostic('error', 'audio', `Erro no player de áudio Discord: ${error.message}`, error.stack);
             console.error('Discord voice audio player error:', error);
             this.isPlayingVoice = false;
+            this.cleanupCurrentAudio();
           });
         }
 
@@ -1534,6 +1677,7 @@ export class DiscordBotService {
   public async disconnectVoice(): Promise<{ success: boolean; message?: string; error?: string }> {
     try {
       this.logDiagnostic('info', 'voice', 'Desconectando bot do canal de voz e liberando player...');
+      this.cleanupCurrentAudio();
       if (this.audioPlayer) {
         try {
           this.audioPlayer.stop(true);
@@ -1588,6 +1732,9 @@ export class DiscordBotService {
     if (!voiceRes.success || !this.audioPlayer) {
       return { success: false, error: voiceRes.error || 'Não conectado ao canal de voz.' };
     }
+
+    // Clean up any previously playing stream or transcode process before starting a new track
+    this.cleanupCurrentAudio();
 
     try {
       let resolvedPath = urlOrPath;
@@ -1649,6 +1796,7 @@ export class DiscordBotService {
             quality: 2,
             seek: seekSeconds && seekSeconds > 0 ? Math.floor(seekSeconds) : undefined
           });
+          this.currentAudioStream = stream.stream;
           resource = createAudioResource(stream.stream, {
             inputType: stream.type,
             inlineVolume: true
@@ -1669,6 +1817,7 @@ export class DiscordBotService {
               quality: 2,
               seek: seekSeconds && seekSeconds > 0 ? Math.floor(seekSeconds) : undefined
             });
+            this.currentAudioStream = stream.stream;
             resource = createAudioResource(stream.stream, {
               inputType: stream.type,
               inlineVolume: true
@@ -1684,6 +1833,7 @@ export class DiscordBotService {
       } else if (seekSeconds && seekSeconds > 0) {
         try {
           const sourceStream = await this.getAudioReadableStream(resolvedPath);
+          this.currentAudioStream = sourceStream;
           const ffmpeg = new prism.FFmpeg({
             args: [
               '-ss', String(Math.floor(seekSeconds)),
@@ -1695,6 +1845,12 @@ export class DiscordBotService {
               '-ac', '2'
             ]
           });
+          this.activeTranscodeProcess = ffmpeg.process;
+          ffmpeg.on('close', () => {
+            if (this.activeTranscodeProcess === ffmpeg.process) {
+              this.activeTranscodeProcess = null;
+            }
+          });
           const pipeStream = sourceStream.pipe(ffmpeg);
           resource = createAudioResource(pipeStream, {
             inputType: StreamType.Raw,
@@ -1703,10 +1859,12 @@ export class DiscordBotService {
         } catch (seekErr: any) {
           console.warn('Prism FFmpeg seek error, falling back to direct stream:', seekErr);
           const sourceStream = await this.getAudioReadableStream(resolvedPath);
+          this.currentAudioStream = sourceStream;
           resource = createAudioResource(sourceStream, { inlineVolume: true });
         }
       } else {
         const sourceStream = await this.getAudioReadableStream(resolvedPath);
+        this.currentAudioStream = sourceStream;
         resource = createAudioResource(sourceStream, { inlineVolume: true });
       }
 
@@ -1756,8 +1914,9 @@ export class DiscordBotService {
   }
 
   public async stopVoiceAudio(): Promise<{ success: boolean }> {
+    this.cleanupCurrentAudio();
     if (this.audioPlayer) {
-      this.audioPlayer.stop();
+      this.audioPlayer.stop(true);
       this.isPlayingVoice = false;
     }
     return { success: true };
