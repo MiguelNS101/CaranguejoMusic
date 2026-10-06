@@ -925,17 +925,32 @@ export const AppTutorialModal: React.FC<AppTutorialModalProps> = ({
                     </p>
                   </div>
 
-                  {/* Dice Rolls */}
-                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-[#2D3139] space-y-1">
+                  {/* Multi-Dice Rolls */}
+                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-blue-500/30 space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-emerald-400 text-sm">🎲 \r [dados] (ou \kr [dados])</span>
-                      <span className="text-[10px] text-zinc-400">Storyteller / Vampiro</span>
+                      <span className="font-mono font-bold text-blue-400 text-sm">🎲 \d [fórmula] [motivo]</span>
+                      <span className="text-[10px] text-zinc-400">Multi-Dados (D&D / d20 / d6 / etc)</span>
                     </div>
                     <p className="text-zinc-300">
-                      Rola dados D10 do Mundo das Trevas com cálculo automático de sucessos (7+), 10s explodindo e cancelamento no 1.
+                      Rola qualquer fórmula RPG tradicional (d4, d6, d8, d10, d12, d20, d100), incluindo modificadores e vantagem (<code className="text-emerald-400">kh1</code>).
                     </p>
                     <span className="text-[11px] text-zinc-500 block">
-                      Exemplo: <code>\r 7d10 Ataque com Garras</code> ou <code>\kr 8d10 Tiro Certeiro</code>.
+                      Exemplos: <code>\d 1d20+5</code> • <code>\d 2d20kh1 + 2d6 + 3 Ataque</code> • <code>\d20</code> • <code>\d 4d6</code>
+                    </span>
+                  </div>
+
+                  {/* WoD Rolls */}
+                  <div className="p-3 rounded-xl bg-[#1A1D21] border border-emerald-500/30 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-emerald-400 text-sm">🩸 \r [dados] & \k [dados]</span>
+                      <span className="text-[10px] text-zinc-400">Mundo das Trevas (Storyteller d10)</span>
+                    </div>
+                    <p className="text-zinc-300">
+                      • <strong className="text-white">\r [dados]</strong>: Rolagem padrão WoD (sucessos 7+, 10s explodem, pares de 1 cancelam).<br/>
+                      • <strong className="text-amber-300">\k [dados]</strong>: Keen Roll com críticos e explosões no <strong>9 e 10</strong>.
+                    </p>
+                    <span className="text-[11px] text-zinc-500 block">
+                      Exemplos: <code>\r 7d10 Ataque com Garras</code> • <code>\k 8d10 Tiro Certeiro</code> • <code>\r 6</code>
                     </span>
                   </div>
                 </div>

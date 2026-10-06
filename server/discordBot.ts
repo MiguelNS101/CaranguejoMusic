@@ -599,7 +599,7 @@ export class DiscordBotService {
       this.logDiagnostic('success', 'bot', `🤖 Discord Bot online e pronto: ${this.client?.user?.tag} (${this.client?.guilds.cache.size} servidores)`);
       console.log(`🤖 Discord Bot logged in as ${this.client?.user?.tag}!`);
       this.client?.user?.setPresence({
-        activities: [{ name: 'RPG 🎲 \\r Multi-Dados | \\wr WoD | \\kr Keen', type: ActivityType.Playing }],
+        activities: [{ name: 'RPG 🎲 \\r WoD | \\k Keen | \\d Multi-Dados', type: ActivityType.Playing }],
         status: 'online'
       });
 
@@ -737,12 +737,12 @@ export class DiscordBotService {
         return;
       }
 
-      // Check for Advanced Multi-Dice Roll commands:
-      // Comandos: \r <formula> [motivo], !r, /r, \roll, !roll, /roll
-      // Ou shorthand: \d20, !2d6+3, \1d100, etc.
-      const rollMatch = /^[!/\\](?:roll|r)(?:\s+(.*))?$/i.exec(content) || /^[!/\\](d\d+|[0-9]+d[0-9]+.*)$/i.exec(content);
-      if (rollMatch) {
-        let rawInput = (rollMatch[1] || '').trim();
+      // Check for Advanced Multi-Dice Roll commands (\d):
+      // IMPORTANT: Discord dice rolls use ONLY the '\' prefix!
+      // Comandos: \d <formula> [motivo], shorthand: \d20, \d100, \d, ou \roll / \dice
+      const multiDiceMatch = content.match(/^\\d(?:\s+(.*)|(\d+.*))?$/i) || content.match(/^\\(?:roll|dice)(?:\s+(.*))?$/i);
+      if (multiDiceMatch) {
+        let rawInput = (multiDiceMatch[1] || multiDiceMatch[2] || '').trim();
         if (!rawInput) {
           rawInput = '1d20';
         }
@@ -772,13 +772,13 @@ export class DiscordBotService {
         } else {
           await message.reply(
             `⚠️ **Fórmula de dados inválida.**\n` +
-            `Exemplos de uso para Multi-Dados:\n` +
-            `• \`\\r 1d20+5\` *(D20 com modificador)*\n` +
-            `• \`\\r 2d20kh1 + 2d6 + 3 Ataque com Vantagem\`\n` +
-            `• \`\\r 4d6\` ou \`\\r 1d100\`\n\n` +
-            `*Para rolar Mundo das Trevas (d10), use:*\n` +
-            `• \`\\wr 6\` (Normal, 10s explodem)\n` +
-            `• \`\\kr 6\` (Keen Roll, 9 e 10 explodem)`
+            `Exemplos de uso para Multi-Dados (Prefixo obrigatório \`\\\`):\n` +
+            `• \`\\d 1d20+5\` *(D20 com modificador)*\n` +
+            `• \`\\d 2d20kh1 + 2d6 + 3 Ataque com Vantagem\`\n` +
+            `• \`\\d 4d6\` ou \`\\d 1d100\` ou \`\\d20\`\n\n` +
+            `*Para rolar Mundo das Trevas (d10):*\n` +
+            `• \`\\r 6\` *(WoD Normal — 10s explodem, pares de 1 anulam)*\n` +
+            `• \`\\k 6\` *(Keen Roll — Crítico e explosões no 9 e 10)*`
           );
           return;
         }
@@ -944,20 +944,23 @@ export class DiscordBotService {
       )
       .addFields([
         {
-          name: '🎲 Rolagem Multi-Dados (d4 a d100 • D&D e Sistemas Gerais)',
+          name: '🎲 Rolagem Multi-Dados (Prefixo \\d • D&D e Sistemas Gerais)',
           value:
-            '• `\\r 1d20+5` — Rola d20 com modificador\n' +
-            '• `\\r 2d20kh1 + 2d6 + 3 Ataque com Vantagem` — Multi-dados com vantagem (`kh1`) e motivo\n' +
-            '• `\\r 4d6` ou `\\r 1d100` — Rola qualquer combinação (d4, d6, d8, d10, d12, d20, d100)\n' +
-            '• `\\r 2d20kl1` — Rolagem com desvantagem (`kl1`)',
+            '• `\\d 1d20+5` — Rola d20 com modificador\n' +
+            '• `\\d 2d20kh1 + 2d6 + 3 Ataque com Vantagem` — Multi-dados com vantagem (`kh1`) e motivo\n' +
+            '• `\\d 4d6` ou `\\d 1d100` — Rola qualquer combinação (d4, d6, d8, d10, d12, d20, d100)\n' +
+            '• `\\d 2d20kl1` — Rolagem com desvantagem (`kl1`)\n' +
+            '• `\\d20` — Atalho rápido para rolar 1d20\n' +
+            '*Importante: No Discord, todas as rolagens usam estritamente o prefixo `\\`.*',
           inline: false
         },
         {
-          name: '🩸 Rolagem Mundo das Trevas (WoD Storyteller d10)',
+          name: '🩸 Rolagem Mundo das Trevas (Prefixo \\r e \\k • WoD Storyteller d10)',
           value:
-            '• `\\wr 8` ou `\\wr 8d10` — **WoD Normal** (Sucesso 7+, 10s explodem, pares de 1 anulam)\n' +
-            '• `\\kr 6` ou `\\kr 6d10` — **Keen Roll** (Críticos e explosões no 9 e 10)\n' +
-            '• `\\wr 7 Furtividade` — Rola com anotação da ação',
+            '• `\\r 8` ou `\\r 8d10` — **WoD Normal** (Sucesso 7+, 10s explodem, pares de 1 anulam)\n' +
+            '• `\\k 6` ou `\\k 6d10` — **Keen Roll** (Críticos e explosões no 9 e 10)\n' +
+            '• `\\r 7 Furtividade` — Rola com anotação da ação\n' +
+            '• `\\k 8 Ataque Letal` — Rola Keen com anotação',
           inline: false
         },
         {

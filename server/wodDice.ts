@@ -117,7 +117,7 @@ export function rollWodDice(
 
   return {
     id: `wod-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    command: `${isKeen ? '\\kr' : '\\wr'} ${count}d10${label ? ` ${label}` : ''}`,
+    command: `${isKeen ? '\\k' : '\\r'} ${count}d10${label ? ` ${label}` : ''}`,
     diceCount: count,
     isKeenRoll: isKeen,
     critThreshold,
@@ -137,12 +137,16 @@ export function rollWodDice(
 
 export function parseWodCommand(content: string): { count: number; isKeen: boolean; label?: string } | null {
   const trimmed = content.trim();
-  // Matches \wr, \kr, /wr, /kr, !wr, !kr (where \wr is WoD standard, \kr is Keen Roll)
-  const match = trimmed.match(/^([\\/!](?:kr|wr))(?:\s+(\d+)(?:d10)?)?(?:\s+(.*))?$/i);
+  // ONLY prefix '\' is allowed for rolls on Discord!
+  // Matches \r (WoD standard), \k (WoD Keen Roll with crit on 9 and 10)
+  // Also supports \wr and \kr as aliases
+  if (!trimmed.startsWith('\\')) return null;
+
+  const match = trimmed.match(/^\\(k|r|kr|wr)(?:\s+(\d+)(?:d10)?)?(?:\s+(.*))?$/i);
   if (!match) return null;
 
   const cmdPrefix = match[1].toLowerCase();
-  const isKeen = cmdPrefix.includes('kr');
+  const isKeen = cmdPrefix === 'k' || cmdPrefix === 'kr';
   const count = match[2] ? parseInt(match[2], 10) : 1;
   const label = match[3]?.trim();
 

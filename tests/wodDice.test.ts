@@ -32,7 +32,7 @@ describe('World of Darkness (WoD) Dice Engine', () => {
     expect(result.critThreshold).toBe(9);
     expect(result.successThreshold).toBe(7);
     expect(result.isKeenRoll).toBe(true);
-    expect(result.command).toContain('\\kr');
+    expect(result.command).toContain('\\k');
   });
 
   it('should calculate netSuccesses and format text properly', () => {
@@ -45,10 +45,15 @@ describe('World of Darkness (WoD) Dice Engine', () => {
     expect(typeof result.totalCriticalFails).toBe('number');
   });
 
-  it('should parse Discord command strings like \\r and \\kr', () => {
+  it('should parse Discord command strings like \\r and \\k with strict \\ prefix', () => {
     expect(parseWodCommand('\\r 5d10')).toEqual({ count: 5, isKeen: false, label: undefined });
-    expect(parseWodCommand('\\kr 8d10 Tiro')).toEqual({ count: 8, isKeen: true, label: 'Tiro' });
-    expect(parseWodCommand('!r 3 Percepção')).toEqual({ count: 3, isKeen: false, label: 'Percepção' });
+    expect(parseWodCommand('\\r 7')).toEqual({ count: 7, isKeen: false, label: undefined });
+    expect(parseWodCommand('\\k 8d10 Tiro')).toEqual({ count: 8, isKeen: true, label: 'Tiro' });
+    expect(parseWodCommand('\\k 4 Defesa')).toEqual({ count: 4, isKeen: true, label: 'Defesa' });
+    // Non-backslash prefixes must be rejected for dice rolls
+    expect(parseWodCommand('!r 3 Percepção')).toBeNull();
+    expect(parseWodCommand('/r 3 Percepção')).toBeNull();
+    expect(parseWodCommand('!k 5')).toBeNull();
     expect(parseWodCommand('invalid')).toBeNull();
   });
 });
