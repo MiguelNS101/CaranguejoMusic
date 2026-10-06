@@ -20,6 +20,8 @@ import {
 import { AdvancedDiceRollResult, DicePreset } from '../types';
 import { safeFetchJson } from '../services/api';
 import { rollAdvancedDice, parseAdvancedDiceFormula } from '../utils/advancedDice';
+import { playDiceSound } from '../utils/diceSoundPlayer';
+import { useAudio } from '../context/AudioContext';
 
 interface AdvancedDiceRollerProps {
   onRollComplete?: (roll: AdvancedDiceRollResult) => void;
@@ -32,6 +34,8 @@ export const AdvancedDiceRoller: React.FC<AdvancedDiceRollerProps> = ({
   onRollComplete,
   className = ''
 }) => {
+  const { soundboardItems = [], playSoundboard } = useAudio();
+
   // Formula builder state
   const [diceCounts, setDiceCounts] = useState<Record<number, number>>({
     4: 0,
@@ -146,6 +150,12 @@ export const AdvancedDiceRoller: React.FC<AdvancedDiceRollerProps> = ({
     setIsRolling(true);
     setFeedback({ status: 'idle' });
 
+    // Trigger rolling sound effect immediately
+    playDiceSound('roll', undefined, (id) => {
+      const found = soundboardItems.find(s => s.id === id);
+      if (found) playSoundboard(found);
+    });
+
     try {
       const res = await safeFetchJson<{
         success: boolean;
@@ -168,6 +178,24 @@ export const AdvancedDiceRoller: React.FC<AdvancedDiceRollerProps> = ({
         setLatestRoll(rollRes);
         setHistory(prev => [rollRes, ...prev.slice(0, 49)]);
 
+        // Play appropriate sound result effect
+        if (rollRes.isCriticalSuccess) {
+          playDiceSound('critSuccess', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else if (rollRes.isCriticalFail) {
+          playDiceSound('critFail', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else {
+          playDiceSound('normalSuccess', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        }
+
         if (broadcastToDiscord) {
           if (res.data.discordSent) {
             setFeedback({ status: 'success', msg: 'Resultado enviado ao Discord!' });
@@ -187,12 +215,47 @@ export const AdvancedDiceRoller: React.FC<AdvancedDiceRollerProps> = ({
         const localRes = rollAdvancedDice(targetFormula, 'Mestre', customLabel || rollLabel);
         setLatestRoll(localRes);
         setHistory(prev => [localRes, ...prev]);
+
+        if (localRes.isCriticalSuccess) {
+          playDiceSound('critSuccess', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else if (localRes.isCriticalFail) {
+          playDiceSound('critFail', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else {
+          playDiceSound('normalSuccess', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        }
+
         setFeedback({ status: 'success', msg: 'Rolagem local computada com sucesso.' });
       }
     } catch (err: any) {
       const localRes = rollAdvancedDice(targetFormula, 'Mestre', customLabel || rollLabel);
       setLatestRoll(localRes);
       setHistory(prev => [localRes, ...prev]);
+
+      if (localRes.isCriticalSuccess) {
+        playDiceSound('critSuccess', undefined, (id) => {
+          const found = soundboardItems.find(s => s.id === id);
+          if (found) playSoundboard(found);
+        });
+      } else if (localRes.isCriticalFail) {
+        playDiceSound('critFail', undefined, (id) => {
+          const found = soundboardItems.find(s => s.id === id);
+          if (found) playSoundboard(found);
+        });
+      } else {
+        playDiceSound('normalSuccess', undefined, (id) => {
+          const found = soundboardItems.find(s => s.id === id);
+          if (found) playSoundboard(found);
+        });
+      }
     } finally {
       setIsRolling(false);
     }

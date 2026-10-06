@@ -27,7 +27,7 @@ interface HeaderProps {
   onOpenSessionModal: () => void;
   onOpenTutorialModal?: () => void;
   onOpenThemeModal?: () => void;
-  onOpenPresetModal?: (initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json') => void;
+  onOpenPresetModal?: (initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'diceSounds' | 'json') => void;
   onOpenConfigModal?: () => void;
 }
 
@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [isInternalConfigOpen, setIsInternalConfigOpen] = useState(false);
   const [isInternalMixerOpen, setIsInternalMixerOpen] = useState(false);
   const [isInternalPresetOpen, setIsInternalPresetOpen] = useState(false);
-  const [internalPresetTab, setInternalPresetTab] = useState<'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json'>('encounters');
+  const [internalPresetTab, setInternalPresetTab] = useState<'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'diceSounds' | 'json'>('encounters');
 
   const handleOpenConfig = () => {
     if (onOpenConfigModal) {

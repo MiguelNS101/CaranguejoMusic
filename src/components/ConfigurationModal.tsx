@@ -39,7 +39,7 @@ interface ConfigurationModalProps {
   onOpenMixerModal: () => void;
   onOpenThemeModal: () => void;
   onOpenTutorialModal: () => void;
-  onOpenPresetModal: (initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json') => void;
+  onOpenPresetModal: (initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'diceSounds' | 'json') => void;
   onOpenFolderModal?: () => void;
   onOpenSessionModal?: () => void;
   initialTab?: 'discord' | 'mixer' | 'folders' | 'saves' | 'themes' | 'guide' | 'presets' | 'playerColors';
@@ -862,6 +862,36 @@ export const ConfigurationModal: React.FC<ConfigurationModalProps> = ({
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-black text-xs font-extrabold shadow-md shadow-sky-500/20 transition-all cursor-pointer shrink-0 whitespace-nowrap"
                 >
                   Configurar Clima & Atmosfera
+                </button>
+              </div>
+
+              {/* Efeitos Sonoros de Rolagem de Dados Card */}
+              <div className="p-4 rounded-2xl bg-[#141619] border border-amber-500/30 hover:border-amber-500/60 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 shrink-0">
+                    <Volume2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-white">Efeitos Sonoros de Rolagem de Dados</h4>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Áudio & Predefinições
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                      Personalize efeitos sonoros para cada tipo de rolagem: fanfarra épica no 20 natural (acerto crítico), sombrio no 1 natural (falha crítica), chocalho de dados na madeira e integração com itens do soundboard ou URLs próprias.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenPresetModal('diceSounds');
+                  }}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-extrabold shadow-md shadow-amber-500/20 transition-all cursor-pointer shrink-0 whitespace-nowrap"
+                >
+                  Configurar Sons de Dados
                 </button>
               </div>
 

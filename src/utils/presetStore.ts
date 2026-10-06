@@ -84,6 +84,135 @@ export interface WeatherAtmospherePreset {
   description?: string;
 }
 
+export type DiceSoundType = 'synth' | 'soundboard' | 'custom_url';
+export type DiceSoundTheme = 'fantasy' | 'retro8bit' | 'metallic' | 'wooden' | 'gothic';
+
+export interface DiceSoundEffectItem {
+  enabled: boolean;
+  type: DiceSoundType;
+  synthTheme: DiceSoundTheme;
+  soundboardItemId?: string;
+  customUrl?: string;
+  volume: number; // 0 to 100
+}
+
+export interface DiceSoundSettingsPreset {
+  enabled: boolean;
+  masterVolume: number; // 0 to 100
+  playLocally: boolean;
+  soundTheme: DiceSoundTheme;
+  rollSound: DiceSoundEffectItem;
+  critSuccessSound: DiceSoundEffectItem;
+  critFailSound: DiceSoundEffectItem;
+  normalSuccessSound: DiceSoundEffectItem;
+  normalFailSound: DiceSoundEffectItem;
+}
+
+export const DEFAULT_DICE_SOUND_SETTINGS: DiceSoundSettingsPreset = {
+  enabled: true,
+  masterVolume: 80,
+  playLocally: true,
+  soundTheme: 'fantasy',
+  rollSound: {
+    enabled: true,
+    type: 'synth',
+    synthTheme: 'wooden',
+    volume: 75
+  },
+  critSuccessSound: {
+    enabled: true,
+    type: 'synth',
+    synthTheme: 'fantasy',
+    volume: 95
+  },
+  critFailSound: {
+    enabled: true,
+    type: 'synth',
+    synthTheme: 'fantasy',
+    volume: 95
+  },
+  normalSuccessSound: {
+    enabled: true,
+    type: 'synth',
+    synthTheme: 'fantasy',
+    volume: 65
+  },
+  normalFailSound: {
+    enabled: true,
+    type: 'synth',
+    synthTheme: 'wooden',
+    volume: 60
+  }
+};
+
+export const DICE_SOUND_THEME_TEMPLATES: Record<DiceSoundTheme, { name: string; icon: string; description: string; settings: Partial<DiceSoundSettingsPreset> }> = {
+  fantasy: {
+    name: 'Fantasia Heroica & Épica',
+    icon: '✨',
+    description: 'Chocalho de dados na madeira, fanfarra triunfante no Acerto Crítico e acorde sombrio de ruína na Falha Crítica.',
+    settings: {
+      soundTheme: 'fantasy',
+      rollSound: { enabled: true, type: 'synth', synthTheme: 'wooden', volume: 75 },
+      critSuccessSound: { enabled: true, type: 'synth', synthTheme: 'fantasy', volume: 95 },
+      critFailSound: { enabled: true, type: 'synth', synthTheme: 'fantasy', volume: 95 },
+      normalSuccessSound: { enabled: true, type: 'synth', synthTheme: 'fantasy', volume: 70 },
+      normalFailSound: { enabled: true, type: 'synth', synthTheme: 'wooden', volume: 60 }
+    }
+  },
+  metallic: {
+    name: 'Dados Metálicos Pesados',
+    icon: '⚔️',
+    description: 'Tilintar de metal pesado rolando, badalada cristalina triunfal e impacto de ferro quebrado no desastre.',
+    settings: {
+      soundTheme: 'metallic',
+      rollSound: { enabled: true, type: 'synth', synthTheme: 'metallic', volume: 80 },
+      critSuccessSound: { enabled: true, type: 'synth', synthTheme: 'metallic', volume: 95 },
+      critFailSound: { enabled: true, type: 'synth', synthTheme: 'metallic', volume: 95 },
+      normalSuccessSound: { enabled: true, type: 'synth', synthTheme: 'metallic', volume: 75 },
+      normalFailSound: { enabled: true, type: 'synth', synthTheme: 'metallic', volume: 65 }
+    }
+  },
+  retro8bit: {
+    name: 'Arcade & Retrô 8-Bit',
+    icon: '👾',
+    description: 'Arpeggios nostálgicos chiptune estilo NES/SNES, sino de moeda no sucesso e explosão 8-bit na falha.',
+    settings: {
+      soundTheme: 'retro8bit',
+      rollSound: { enabled: true, type: 'synth', synthTheme: 'retro8bit', volume: 70 },
+      critSuccessSound: { enabled: true, type: 'synth', synthTheme: 'retro8bit', volume: 90 },
+      critFailSound: { enabled: true, type: 'synth', synthTheme: 'retro8bit', volume: 90 },
+      normalSuccessSound: { enabled: true, type: 'synth', synthTheme: 'retro8bit', volume: 70 },
+      normalFailSound: { enabled: true, type: 'synth', synthTheme: 'retro8bit', volume: 60 }
+    }
+  },
+  wooden: {
+    name: 'Mesa de Carvalho & Taverna',
+    icon: '🪵',
+    description: 'Rolagem rústica de dados na madeira maciça com impactos orgânicos e estalos naturais.',
+    settings: {
+      soundTheme: 'wooden',
+      rollSound: { enabled: true, type: 'synth', synthTheme: 'wooden', volume: 80 },
+      critSuccessSound: { enabled: true, type: 'synth', synthTheme: 'fantasy', volume: 85 },
+      critFailSound: { enabled: true, type: 'synth', synthTheme: 'wooden', volume: 85 },
+      normalSuccessSound: { enabled: true, type: 'synth', synthTheme: 'wooden', volume: 65 },
+      normalFailSound: { enabled: true, type: 'synth', synthTheme: 'wooden', volume: 65 }
+    }
+  },
+  gothic: {
+    name: 'Gótico Sombrio & WoD',
+    icon: '🦇',
+    description: 'Ressonância misteriosa em tons menores, eco sepulcral no desastre e sino espectral no sucesso.',
+    settings: {
+      soundTheme: 'gothic',
+      rollSound: { enabled: true, type: 'synth', synthTheme: 'gothic', volume: 75 },
+      critSuccessSound: { enabled: true, type: 'synth', synthTheme: 'gothic', volume: 95 },
+      critFailSound: { enabled: true, type: 'synth', synthTheme: 'gothic', volume: 95 },
+      normalSuccessSound: { enabled: true, type: 'synth', synthTheme: 'gothic', volume: 70 },
+      normalFailSound: { enabled: true, type: 'synth', synthTheme: 'gothic', volume: 65 }
+    }
+  }
+};
+
 // =========================================================================
 // DEFAULT DATA SETS
 // =========================================================================
@@ -472,7 +601,8 @@ const STORAGE_KEYS = {
   timers: 'caranguejo_preset_timers_v2',
   notes: 'caranguejo_preset_notes_v2',
   rules: 'caranguejo_preset_rules_v2',
-  weather: 'caranguejo_preset_weather_v2'
+  weather: 'caranguejo_preset_weather_v2',
+  diceSounds: 'caranguejo_preset_dice_sounds_v1'
 };
 
 function notifyPresetChange(type: string) {
@@ -628,6 +758,37 @@ export function saveWeatherPresets(presets: WeatherAtmospherePreset[]) {
   }
 }
 
+// DICE ROLL SOUND EFFECTS
+export function getDiceSoundSettings(): DiceSoundSettingsPreset {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.diceSounds);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          ...DEFAULT_DICE_SOUND_SETTINGS,
+          ...parsed,
+          rollSound: { ...DEFAULT_DICE_SOUND_SETTINGS.rollSound, ...(parsed.rollSound || {}) },
+          critSuccessSound: { ...DEFAULT_DICE_SOUND_SETTINGS.critSuccessSound, ...(parsed.critSuccessSound || {}) },
+          critFailSound: { ...DEFAULT_DICE_SOUND_SETTINGS.critFailSound, ...(parsed.critFailSound || {}) },
+          normalSuccessSound: { ...DEFAULT_DICE_SOUND_SETTINGS.normalSuccessSound, ...(parsed.normalSuccessSound || {}) },
+          normalFailSound: { ...DEFAULT_DICE_SOUND_SETTINGS.normalFailSound, ...(parsed.normalFailSound || {}) }
+        };
+      }
+    }
+  } catch {}
+  return DEFAULT_DICE_SOUND_SETTINGS;
+}
+
+export function saveDiceSoundSettings(settings: DiceSoundSettingsPreset) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.diceSounds, JSON.stringify(settings));
+    notifyPresetChange('diceSounds');
+  } catch (e) {
+    console.error('Error saving dice sound settings:', e);
+  }
+}
+
 // EXPORT ALL PRESETS AS CLEAN JSON
 export function exportAllPresetsJson(): string {
   const payload = {
@@ -641,7 +802,8 @@ export function exportAllPresetsJson(): string {
       timers: getTimerPresets(),
       noteTemplates: getNoteTabTemplates(),
       rules: getConditionRulePresets(),
-      weather: getWeatherPresets()
+      weather: getWeatherPresets(),
+      diceSounds: getDiceSoundSettings()
     }
   };
   return JSON.stringify(payload, null, 2);
@@ -660,6 +822,7 @@ export function importPresetsFromJson(jsonString: string): { success: boolean; m
     if (Array.isArray(data.noteTemplates)) saveNoteTabTemplates(data.noteTemplates);
     if (Array.isArray(data.rules)) saveConditionRulePresets(data.rules);
     if (Array.isArray(data.weather)) saveWeatherPresets(data.weather);
+    if (data.diceSounds && typeof data.diceSounds === 'object') saveDiceSoundSettings(data.diceSounds);
 
     return { success: true, message: 'Predefinições importadas com sucesso!' };
   } catch (e: any) {

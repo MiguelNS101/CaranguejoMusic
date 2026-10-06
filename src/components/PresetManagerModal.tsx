@@ -21,7 +21,13 @@ import {
   Code,
   X,
   Copy,
-  ChevronRight
+  ChevronRight,
+  Volume2,
+  VolumeX,
+  Play,
+  Dices,
+  ShieldAlert,
+  Flame
 } from 'lucide-react';
 import {
   getLootPresets,
@@ -38,6 +44,8 @@ import {
   saveConditionRulePresets,
   getWeatherPresets,
   saveWeatherPresets,
+  getDiceSoundSettings,
+  saveDiceSoundSettings,
   exportAllPresetsJson,
   importPresetsFromJson,
   DEFAULT_LOOT_TABLES,
@@ -47,19 +55,27 @@ import {
   DEFAULT_NOTE_TEMPLATES,
   DEFAULT_CONDITION_RULES,
   DEFAULT_WEATHER_PRESETS,
+  DEFAULT_DICE_SOUND_SETTINGS,
+  DICE_SOUND_THEME_TEMPLATES,
   LootTablePreset,
   EncounterPreset,
   RoulettePreset,
   TimerPreset,
   NoteTabTemplate,
   ConditionRulePreset,
-  WeatherAtmospherePreset
+  WeatherAtmospherePreset,
+  DiceSoundSettingsPreset,
+  DiceSoundTheme,
+  DiceSoundType,
+  DiceSoundEffectItem
 } from '../utils/presetStore';
+import { testDiceSound, DiceSoundEventType } from '../utils/diceSoundPlayer';
+import { useAudio } from '../context/AudioContext';
 
 interface PresetManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json';
+  initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'diceSounds' | 'json';
 }
 
 export const PresetManagerModal: React.FC<PresetManagerModalProps> = ({
@@ -67,7 +83,9 @@ export const PresetManagerModal: React.FC<PresetManagerModalProps> = ({
   onClose,
   initialTab = 'encounters'
 }) => {
-  const [activeTab, setActiveTab] = useState<'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'diceSounds' | 'json'>(initialTab);
+
+  const { soundboardItems = [], playSoundboard } = useAudio();
 
   // States
   const [encounters, setEncounters] = useState<EncounterPreset[]>([]);
@@ -77,6 +95,8 @@ export const PresetManagerModal: React.FC<PresetManagerModalProps> = ({
   const [noteTemplates, setNoteTemplates] = useState<NoteTabTemplate[]>([]);
   const [rules, setRules] = useState<ConditionRulePreset[]>([]);
   const [weathers, setWeathers] = useState<WeatherAtmospherePreset[]>([]);
+  const [diceSounds, setDiceSounds] = useState<DiceSoundSettingsPreset>(getDiceSoundSettings);
+  const [testingSoundType, setTestingSoundType] = useState<string | null>(null);
 
   // Raw JSON state
   const [jsonText, setJsonText] = useState<string>('');
@@ -91,6 +111,7 @@ export const PresetManagerModal: React.FC<PresetManagerModalProps> = ({
     setNoteTemplates(getNoteTabTemplates());
     setRules(getConditionRulePresets());
     setWeathers(getWeatherPresets());
+    setDiceSounds(getDiceSoundSettings());
     setJsonText(exportAllPresetsJson());
   };
 
@@ -305,6 +326,7 @@ export const PresetManagerModal: React.FC<PresetManagerModalProps> = ({
       saveNoteTabTemplates(DEFAULT_NOTE_TEMPLATES);
       saveConditionRulePresets(DEFAULT_CONDITION_RULES);
       saveWeatherPresets(DEFAULT_WEATHER_PRESETS);
+      saveDiceSoundSettings(DEFAULT_DICE_SOUND_SETTINGS);
       reloadData();
       showFeedback('success', 'Predefinições de fábrica restauradas!');
     }
@@ -459,6 +481,17 @@ export const PresetManagerModal: React.FC<PresetManagerModalProps> = ({
           >
             <CloudRain className="w-3.5 h-3.5" />
             Clima & Atmosfera ({weathers.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('diceSounds')}
+            className={`px-3.5 py-2 rounded-t-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'diceSounds'
+                ? 'bg-[#1A1D21] text-amber-400 border-t-2 border-amber-500'
+                : 'text-[#9E9E9E] hover:text-white'
+            }`}
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            Sons de Dados ({diceSounds.enabled ? 'Ativo' : 'Mudo'})
           </button>
           <button
             onClick={() => {
@@ -1187,6 +1220,350 @@ export const PresetManagerModal: React.FC<PresetManagerModalProps> = ({
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: DICE ROLL SOUND EFFECTS */}
+          {activeTab === 'diceSounds' && (
+            <div className="space-y-4">
+              {/* Top Banner: Master Controls */}
+              <div className="p-4 rounded-xl bg-[#141619] border border-[#2D3139] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                      <Volume2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        Efeitos Sonoros de Rolagem de Dados
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
+                          diceSounds.enabled
+                            ? 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40'
+                            : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                        }`}>
+                          {diceSounds.enabled ? 'Ativado' : 'Desativado'}
+                        </span>
+                      </h3>
+                      <p className="text-xs text-zinc-400 mt-0.5">
+                        Sons imersivos ao rolar dados, fanfarras triunfantes no 20 natural e acordes dramáticos no 1 natural.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = { ...diceSounds, enabled: !diceSounds.enabled };
+                        setDiceSounds(updated);
+                        saveDiceSoundSettings(updated);
+                        showFeedback('success', updated.enabled ? 'Sons de dados ativados!' : 'Sons de dados silenciados.');
+                      }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-sm ${
+                        diceSounds.enabled
+                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                      }`}
+                    >
+                      {diceSounds.enabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                      {diceSounds.enabled ? 'Sons Ativos' : 'Sons Desativados'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        saveDiceSoundSettings(diceSounds);
+                        showFeedback('success', 'Configurações de som de dados salvas!');
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                    >
+                      <Save className="w-4 h-4" />
+                      Salvar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Master Volume Slider */}
+                <div className="pt-2 border-t border-[#252830] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs text-zinc-300">
+                    <span className="font-semibold">Volume Geral dos Efeitos de Dados:</span>
+                    <span className="text-amber-400 font-mono font-bold">{diceSounds.masterVolume}%</span>
+                  </div>
+                  <div className="flex items-center gap-3 w-full sm:w-64">
+                    <VolumeX className="w-3.5 h-3.5 text-zinc-500" />
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={diceSounds.masterVolume}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        const updated = { ...diceSounds, masterVolume: val };
+                        setDiceSounds(updated);
+                        saveDiceSoundSettings(updated);
+                      }}
+                      className="flex-1 accent-amber-500 cursor-pointer"
+                    />
+                    <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Themes Bar */}
+              <div className="p-4 rounded-xl bg-[#141619] border border-[#2D3139] space-y-2.5">
+                <span className="text-xs font-bold text-white block">
+                  Temas Sonoros Pré-Definidos (Aplicar com 1-Clique):
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {(Object.keys(DICE_SOUND_THEME_TEMPLATES) as DiceSoundTheme[]).map((themeKey) => {
+                    const themeObj = DICE_SOUND_THEME_TEMPLATES[themeKey];
+                    const isSelected = diceSounds.soundTheme === themeKey;
+                    return (
+                      <button
+                        key={themeKey}
+                        type="button"
+                        onClick={() => {
+                          const updated = {
+                            ...diceSounds,
+                            ...themeObj.settings,
+                            soundTheme: themeKey
+                          } as DiceSoundSettingsPreset;
+                          setDiceSounds(updated);
+                          saveDiceSoundSettings(updated);
+                          testDiceSound('critSuccess', updated.critSuccessSound, updated.masterVolume, (id) => {
+                            const found = soundboardItems.find(s => s.id === id);
+                            if (found) playSoundboard(found);
+                          });
+                          showFeedback('success', `Tema "${themeObj.name}" aplicado!`);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-amber-950/40 border-amber-500/70 text-amber-200 shadow-md shadow-amber-500/10'
+                            : 'bg-[#1A1D21] border-[#2D3139] hover:border-zinc-500 text-zinc-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-base">{themeObj.icon}</span>
+                          {isSelected && <span className="w-2 h-2 rounded-full bg-amber-400" />}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold truncate">{themeObj.name}</p>
+                          <p className="text-[10px] text-zinc-400 line-clamp-2 mt-0.5 leading-snug">
+                            {themeObj.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Individual Sound Events Cards */}
+              <div className="space-y-3">
+                <span className="text-xs font-bold text-zinc-400 block">
+                  Configuração Detalhada por Tipo de Rolagem:
+                </span>
+
+                {[
+                  {
+                    key: 'rollSound' as const,
+                    eventType: 'roll' as DiceSoundEventType,
+                    title: 'Som ao Rolar (Chocalho dos Dados)',
+                    desc: 'Disparado assim que a rolagem começa ou os dados são lançados.',
+                    badge: 'Início',
+                    color: 'text-indigo-400',
+                    border: 'border-indigo-500/30'
+                  },
+                  {
+                    key: 'critSuccessSound' as const,
+                    eventType: 'critSuccess' as DiceSoundEventType,
+                    title: 'Acerto Crítico (20 Natural / Sucesso Épico)',
+                    desc: 'Disparado em 20 natural no d20 ou acertos críticos estelares no WoD.',
+                    badge: 'Nat 20 / Épico',
+                    color: 'text-amber-400',
+                    border: 'border-amber-500/40'
+                  },
+                  {
+                    key: 'critFailSound' as const,
+                    eventType: 'critFail' as DiceSoundEventType,
+                    title: 'Falha Crítica (1 Natural / Desastre)',
+                    desc: 'Disparado em 1 natural no d20 ou falhas críticas severas no WoD.',
+                    badge: 'Nat 1 / Desastre',
+                    color: 'text-rose-400',
+                    border: 'border-rose-500/40'
+                  },
+                  {
+                    key: 'normalSuccessSound' as const,
+                    eventType: 'normalSuccess' as DiceSoundEventType,
+                    title: 'Sucesso Normal (D&D / WoD)',
+                    desc: 'Disparado em rolagens padrão bem-sucedidas ou sucessos regulares.',
+                    badge: 'Sucesso',
+                    color: 'text-emerald-400',
+                    border: 'border-emerald-500/30'
+                  },
+                  {
+                    key: 'normalFailSound' as const,
+                    eventType: 'normalFail' as DiceSoundEventType,
+                    title: 'Falha Normal (Sem Crítico)',
+                    desc: 'Disparado em testes comuns onde não houve sucesso nem desastre crítico.',
+                    badge: 'Neutro / Falha',
+                    color: 'text-zinc-400',
+                    border: 'border-zinc-600/30'
+                  }
+                ].map(({ key, eventType, title, desc, badge, color, border }) => {
+                  const cfg = diceSounds[key];
+                  const isTesting = testingSoundType === key;
+
+                  const handleTest = async () => {
+                    setTestingSoundType(key);
+                    try {
+                      await testDiceSound(
+                        eventType,
+                        cfg,
+                        diceSounds.masterVolume,
+                        (id) => {
+                          const found = soundboardItems.find(s => s.id === id);
+                          if (found) playSoundboard(found);
+                        }
+                      );
+                    } finally {
+                      setTimeout(() => setTestingSoundType(null), 800);
+                    }
+                  };
+
+                  const updateCfg = (updates: Partial<DiceSoundEffectItem>) => {
+                    const updated = {
+                      ...diceSounds,
+                      [key]: { ...cfg, ...updates }
+                    };
+                    setDiceSounds(updated);
+                    saveDiceSoundSettings(updated);
+                  };
+
+                  return (
+                    <div
+                      key={key}
+                      className={`p-4 rounded-xl bg-[#141619] border ${border} space-y-3 transition-colors`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={cfg.enabled}
+                            onChange={(e) => updateCfg({ enabled: e.target.checked })}
+                            className="rounded text-amber-500 focus:ring-amber-500 cursor-pointer"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className={`text-xs font-bold ${color}`}>{title}</h4>
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#1A1D21] text-zinc-400 border border-[#2D3139]">
+                                {badge}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-400 mt-0.5">{desc}</p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleTest}
+                          className="px-3 py-1.5 rounded-lg bg-[#22262B] hover:bg-[#2D3139] text-xs font-bold text-amber-300 hover:text-white border border-[#3A3F4A] flex items-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto shrink-0 shadow-sm"
+                        >
+                          <Play className={`w-3.5 h-3.5 ${isTesting ? 'animate-bounce text-amber-400' : ''}`} />
+                          {isTesting ? 'Tocando...' : 'Testar Som'}
+                        </button>
+                      </div>
+
+                      {cfg.enabled && (
+                        <div className="pt-2 border-t border-[#22252B] grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {/* Sound Mode Type */}
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-zinc-400 block">Tipo de Áudio:</label>
+                            <select
+                              value={cfg.type}
+                              onChange={(e) => updateCfg({ type: e.target.value as DiceSoundType })}
+                              className="w-full bg-[#1A1D21] border border-[#2D3139] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                            >
+                              <option value="synth">Sintetizador Web Audio (Nativo / Zero Delay)</option>
+                              <option value="soundboard">Item do Soundboard da Mesa</option>
+                              <option value="custom_url">URL de Áudio Própria (MP3 / WAV)</option>
+                            </select>
+                          </div>
+
+                          {/* Secondary Selector depending on type */}
+                          {cfg.type === 'synth' && (
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-zinc-400 block">Estilo Sintetizado:</label>
+                              <select
+                                value={cfg.synthTheme}
+                                onChange={(e) => updateCfg({ synthTheme: e.target.value as DiceSoundTheme })}
+                                className="w-full bg-[#1A1D21] border border-[#2D3139] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                              >
+                                <option value="fantasy">Fantasia Heroica (Metais & Brilho)</option>
+                                <option value="metallic">Dados Metálicos (Sino & Tilintar)</option>
+                                <option value="wooden">Mesa de Madeira (Rústico & Clack)</option>
+                                <option value="retro8bit">Arcade Retrô 8-Bit (Chiptune)</option>
+                                <option value="gothic">Gótico Sombrio / WoD (Catedral & Sepulcro)</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {cfg.type === 'soundboard' && (
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-zinc-400 block">Efeito do Soundboard:</label>
+                              {soundboardItems.length === 0 ? (
+                                <p className="text-[11px] text-zinc-500 py-1.5">Nenhum som no soundboard cadastrado.</p>
+                              ) : (
+                                <select
+                                  value={cfg.soundboardItemId || ''}
+                                  onChange={(e) => updateCfg({ soundboardItemId: e.target.value })}
+                                  className="w-full bg-[#1A1D21] border border-[#2D3139] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                                >
+                                  <option value="">Selecione um som...</option>
+                                  {soundboardItems.map(item => (
+                                    <option key={item.id} value={item.id}>
+                                      {item.emoji ? `${item.emoji} ` : ''}{item.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          )}
+
+                          {cfg.type === 'custom_url' && (
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-zinc-400 block">Link de Áudio:</label>
+                              <input
+                                type="text"
+                                value={cfg.customUrl || ''}
+                                onChange={(e) => updateCfg({ customUrl: e.target.value })}
+                                placeholder="https://.../meu-efeito.mp3"
+                                className="w-full bg-[#1A1D21] border border-[#2D3139] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+                          )}
+
+                          {/* Individual volume */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[11px] font-semibold text-zinc-400">
+                              <span>Volume do Efeito:</span>
+                              <span className="text-amber-400 font-mono">{cfg.volume}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={cfg.volume}
+                              onChange={(e) => updateCfg({ volume: parseInt(e.target.value, 10) })}
+                              className="w-full accent-amber-500 cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

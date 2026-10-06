@@ -18,6 +18,7 @@ import { ThemeCustomizerModal } from './components/ThemeCustomizerModal';
 import { PresetManagerModal } from './components/PresetManagerModal';
 import { ConfigurationModal } from './components/ConfigurationModal';
 import { AudioMixerModal } from './components/AudioMixerModal';
+import { MasterSessionPdfExportModal } from './components/MasterSessionPdfExportModal';
 import { ActionLogFooter } from './components/ActionLogFooter';
 import { Button } from './components/Button';
 
@@ -42,10 +43,11 @@ export default function App() {
   const [discordModalTab, setDiscordModalTab] = useState<'bot' | 'diagnostics' | 'guide' | 'docker' | 'portable'>('bot');
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState<boolean>(false);
+  const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState<boolean>(false);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = useState<boolean>(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState<boolean>(false);
   const [isPresetModalOpen, setIsPresetModalOpen] = useState<boolean>(false);
-  const [presetModalTab, setPresetModalTab] = useState<'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'json'>('encounters');
+  const [presetModalTab, setPresetModalTab] = useState<'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'diceSounds' | 'json'>('encounters');
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
   const [isMixerModalOpen, setIsMixerModalOpen] = useState<boolean>(false);
 
@@ -86,6 +88,7 @@ export default function App() {
                 onOpenNpcTab={() => setCurrentTab('npcs')}
                 onOpenChatTab={() => setCurrentTab('chat')}
                 onOpenSessionModal={() => setIsSessionModalOpen(true)}
+                onOpenPdfExportModal={() => setIsPdfExportModalOpen(true)}
               />
             )}
 
@@ -247,6 +250,12 @@ export default function App() {
           <SessionManagerModal
             isOpen={isSessionModalOpen}
             onClose={() => setIsSessionModalOpen(false)}
+            onOpenPdfExportModal={() => setIsPdfExportModalOpen(true)}
+          />
+
+          <MasterSessionPdfExportModal
+            isOpen={isPdfExportModalOpen}
+            onClose={() => setIsPdfExportModalOpen(false)}
           />
 
           <AppTutorialModal

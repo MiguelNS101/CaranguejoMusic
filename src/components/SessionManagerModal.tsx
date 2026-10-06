@@ -23,9 +23,14 @@ import { exportAllPresetsJson, importPresetsFromJson } from '../utils/presetStor
 interface SessionManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenPdfExportModal?: () => void;
 }
 
-export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({ isOpen, onClose }) => {
+export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({
+  isOpen,
+  onClose,
+  onOpenPdfExportModal
+}) => {
   const {
     savedSessions,
     saveCurrentSession,
@@ -347,6 +352,21 @@ export const SessionManagerModal: React.FC<SessionManagerModalProps> = ({ isOpen
                 <Download className="w-3.5 h-3.5" />
                 Exportar Estado Completo (.JSON)
               </button>
+
+              {onOpenPdfExportModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenPdfExportModal();
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 border border-amber-500/40 hover:border-amber-400 text-xs font-bold transition-all cursor-pointer shadow-sm shadow-amber-500/10"
+                  title="Exportar arquivo oficial da sessão em formato PDF formatado para o Mestre"
+                >
+                  <FileText className="w-3.5 h-3.5 text-amber-400" />
+                  Exportar Arquivo da Sessão (PDF)
+                </button>
+              )}
 
               <button
                 type="button"

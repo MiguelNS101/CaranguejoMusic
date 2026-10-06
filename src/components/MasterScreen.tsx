@@ -68,7 +68,9 @@ import {
   CloudRain,
   Volume2,
   VolumeX,
-  Music
+  Music,
+  FileText,
+  Download
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import {
@@ -97,6 +99,7 @@ import { CustomRouletteWidget } from './CustomRouletteWidget';
 import { ScenarioMapManager } from './ScenarioMapManager';
 import { AdvancedDiceRoller } from './AdvancedDiceRoller';
 import { Button } from './Button';
+import { playDiceSound } from '../utils/diceSoundPlayer';
 
 interface MasterScreenProps {
   onOpenMusicTab: () => void;
@@ -105,6 +108,7 @@ interface MasterScreenProps {
   onOpenNpcTab: () => void;
   onOpenChatTab: () => void;
   onOpenSessionModal: () => void;
+  onOpenPdfExportModal?: () => void;
 }
 
 export interface WidgetCatalogItem {
@@ -441,7 +445,8 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
   onOpenSoundboardTab,
   onOpenNpcTab,
   onOpenChatTab,
-  onOpenSessionModal
+  onOpenSessionModal,
+  onOpenPdfExportModal
 }) => {
   const {
     currentTrack,
@@ -639,6 +644,12 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
     const count = customCount !== undefined ? customCount : diceCount;
     setIsRolling(true);
 
+    // Play tumbling roll sound
+    playDiceSound('roll', undefined, (id) => {
+      const found = soundboardItems.find(s => s.id === id);
+      if (found) playSoundboard(found);
+    });
+
     const notation = `${count}d${sides}${diceModifier > 0 ? `+${diceModifier}` : diceModifier < 0 ? `${diceModifier}` : ''}`;
 
     try {
@@ -655,6 +666,23 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
       if (res.success && res.data?.roll) {
         const roll = res.data.roll;
         setLastRoll(roll);
+
+        if (roll.isCriticalSuccess) {
+          playDiceSound('critSuccess', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else if (roll.isCriticalFail) {
+          playDiceSound('critFail', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else {
+          playDiceSound('normalSuccess', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        }
       }
     } catch (err) {
       console.error('Error rolling dice:', err);
@@ -666,6 +694,12 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
   // Roll World of Darkness (WoD) Storyteller Action
   const handleRollWod = async () => {
     setIsWodRolling(true);
+
+    playDiceSound('roll', undefined, (id) => {
+      const found = soundboardItems.find(s => s.id === id);
+      if (found) playSoundboard(found);
+    });
+
     try {
       const result = await rollWodDiceAction(
         wodDiceCount,
@@ -677,6 +711,28 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
 
       if (result) {
         setLastWodRoll(result);
+
+        if (result.totalCriticalHits > 0) {
+          playDiceSound('critSuccess', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else if (result.totalCriticalFails > 0) {
+          playDiceSound('critFail', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else if (result.totalSuccesses > 0) {
+          playDiceSound('normalSuccess', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        } else {
+          playDiceSound('normalFail', undefined, (id) => {
+            const found = soundboardItems.find(s => s.id === id);
+            if (found) playSoundboard(found);
+          });
+        }
       }
     } catch (err) {
       console.error('Error rolling WoD dice:', err);
@@ -1464,7 +1520,18 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 self-end sm:self-center">
+              <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+                {onOpenPdfExportModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenPdfExportModal}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs shadow-sm shadow-amber-500/20 transition-all cursor-pointer"
+                    title="Exportar histórico de mensagens, lista de NPCs e progresso da sessão em PDF"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-black" />
+                    Exportar PDF
+                  </button>
+                )}
                 <button
                   onClick={onOpenSessionModal}
                   className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm shadow-indigo-600/30 transition-all cursor-pointer"
@@ -2822,6 +2889,18 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
 
         {/* Top Header Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          {onOpenPdfExportModal && (
+            <button
+              type="button"
+              onClick={onOpenPdfExportModal}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 hover:text-amber-200 border border-amber-500/30 transition-all cursor-pointer shadow-md shadow-amber-500/10"
+              title="Exportar histórico de mensagens, lista de NPCs e progresso da sessão em PDF para arquivamento do Mestre"
+            >
+              <FileText className="w-4 h-4 text-amber-400" />
+              <span>Exportar Arquivo (PDF)</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsCustomizerOpen(!isCustomizerOpen)}
