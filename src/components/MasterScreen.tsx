@@ -70,7 +70,13 @@ import {
   VolumeX,
   Music,
   FileText,
-  Download
+  Download,
+  Shield,
+  Heart,
+  Skull,
+  Minus,
+  Lock,
+  UserPlus
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import {
@@ -82,13 +88,15 @@ import {
   MasterWidgetConfig,
   WidgetWidth,
   WidgetHeight,
-  WidgetDensity
+  WidgetDensity,
+  Combatant
 } from '../types';
 import { safeFetchJson } from '../services/api';
 import { AudioScrubber } from './AudioScrubber';
 import { MultiTimersWidget } from './MultiTimersWidget';
 import { MultiTabNotepad } from './MultiTabNotepad';
 import { SummaryStatsWidget } from './SummaryStatsWidget';
+import { RealtimeDashboardWidget } from './RealtimeDashboardWidget';
 import { MasterImageViewerWidget } from './MasterImageViewerWidget';
 import { QuickRulesWidget } from './QuickRulesWidget';
 import { LootGeneratorWidget } from './LootGeneratorWidget';
@@ -108,7 +116,6 @@ interface MasterScreenProps {
   onOpenNpcTab: () => void;
   onOpenChatTab: () => void;
   onOpenSessionModal: () => void;
-  onOpenCampaignModal?: () => void;
   onOpenPdfExportModal?: () => void;
 }
 
@@ -221,6 +228,18 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
     description: 'Ordem de iniciativa, PV de monstros/heróis, contador de rodadas e anúncio no Discord.',
     allowMultiple: false,
     tags: ['iniciativa', 'combate', 'turnos', 'pv']
+  },
+  {
+    type: 'realtime_dashboard',
+    name: 'Dashboard de Estatísticas em Tempo Real',
+    category: 'core',
+    icon: '⚡',
+    defaultTitle: 'Dashboard de Estatísticas & Monitor de Uso',
+    defaultWidth: 'full',
+    defaultDensity: 'expanded',
+    description: 'Tempo total e da sessão de áudio reproduzido, número de mensagens enviadas pelo bot Discord e histórico ao vivo de rolagens de dados.',
+    allowMultiple: false,
+    tags: ['estatísticas', 'tempo real', 'dashboard', 'áudio', 'bot', 'dados', 'métricas']
   },
   {
     type: 'stats_summary',
@@ -358,6 +377,7 @@ export const WIDGET_CATALOG: WidgetCatalogItem[] = [
 
 const DEFAULT_WIDGETS_CONFIG: MasterWidgetConfig[] = [
   { id: 'stats_summary', type: 'stats_summary', title: 'Resumo da Mesa & Estatísticas', visible: true, width: 'full', density: 'expanded' },
+  { id: 'realtime_dashboard', type: 'realtime_dashboard', title: 'Dashboard de Estatísticas & Monitor de Uso', visible: true, width: 'full', density: 'expanded' },
   { id: 'session_bar', type: 'session_bar', title: 'Sessão da Mesa & Backup Local', visible: true, width: 'full', density: 'compact' },
   { id: 'now_playing', type: 'now_playing', title: 'Tocando Agora & Player de Áudio', visible: true, width: 'half', density: 'expanded' },
   { id: 'image_viewer', type: 'image_viewer', title: 'Cenários, Mapas & Handouts', visible: true, width: 'half', density: 'expanded' },
@@ -447,7 +467,6 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
   onOpenNpcTab,
   onOpenChatTab,
   onOpenSessionModal,
-  onOpenCampaignModal,
   onOpenPdfExportModal
 }) => {
   const {
@@ -489,11 +508,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
     setActiveLayoutId,
     savedSessions,
     rollWodDiceAction,
-    announceInitiativeTurn,
-    campaigns,
-    activeCampaign,
-    activeScene,
-    activateScene
+    announceInitiativeTurn
   } = useAudio();
 
   // Layout & Widget Management State
@@ -581,12 +596,24 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
   const [postingNpcId, setPostingNpcId] = useState<string | null>(null);
 
   // Initiative Tracker State
-  const [initiativeList, setInitiativeList] = useState<Array<{ id: string; name: string; init: number; hp: number; maxHp: number; isNpc: boolean }>>(() => {
+  const [initiativeList, setInitiativeList] = useState<Combatant[]>(() => {
     try {
       const saved = localStorage.getItem('caranguejo_initiative_list');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map((item: any) => ({
+            id: item.id || `init-${Date.now()}-${Math.random()}`,
+            name: item.name || 'Combatente',
+            init: typeof item.init === 'number' ? item.init : (typeof item.initiative === 'number' ? item.initiative : 10),
+            hp: typeof item.hp === 'number' ? item.hp : 25,
+            maxHp: typeof item.maxHp === 'number' ? item.maxHp : (typeof item.hp === 'number' ? item.hp : 25),
+            isNpc: item.isNpc !== undefined ? !!item.isNpc : true,
+            faction: item.faction === 'ally' || item.faction === 'enemy' ? item.faction : (item.isNpc ? 'enemy' : 'ally'),
+            npcId: item.npcId,
+            notes: item.notes
+          }));
+        }
       }
     } catch {}
     return [];
@@ -600,6 +627,11 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
   const [activeTurnIdx, setActiveTurnIdx] = useState<number>(0);
   const [newCombatantName, setNewCombatantName] = useState('');
   const [newCombatantInit, setNewCombatantInit] = useState('');
+  const [newCombatantHp, setNewCombatantHp] = useState<string>('25');
+  const [newCombatantMaxHp, setNewCombatantMaxHp] = useState<string>('25');
+  const [newCombatantFaction, setNewCombatantFaction] = useState<'ally' | 'enemy'>('enemy');
+  const [newCombatantNpcId, setNewCombatantNpcId] = useState<string>('');
+  const [initiativeFactionFilter, setInitiativeFactionFilter] = useState<'all' | 'ally' | 'enemy'>('all');
   const [autoAnnounceTurn, setAutoAnnounceTurn] = useState<boolean>(false);
   const [isAnnouncingTurn, setIsAnnouncingTurn] = useState<boolean>(false);
   const [turnAnnouncementFeedback, setTurnAnnouncementFeedback] = useState<string | null>(null);
@@ -782,26 +814,107 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
     }
   };
 
+  const handleSelectNpcForInitiative = (npcId: string) => {
+    if (!npcId) {
+      setNewCombatantNpcId('');
+      return;
+    }
+    const npc = npcs.find(n => n.id === npcId);
+    if (!npc) return;
+    setNewCombatantName(npc.name);
+    setNewCombatantNpcId(npc.id);
+    const hpVal = typeof npc.hp === 'number' && npc.hp > 0 ? npc.hp : 25;
+    const maxVal = typeof npc.maxHp === 'number' && npc.maxHp > 0 ? npc.maxHp : hpVal;
+    setNewCombatantHp(hpVal.toString());
+    setNewCombatantMaxHp(maxVal.toString());
+    const isAlly = (npc.role || '').toLowerCase().includes('aliado') || (npc.description || '').toLowerCase().includes('aliado');
+    setNewCombatantFaction(isAlly ? 'ally' : 'enemy');
+  };
+
+  const handleCombatantNameChange = (nameVal: string) => {
+    setNewCombatantName(nameVal);
+    const matched = npcs.find(n => n.name.toLowerCase() === nameVal.trim().toLowerCase());
+    if (matched) {
+      setNewCombatantNpcId(matched.id);
+      const hpVal = typeof matched.hp === 'number' && matched.hp > 0 ? matched.hp : 25;
+      const maxVal = typeof matched.maxHp === 'number' && matched.maxHp > 0 ? matched.maxHp : hpVal;
+      setNewCombatantHp(hpVal.toString());
+      setNewCombatantMaxHp(maxVal.toString());
+      const isAlly = (matched.role || '').toLowerCase().includes('aliado') || (matched.description || '').toLowerCase().includes('aliado');
+      setNewCombatantFaction(isAlly ? 'ally' : 'enemy');
+    }
+  };
+
   const handleAddCombatant = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCombatantName.trim()) return;
 
-    const matchedNpc = npcs.find(n => n.name.toLowerCase() === newCombatantName.trim().toLowerCase());
+    const matchedNpc = npcs.find(n => n.name.toLowerCase() === newCombatantName.trim().toLowerCase()) ||
+      (newCombatantNpcId ? npcs.find(n => n.id === newCombatantNpcId) : undefined);
+    
     const parsedInit = parseInt(newCombatantInit, 10) || Math.floor(Math.random() * 20) + 1;
+    const rawHp = parseInt(newCombatantHp, 10);
+    const initialHp = !isNaN(rawHp) ? rawHp : (matchedNpc && typeof matchedNpc.hp === 'number' ? matchedNpc.hp : 25);
+    const rawMaxHp = parseInt(newCombatantMaxHp, 10);
+    const initialMaxHp = !isNaN(rawMaxHp) ? rawMaxHp : (matchedNpc ? (matchedNpc.maxHp || matchedNpc.hp || initialHp) : initialHp);
 
-    const item = {
-      id: `init-${Date.now()}`,
+    const item: Combatant = {
+      id: `init-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name: newCombatantName.trim(),
       init: parsedInit,
-      hp: matchedNpc ? (matchedNpc.hp || 25) : 25,
-      maxHp: matchedNpc ? (matchedNpc.maxHp || matchedNpc.hp || 25) : 25,
-      isNpc: !!matchedNpc || true
+      hp: Math.max(0, initialHp),
+      maxHp: Math.max(1, initialMaxHp),
+      isNpc: !!matchedNpc || (newCombatantFaction === 'enemy'),
+      faction: newCombatantFaction,
+      npcId: matchedNpc?.id
     };
 
     const newList = [...initiativeList, item].sort((a, b) => b.init - a.init);
     setInitiativeList(newList);
     setNewCombatantName('');
     setNewCombatantInit('');
+    setNewCombatantHp('25');
+    setNewCombatantMaxHp('25');
+    setNewCombatantNpcId('');
+  };
+
+  const handleUpdateCombatantHp = (id: string, delta: number) => {
+    setInitiativeList(prev => prev.map(c => {
+      if (c.id === id) {
+        const nextHp = Math.max(0, c.hp + delta);
+        return { ...c, hp: nextHp };
+      }
+      return c;
+    }));
+  };
+
+  const handleSetCombatantHp = (id: string, newHp: number) => {
+    setInitiativeList(prev => prev.map(c => {
+      if (c.id === id) {
+        return { ...c, hp: Math.max(0, newHp) };
+      }
+      return c;
+    }));
+  };
+
+  const handleSetCombatantMaxHp = (id: string, newMaxHp: number) => {
+    setInitiativeList(prev => prev.map(c => {
+      if (c.id === id) {
+        const validMax = Math.max(1, newMaxHp);
+        return { ...c, maxHp: validMax };
+      }
+      return c;
+    }));
+  };
+
+  const handleToggleCombatantFaction = (id: string) => {
+    setInitiativeList(prev => prev.map(c => {
+      if (c.id === id) {
+        const nextFaction: 'ally' | 'enemy' = c.faction === 'ally' ? 'enemy' : 'ally';
+        return { ...c, faction: nextFaction };
+      }
+      return c;
+    }));
   };
 
   const handleNextTurn = () => {
@@ -1527,44 +1640,6 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
-                {activeCampaign && (
-                  <div className="flex items-center gap-1.5 bg-[#141619] border border-[#2D3139] px-2.5 py-1 rounded-xl">
-                    <span className="text-[11px] font-bold text-purple-300 flex items-center gap-1 shrink-0">
-                      🎬 {activeCampaign.name}:
-                    </span>
-                    {activeCampaign.scenes && activeCampaign.scenes.length > 0 ? (
-                      <select
-                        value={activeCampaign.activeSceneId || ''}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            activateScene(activeCampaign.id, e.target.value);
-                          }
-                        }}
-                        className="bg-[#1A1D21] border border-[#2D3139] rounded-lg px-2 py-0.5 text-xs text-zinc-200 focus:outline-none focus:border-purple-400 cursor-pointer"
-                        title="Troca rápida de cena: carrega trilha sonora, clima e NPCs automaticamente"
-                      >
-                        {activeCampaign.scenes.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-[11px] text-zinc-500 italic">Sem cenas</span>
-                    )}
-                    {onOpenCampaignModal && (
-                      <button
-                        type="button"
-                        onClick={onOpenCampaignModal}
-                        className="text-[10px] text-purple-400 hover:text-purple-300 font-semibold underline ml-1 cursor-pointer shrink-0"
-                        title="Abrir gerenciador de campanhas e cenas"
-                      >
-                        Cenas
-                      </button>
-                    )}
-                  </div>
-                )}
-
                 {onOpenPdfExportModal && (
                   <button
                     type="button"
@@ -2254,10 +2329,23 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
           </div>
         );
 
-      case 'initiative':
+      case 'initiative': {
+        const allyCombatants = initiativeList.filter(c => c.faction === 'ally');
+        const enemyCombatants = initiativeList.filter(c => c.faction === 'enemy');
+        const totalAllyHp = allyCombatants.reduce((acc, c) => acc + c.hp, 0);
+        const totalAllyMaxHp = allyCombatants.reduce((acc, c) => acc + c.maxHp, 0);
+        const totalEnemyHp = enemyCombatants.reduce((acc, c) => acc + c.hp, 0);
+        const totalEnemyMaxHp = enemyCombatants.reduce((acc, c) => acc + c.maxHp, 0);
+
+        const displayedList = initiativeList.filter(c => {
+          if (initiativeFactionFilter === 'ally') return c.faction === 'ally';
+          if (initiativeFactionFilter === 'enemy') return c.faction === 'enemy';
+          return true;
+        });
+
         return (
-          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 md:p-5 shadow-lg space-y-3">
-            <div className="flex items-center justify-between border-b border-[#2D3139]/60 pb-2">
+          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 md:p-5 shadow-lg space-y-3.5">
+            <div className="flex items-center justify-between border-b border-[#2D3139]/60 pb-2.5">
               <div className="flex items-center gap-2">
                 <Swords className="w-4 h-4 text-rose-400" />
                 <h2 className="text-sm font-bold uppercase tracking-wider text-[#FFFFFF] font-rpg">
@@ -2267,7 +2355,13 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                   Rodada {combatRound}
                 </span>
               </div>
-              {!isModal && renderWidgetHeaderControls(widget)}
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-amber-300/80 bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-600/30 font-medium">
+                  <Lock className="w-3 h-3 text-amber-400" />
+                  PVs Privados do Mestre
+                </span>
+                {!isModal && renderWidgetHeaderControls(widget)}
+              </div>
             </div>
 
             {isMinimized ? (
@@ -2287,134 +2381,403 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
                 {turnAnnouncementFeedback && (
                   <div className="p-2.5 rounded-xl bg-indigo-950/60 border border-indigo-500/40 text-indigo-200 text-xs flex items-center justify-between animate-fadeIn">
                     <span className="font-bold">{turnAnnouncementFeedback}</span>
-                    <span className="text-[10px] opacity-75 font-mono">Discord Sync</span>
+                    <span className="text-[10px] opacity-75 font-mono">Discord Sync (Sem PV)</span>
                   </div>
                 )}
 
+                {/* Mostrador de Batalha & Filtros de Aliados / Inimigos */}
+                <div className="bg-[#141619] p-2.5 rounded-xl border border-[#2D3139] space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    {/* Filtros de Facção */}
+                    <div className="flex items-center gap-1 bg-[#0F1113] p-1 rounded-lg border border-[#2D3139]">
+                      <button
+                        type="button"
+                        onClick={() => setInitiativeFactionFilter('all')}
+                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                          initiativeFactionFilter === 'all'
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'text-[#9E9E9E] hover:text-white'
+                        }`}
+                      >
+                        Todos ({initiativeList.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInitiativeFactionFilter('ally')}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          initiativeFactionFilter === 'ally'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'text-emerald-400/70 hover:text-emerald-300'
+                        }`}
+                      >
+                        <Shield className="w-3 h-3" />
+                        Aliados ({allyCombatants.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setInitiativeFactionFilter('enemy')}
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          initiativeFactionFilter === 'enemy'
+                            ? 'bg-rose-600 text-white shadow-sm'
+                            : 'text-rose-400/70 hover:text-rose-300'
+                        }`}
+                      >
+                        <Skull className="w-3 h-3" />
+                        Inimigos ({enemyCombatants.length})
+                      </button>
+                    </div>
+
+                    {/* Resumo de Balanço de PV */}
+                    <div className="flex items-center gap-3 text-[10px] font-mono">
+                      <div className="flex items-center gap-1 text-emerald-400">
+                        <Shield className="w-3 h-3" />
+                        <span>Aliados: <strong>{totalAllyHp}</strong>/{totalAllyMaxHp} PV</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-rose-400">
+                        <Skull className="w-3 h-3" />
+                        <span>Inimigos: <strong>{totalEnemyHp}</strong>/{totalEnemyMaxHp} PV</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Barra Visual de Equilíbrio da Batalha */}
+                  {(totalAllyMaxHp > 0 || totalEnemyMaxHp > 0) && (
+                    <div className="w-full h-1.5 rounded-full bg-[#22262B] overflow-hidden flex">
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-300"
+                        style={{
+                          width: `${(totalAllyHp + totalEnemyHp > 0) ? (totalAllyHp / (totalAllyHp + totalEnemyHp)) * 100 : 50}%`
+                        }}
+                        title={`Aliados: ${totalAllyHp} PV`}
+                      />
+                      <div
+                        className="h-full bg-rose-500 transition-all duration-300"
+                        style={{
+                          width: `${(totalAllyHp + totalEnemyHp > 0) ? (totalEnemyHp / (totalAllyHp + totalEnemyHp)) * 100 : 50}%`
+                        }}
+                        title={`Inimigos: ${totalEnemyHp} PV`}
+                      />
+                    </div>
+                  )}
+                </div>
+
                 {/* Combatants List */}
-                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                  {initiativeList.length === 0 ? (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {displayedList.length === 0 ? (
                     <div className="p-4 text-center rounded-xl bg-[#141619] border border-dashed border-[#2D3139] text-[#9E9E9E] text-xs">
-                      Nenhum combatente na iniciativa. Adicione jogadores ou monstros abaixo para iniciar a rodada.
+                      {initiativeList.length === 0
+                        ? 'Nenhum combatente na iniciativa. Adicione jogadores ou monstros abaixo.'
+                        : 'Nenhum combatente nesta categoria de facção.'}
                     </div>
                   ) : (
-                    initiativeList.map((item, idx) => {
+                    displayedList.map((item) => {
+                      const idx = initiativeList.findIndex(c => c.id === item.id);
                       const isActive = idx === activeTurnIdx;
+                      const isAlly = item.faction === 'ally';
+                      const maxHpSafe = Math.max(1, item.maxHp || item.hp || 1);
+                      const hpPercent = Math.max(0, Math.min(100, (item.hp / maxHpSafe) * 100));
+                      const isDeadOrUnconscious = item.hp === 0;
+
                       return (
                         <div
                           key={item.id}
                           onClick={() => setActiveTurnIdx(idx)}
-                          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                          className={`p-2.5 rounded-xl border flex flex-col gap-2 transition-all cursor-pointer ${
                             isActive
-                              ? 'bg-indigo-600/20 border-indigo-500 ring-1 ring-indigo-500 shadow-md'
+                              ? 'bg-indigo-600/15 border-indigo-500 ring-1 ring-indigo-500 shadow-md'
                               : 'bg-[#141619] border-[#2D3139] hover:border-[#3D424E]'
                           }`}
                         >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono font-bold text-xs ${
-                            isActive ? 'bg-indigo-600 text-white' : 'bg-[#22262B] text-[#9E9E9E]'
-                          }`}>
-                            {item.init}
-                          </span>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-                              {item.name}
-                              {item.isNpc && (
-                                <span className="text-[9px] px-1 py-0.2 rounded bg-rose-950/50 text-rose-300 border border-rose-800/40">
-                                  NPC
-                                </span>
+                          {/* Row 1: Turno, Nome, Facção e Botões de Turno / Remoção */}
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
+                                  isActive
+                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                    : 'bg-[#22262B] text-[#9E9E9E]'
+                                }`}
+                                title="Valor de Iniciativa"
+                              >
+                                {item.init}
+                              </span>
+
+                              <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                                <h4 className="text-xs font-bold text-white truncate">
+                                  {item.name}
+                                </h4>
+
+                                {/* Botão interativo para mudar entre Aliado e Inimigo no mesmo widget */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleCombatantFaction(item.id);
+                                  }}
+                                  className={`text-[9px] px-2 py-0.5 rounded font-bold transition-all flex items-center gap-1 cursor-pointer border ${
+                                    isAlly
+                                      ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'
+                                      : 'bg-rose-950/60 text-rose-300 border-rose-500/40 hover:bg-rose-900/60'
+                                  }`}
+                                  title="Clique para alternar entre Aliado e Inimigo"
+                                >
+                                  {isAlly ? <Shield className="w-2.5 h-2.5" /> : <Skull className="w-2.5 h-2.5" />}
+                                  <span>{isAlly ? 'Aliado' : 'Inimigo'}</span>
+                                </button>
+
+                                {item.isNpc && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#22262B] text-[#9E9E9E] border border-[#2D3139]">
+                                    NPC
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {isActive && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAnnounceTurn(item);
+                                  }}
+                                  disabled={isAnnouncingTurn}
+                                  className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[10px] flex items-center gap-1 shadow-sm cursor-pointer"
+                                  title="Anunciar turno deste combatente no Discord (Sem revelar PV)"
+                                >
+                                  <Megaphone className="w-3 h-3" />
+                                  <span className="hidden sm:inline">Anunciar</span>
+                                </button>
                               )}
-                            </h4>
-                            <span className="text-[10px] text-[#9E9E9E]">
-                              PV: {item.hp}/{item.maxHp}
-                            </span>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveCombatant(item.id);
+                                }}
+                                className="p-1 text-[#6E7681] hover:text-rose-400 rounded hover:bg-[#22262B] transition-colors cursor-pointer"
+                                title="Remover do Combate"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Row 2: Contador de HP & Controles do Mestre (Privado) */}
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-[#0D0F11] p-2 rounded-lg border border-[#242830] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2"
+                          >
+                            {/* Barra de Vida & Estatísticas */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between text-[10px] mb-1">
+                                <span className="text-[#9E9E9E] flex items-center gap-1">
+                                  <Heart className={`w-3 h-3 ${isDeadOrUnconscious ? 'text-rose-500' : 'text-rose-400'}`} />
+                                  <span>PV:</span>
+                                </span>
+                                <div className="flex items-center gap-1 font-mono font-bold">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.hp}
+                                    onChange={(e) => handleSetCombatantHp(item.id, parseInt(e.target.value) || 0)}
+                                    className={`w-12 text-center rounded px-1 py-0.5 bg-[#141619] border text-xs font-mono focus:outline-none ${
+                                      isDeadOrUnconscious
+                                        ? 'border-rose-600 text-rose-400 bg-rose-950/30'
+                                        : 'border-[#2D3139] text-white focus:border-indigo-500'
+                                    }`}
+                                  />
+                                  <span className="text-[#6E7681]">/</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={item.maxHp}
+                                    onChange={(e) => handleSetCombatantMaxHp(item.id, parseInt(e.target.value) || 1)}
+                                    className="w-12 text-center rounded px-1 py-0.5 bg-[#141619] border border-[#2D3139] text-[#9E9E9E] text-xs font-mono focus:border-indigo-500 focus:outline-none"
+                                    title="PV Máximo"
+                                  />
+                                  <span className={`ml-1 text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                                    isDeadOrUnconscious
+                                      ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                      : hpPercent <= 25
+                                      ? 'bg-rose-900/60 text-rose-200'
+                                      : hpPercent <= 50
+                                      ? 'bg-amber-900/60 text-amber-200'
+                                      : 'bg-emerald-900/60 text-emerald-200'
+                                  }`}>
+                                    {isDeadOrUnconscious ? '💀 0 PV' : `${Math.round(hpPercent)}%`}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Barra de Progresso de HP */}
+                              <div className="w-full h-1.5 rounded-full bg-[#1A1D21] overflow-hidden border border-[#2D3139]">
+                                <div
+                                  className={`h-full transition-all duration-200 ${
+                                    isDeadOrUnconscious
+                                      ? 'bg-rose-600'
+                                      : hpPercent <= 25
+                                      ? 'bg-rose-500'
+                                      : hpPercent <= 50
+                                      ? 'bg-amber-500'
+                                      : 'bg-emerald-500'
+                                  }`}
+                                  style={{ width: `${hpPercent}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Botões Rápidos de Alterar HP */}
+                            <div className="flex items-center gap-1 shrink-0 justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCombatantHp(item.id, -5)}
+                                className="px-1.5 py-1 rounded bg-[#1F2329] hover:bg-rose-900/50 hover:text-rose-300 text-[#9E9E9E] text-[10px] font-bold border border-[#2D3139] transition-colors cursor-pointer"
+                                title="Aplicar 5 de Dano"
+                              >
+                                -5
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCombatantHp(item.id, -1)}
+                                className="px-1.5 py-1 rounded bg-[#1F2329] hover:bg-rose-900/50 hover:text-rose-300 text-[#9E9E9E] text-[10px] font-bold border border-[#2D3139] transition-colors cursor-pointer"
+                                title="Aplicar 1 de Dano"
+                              >
+                                -1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCombatantHp(item.id, 1)}
+                                className="px-1.5 py-1 rounded bg-[#1F2329] hover:bg-emerald-900/50 hover:text-emerald-300 text-[#9E9E9E] text-[10px] font-bold border border-[#2D3139] transition-colors cursor-pointer"
+                                title="Curar 1 PV"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCombatantHp(item.id, 5)}
+                                className="px-1.5 py-1 rounded bg-[#1F2329] hover:bg-emerald-900/50 hover:text-emerald-300 text-[#9E9E9E] text-[10px] font-bold border border-[#2D3139] transition-colors cursor-pointer"
+                                title="Curar 5 PV"
+                              >
+                                +5
+                              </button>
+                            </div>
                           </div>
                         </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          {isActive && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAnnounceTurn(item);
-                              }}
-                              disabled={isAnnouncingTurn}
-                              className="px-2 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[10px] flex items-center gap-1 shadow-sm cursor-pointer"
-                              title="Anunciar turno deste combatente no Discord"
-                            >
-                              <Megaphone className="w-3 h-3" />
-                              <span className="hidden sm:inline">Anunciar</span>
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveCombatant(item.id);
-                            }}
-                            className="p-1 text-[#6E7681] hover:text-rose-400 rounded hover:bg-[#22262B] transition-colors cursor-pointer"
-                            title="Remover do Combate"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
                 </div>
 
-                {/* Add Combatant Form */}
-                <form onSubmit={handleAddCombatant} className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Nome do Combatente / NPC..."
-                    value={newCombatantName}
-                    onChange={(e) => setNewCombatantName(e.target.value)}
-                    className="flex-1 bg-[#141619] border border-[#2D3139] rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-[#6E7681] focus:border-indigo-500 focus:outline-none"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Inic."
-                    value={newCombatantInit}
-                    onChange={(e) => setNewCombatantInit(e.target.value)}
-                    className="w-16 bg-[#141619] border border-[#2D3139] rounded-xl px-2 py-1.5 text-xs text-white text-center font-mono focus:border-indigo-500 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shrink-0 cursor-pointer"
-                  >
-                    + Add
-                  </button>
-                </form>
+                {/* Formulário de Adicionar Combatente (com Seletor de NPC e puxada de HP automática) */}
+                <form onSubmit={handleAddCombatant} className="space-y-2 pt-1 border-t border-[#2D3139]/60">
+                  {/* Linha 1: Seletor Rápido de NPC existente para autopreenchimento */}
+                  {npcs.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={newCombatantNpcId}
+                        onChange={(e) => handleSelectNpcForInitiative(e.target.value)}
+                        className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-2.5 py-1.5 text-[11px] text-[#E0E0E0] focus:border-indigo-500 focus:outline-none cursor-pointer"
+                      >
+                        <option value="">Puxar dados de um NPC cadastrado (Autopreencher PV)...</option>
+                        {npcs.map(npc => (
+                          <option key={npc.id} value={npc.id}>
+                            {npc.name} {npc.hp ? `(PV ${npc.hp})` : ''} - {npc.role || npc.classOrType || 'NPC'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
-                {/* Action Controls */}
-                <div className="flex items-center justify-between pt-1 gap-2">
-                  <label className="flex items-center gap-1.5 text-[11px] text-[#9E9E9E] cursor-pointer">
+                  {/* Linha 2: Nome, Iniciativa, PV e Facção */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
                     <input
-                      type="checkbox"
-                      checked={autoAnnounceTurn}
-                      onChange={(e) => setAutoAnnounceTurn(e.target.checked)}
-                      className="rounded bg-[#141619] border-[#2D3139] text-indigo-600 focus:ring-0"
+                      type="text"
+                      placeholder="Nome do Combatente / Herói / Monstro..."
+                      value={newCombatantName}
+                      onChange={(e) => handleCombatantNameChange(e.target.value)}
+                      className="sm:col-span-5 bg-[#141619] border border-[#2D3139] rounded-xl px-2.5 py-1.5 text-xs text-white placeholder:text-[#6E7681] focus:border-indigo-500 focus:outline-none"
                     />
-                    Auto-Anunciar no Discord
-                  </label>
 
-                  <button
-                    type="button"
-                    onClick={handleNextTurn}
-                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>Próximo Turno</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                    <div className="sm:col-span-2 flex items-center gap-1">
+                      <input
+                        type="number"
+                        placeholder="Inic."
+                        value={newCombatantInit}
+                        onChange={(e) => setNewCombatantInit(e.target.value)}
+                        className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-2 py-1.5 text-xs text-white text-center font-mono focus:border-indigo-500 focus:outline-none"
+                        title="Valor de Iniciativa"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-3 flex items-center gap-1">
+                      <input
+                        type="number"
+                        placeholder="PV"
+                        value={newCombatantHp}
+                        onChange={(e) => setNewCombatantHp(e.target.value)}
+                        className="w-1/2 bg-[#141619] border border-[#2D3139] rounded-xl px-1 py-1.5 text-xs text-emerald-400 text-center font-mono focus:border-indigo-500 focus:outline-none"
+                        title="PV Inicial"
+                      />
+                      <span className="text-[#6E7681] text-xs">/</span>
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={newCombatantMaxHp}
+                        onChange={(e) => setNewCombatantMaxHp(e.target.value)}
+                        className="w-1/2 bg-[#141619] border border-[#2D3139] rounded-xl px-1 py-1.5 text-xs text-[#9E9E9E] text-center font-mono focus:border-indigo-500 focus:outline-none"
+                        title="PV Máximo"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2 flex items-center gap-1">
+                      <select
+                        value={newCombatantFaction}
+                        onChange={(e) => setNewCombatantFaction(e.target.value as 'ally' | 'enemy')}
+                        className="w-full bg-[#141619] border border-[#2D3139] rounded-xl px-1.5 py-1.5 text-[11px] text-white focus:border-indigo-500 focus:outline-none cursor-pointer"
+                      >
+                        <option value="enemy">⚔️ Inimigo</option>
+                        <option value="ally">🛡️ Aliado</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <label className="flex items-center gap-1.5 text-[11px] text-[#9E9E9E] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoAnnounceTurn}
+                        onChange={(e) => setAutoAnnounceTurn(e.target.checked)}
+                        className="rounded bg-[#141619] border-[#2D3139] text-indigo-600 focus:ring-0"
+                      />
+                      Auto-Anunciar no Discord (Sem PV)
+                    </label>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shrink-0 cursor-pointer shadow-sm"
+                      >
+                        + Adicionar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleNextTurn}
+                        className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>Próximo</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </form>
               </div>
             )}
           </div>
         );
+      }
 
       case 'soundboard':
         return (
@@ -2808,6 +3171,34 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
               </div>
             ) : (
               <ScenarioMapManager isWidgetMode={true} />
+            )}
+          </div>
+        );
+
+      case 'realtime_dashboard':
+        return (
+          <div className="bg-[#1A1D21] border border-[#2D3139] rounded-2xl p-4 md:p-5 shadow-lg space-y-3">
+            <div className="flex items-center justify-between border-b border-[#2D3139]/60 pb-2">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-[#FFFFFF] font-rpg">
+                  {widget.title || 'Dashboard de Estatísticas em Tempo Real'}
+                </h2>
+              </div>
+              {!isModal && renderWidgetHeaderControls(widget)}
+            </div>
+
+            {isMinimized ? (
+              <div className="text-xs text-[#9E9E9E] italic">
+                Dashboard de estatísticas recolhido. Tempo de áudio, mensagens do bot e rolagens recentes.
+              </div>
+            ) : (
+              <RealtimeDashboardWidget
+                onOpenDiceTab={() => setDiceSystem('advanced')}
+                onOpenMusicTab={onOpenMusicTab}
+                onOpenDiscordReader={onOpenChatTab}
+                density={widget.density}
+              />
             )}
           </div>
         );

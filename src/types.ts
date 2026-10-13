@@ -320,12 +320,68 @@ export interface SessionSave {
     noteTabs?: NoteTab[];
     customTimers?: TimerItem[];
     sessionSeconds?: number;
-    initiativeList: Array<{ id: string; name: string; initiative: number; hp?: number; maxHp?: number; isNpc: boolean }>;
+    initiativeList: Array<{ id: string; name: string; init?: number; initiative?: number; hp?: number; maxHp?: number; isNpc: boolean; faction?: 'ally' | 'enemy'; npcId?: string }>;
     currentTrack: MusicTrack | null;
     queue: QueueItem[];
     volume: number;
     loopMode: LoopMode;
     mediaDirectories?: MediaDirectoriesConfig;
+  };
+}
+
+export interface Combatant {
+  id: string;
+  name: string;
+  init: number;
+  hp: number;
+  maxHp: number;
+  isNpc: boolean;
+  faction: 'ally' | 'enemy';
+  npcId?: string;
+  notes?: string;
+}
+
+export interface RealtimeUsageStats {
+  totalAudioPlayedSeconds: number;
+  sessionAudioPlayedSeconds: number;
+  totalBotMessagesSent: number;
+  totalDiceRolls: number;
+  messagesByType: {
+    narrative: number;
+    initiative: number;
+    dice: number;
+    npc: number;
+    map: number;
+    chat: number;
+  };
+  diceStats: {
+    totalRolls: number;
+    criticalHits: number;
+    criticalFails: number;
+    successRate: number;
+    averageTotal: number;
+  };
+  recentDiceRolls: Array<{
+    id: string;
+    timestamp: number;
+    rollerName: string;
+    formula: string;
+    total: number;
+    subtotalOrSuccesses?: number;
+    rolls: number[];
+    isCriticalSuccess?: boolean;
+    isCriticalFail?: boolean;
+    isWod?: boolean;
+    label?: string;
+    source: 'web' | 'discord';
+  }>;
+  activeAudio?: {
+    isPlaying: boolean;
+    currentTrack?: string;
+    currentTrackUrl?: string;
+    volume?: number;
+    elapsedSeconds?: number;
+    duration?: number;
   };
 }
 
@@ -343,6 +399,7 @@ export type TimerType = 'countdown' | 'stopwatch';
 
 export type WidgetType =
   | 'stats_summary'
+  | 'realtime_dashboard'
   | 'image_viewer'
   | 'session_bar'
   | 'now_playing'
@@ -641,57 +698,6 @@ export interface PlaylistImportResult {
   error?: string;
 }
 
-// ==========================================
-// CAMPAIGN & SCENE MANAGEMENT
-// ==========================================
 
-export interface Scene {
-  id: string;
-  campaignId: string;
-  name: string;
-  description?: string;
-  icon?: string;
-  themeColor?: string;
 
-  // Audio Associations
-  musicTrackId?: string;
-  musicTrackTitle?: string;
-  musicPlaylistFolderId?: string;
-  musicVolume?: number; // 0-100
 
-  ambienceTrackId?: string;
-  ambienceTrackTitle?: string;
-  ambienceFolderId?: string;
-  ambienceVolume?: number; // 0-100
-
-  // Soundboard Association
-  soundboardLayoutId?: string;
-  soundboardFolderId?: string;
-  favoriteSfxIds?: string[];
-
-  // NPC Association
-  assignedNpcIds: string[];
-  npcFolderId?: string;
-
-  // Additional Atmospheric Context
-  weatherAtmosphereId?: string;
-  notes?: string;
-  mapId?: string;
-
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface Campaign {
-  id: string;
-  name: string;
-  description?: string;
-  genre?: 'fantasy' | 'scifi' | 'modern' | 'gothic' | 'cyberpunk' | 'general';
-  system?: string;
-  coverUrl?: string;
-  bannerColor?: string;
-  activeSceneId?: string;
-  scenes: Scene[];
-  createdAt: number;
-  updatedAt: number;
-}

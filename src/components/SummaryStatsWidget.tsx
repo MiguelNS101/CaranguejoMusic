@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { NoteTab } from '../types';
+import { RealtimeDashboardWidget } from './RealtimeDashboardWidget';
 
 interface SummaryStatsWidgetProps {
   onOpenSessionModal: () => void;
@@ -39,6 +40,8 @@ export const SummaryStatsWidget: React.FC<SummaryStatsWidgetProps> = ({
     isSessionTimerRunning,
     botStatus
   } = useAudio();
+
+  const [viewMode, setViewMode] = useState<'realtime' | 'catalog'>('realtime');
 
   // Read note tabs count from storage
   const [noteCount, setNoteCount] = useState<number>(4);
@@ -73,6 +76,45 @@ export const SummaryStatsWidget: React.FC<SummaryStatsWidgetProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* View Mode Switcher */}
+      <div className="flex items-center justify-between pb-2 border-b border-[#2D3139]/50 flex-wrap gap-2">
+        <div className="flex items-center gap-1.5 bg-[#141619] p-1 rounded-xl border border-[#2D3139]">
+          <button
+            type="button"
+            onClick={() => setViewMode('realtime')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              viewMode === 'realtime'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-[#9E9E9E] hover:text-white'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>Dashboard em Tempo Real</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setViewMode('catalog')}
+            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              viewMode === 'catalog'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-[#9E9E9E] hover:text-white'
+            }`}
+          >
+            <HardDrive className="w-3.5 h-3.5" />
+            <span>Resumo de Arquivos & Saves</span>
+          </button>
+        </div>
+
+        <span className="text-[11px] text-[#9E9E9E]">
+          {viewMode === 'realtime' ? 'Tempo de áudio, mensagens do bot & rolagens' : `${savedSessions.length} saves • ${totalNpcs} NPCs • ${totalAudioAssets} sons`}
+        </span>
+      </div>
+
+      {viewMode === 'realtime' ? (
+        <RealtimeDashboardWidget onOpenMusicTab={onOpenMusicTab} />
+      ) : (
+        <>
       {/* Top Main 3 KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Card 1: Sessões Jogadas & Tempo */}
@@ -217,6 +259,8 @@ export const SummaryStatsWidget: React.FC<SummaryStatsWidgetProps> = ({
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

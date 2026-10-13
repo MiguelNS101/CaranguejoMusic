@@ -46,7 +46,8 @@ import {
   GeneratedEncounter,
   ScenarioMap,
   MapMarker,
-  AdvancedDiceRollResult
+  AdvancedDiceRollResult,
+  RealtimeUsageStats
 } from '../src/types.js';
 import { rollWodDice, parseWodCommand } from './wodDice.js';
 import { parseAdvancedDiceFormula, rollAdvancedDice } from '../src/utils/advancedDice.js';
@@ -125,6 +126,11 @@ export class DiscordBotService {
   private stallRecoveryCount: number = 0;
   private isRecoveringBuffer: boolean = false;
 
+  // Real-time Audio Playback Time Tracking
+  private sessionAudioPlayedSeconds: number = 0;
+  private audioTickAccumulator: number = 0;
+  private audioHeartbeatTimer: NodeJS.Timeout | null = null;
+
   private cleanupCurrentAudio(): void {
     if (this.bufferWatchdogTimer) {
       clearTimeout(this.bufferWatchdogTimer);
@@ -152,10 +158,27 @@ export class DiscordBotService {
       } catch {}
       this.currentResource = null;
     }
+
+    if (this.audioTickAccumulator > 0) {
+      db.incrementAudioPlayedSeconds(this.audioTickAccumulator);
+      this.audioTickAccumulator = 0;
+    }
   }
 
   constructor() {
     this.logDiagnostic('info', 'system', 'Inicializando serviço DiscordBot do CaranguejoRPG...', `Node ${process.version} em ${process.platform} (${process.arch})`);
+
+    // Periodic 1-second audio heartbeat ticker
+    this.audioHeartbeatTimer = setInterval(() => {
+      if (this.isPlayingVoice) {
+        this.sessionAudioPlayedSeconds += 1;
+        this.audioTickAccumulator += 1;
+        if (this.audioTickAccumulator >= 5) {
+          db.incrementAudioPlayedSeconds(this.audioTickAccumulator);
+          this.audioTickAccumulator = 0;
+        }
+      }
+    }, 1000);
     
     // Initial auto-connect if token in env or db
     const config = db.getBotConfig();
@@ -560,6 +583,14 @@ export class DiscordBotService {
 
   public async stop(): Promise<void> {
     this.logDiagnostic('info', 'bot', 'Desligando bot do Discord e liberando conexões e processos de áudio...');
+    if (this.audioHeartbeatTimer) {
+      clearInterval(this.audioHeartbeatTimer);
+      this.audioHeartbeatTimer = null;
+    }
+    if (this.audioTickAccumulator > 0) {
+      db.incrementAudioPlayedSeconds(this.audioTickAccumulator);
+      this.audioTickAccumulator = 0;
+    }
     this.cleanupCurrentAudio();
     if (this.audioPlayer) {
       try {
@@ -631,6 +662,8 @@ export class DiscordBotService {
         const rollerName = message.member?.displayName || message.author.username;
         const result = rollWodDice(wodParsed.count, wodParsed.isKeen, rollerName, wodParsed.label);
         this.addRecentWodRoll(result);
+        db.incrementDiceRolls();
+        db.incrementBotMessages('dice');
 
         const embed = this.createWodEmbed(result);
         await message.reply({ embeds: [embed] });
@@ -643,6 +676,7 @@ export class DiscordBotService {
         content.startsWith('\\caranguejo ') || content.startsWith('!caranguejo ') || content.startsWith('/caranguejo ')
       ) {
         const embed = this.getCrabCuriosityEmbed(content);
+        db.incrementBotMessages('chat');
         await message.reply({ embeds: [embed] });
         return;
       }
@@ -655,6 +689,7 @@ export class DiscordBotService {
         content.startsWith('\\ajuda ') || content.startsWith('!ajuda ') || content.startsWith('/ajuda ')
       ) {
         const helpEmbed = this.createComprehensiveHelpEmbed();
+        db.incrementBotMessages('chat');
         await message.reply({ embeds: [helpEmbed] });
         return;
       }
@@ -766,6 +801,7 @@ export class DiscordBotService {
           const result = rollAdvancedDice(formulaStr, rollerName, labelStr);
           result.source = 'discord';
           db.addDiceRoll(result);
+          db.incrementBotMessages('dice');
           const embed = this.createAdvancedDiceEmbed(result);
           await message.reply({ embeds: [embed] });
           return;
@@ -1020,6 +1056,8 @@ export class DiscordBotService {
 
       const embed = this.createWodEmbed(result);
       await (channel as TextChannel).send({ embeds: [embed] });
+      db.incrementBotMessages('dice');
+      db.incrementDiceRolls();
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message };
@@ -1089,6 +1127,7 @@ export class DiscordBotService {
 
       const embed = this.createAdvancedDiceEmbed(result);
       await (channel as TextChannel).send({ embeds: [embed] });
+      db.incrementBotMessages('dice');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message };
@@ -1159,6 +1198,7 @@ export class DiscordBotService {
 
       const embed = this.createScenarioMapEmbed(map);
       await (channel as TextChannel).send({ embeds: [embed] });
+      db.incrementBotMessages('map');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message };
@@ -1217,6 +1257,7 @@ export class DiscordBotService {
 
       const embed = this.createMapMarkerEmbed(map, marker);
       await (channel as TextChannel).send({ embeds: [embed] });
+      db.incrementBotMessages('map');
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message };
@@ -1360,6 +1401,7 @@ export class DiscordBotService {
         }
 
         const sent = await textChannel.send({ embeds: [narrativeEmbed], files: files.length > 0 ? files : undefined });
+        db.incrementBotMessages('narrative');
         return { success: true, messageId: sent.id };
       }
 
@@ -1394,6 +1436,7 @@ export class DiscordBotService {
           embeds: [embed],
           files: files.length > 0 ? files : undefined
         });
+        db.incrementBotMessages(payload.type || 'chat');
         return { success: true, messageId: sent.id };
       }
 
@@ -1403,6 +1446,7 @@ export class DiscordBotService {
           content: payload.content || undefined,
           files: files.length > 0 ? files : undefined
         });
+        db.incrementBotMessages(payload.type || 'chat');
         return { success: true, messageId: sent.id };
       }
 
@@ -1976,6 +2020,7 @@ export class DiscordBotService {
           const attachment = new AttachmentBuilder(localPath, { name: ANONYMOUS_IMAGE_NAME, description: 'Retrato do Mestre' });
           // Post ONLY the image attachment - NO text, NO name, NO embed title, NO stat block
           await textChannel.send({ files: [attachment] });
+          db.incrementBotMessages('npc');
           return { success: true };
         }
       }
@@ -1988,6 +2033,7 @@ export class DiscordBotService {
           .setImage(npc.imageUrl);
 
         await textChannel.send({ embeds: [embed] });
+        db.incrementBotMessages('npc');
         return { success: true };
       }
 
@@ -2033,6 +2079,7 @@ export class DiscordBotService {
         .setTimestamp();
 
       await (channel as TextChannel).send({ embeds: [embed] });
+      db.incrementBotMessages('initiative');
       return { success: true };
     } catch (err: any) {
       console.error('Error announcing turn to Discord:', err);
@@ -2070,6 +2117,8 @@ export class DiscordBotService {
         .setTimestamp();
 
       await (channel as TextChannel).send({ embeds: [embed] });
+      db.incrementBotMessages('dice');
+      db.incrementDiceRolls();
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message };
@@ -2150,6 +2199,7 @@ export class DiscordBotService {
       embed.setFooter({ text: 'CaranguejoRPG • Gerador de Encontros Aleatórios' });
 
       await (channel as TextChannel).send({ embeds: [embed] });
+      db.incrementBotMessages('chat');
       return { success: true };
     } catch (err: any) {
       console.error('Error posting encounter to Discord:', err);
@@ -2204,11 +2254,121 @@ export class DiscordBotService {
       embed.setFooter({ text: 'CaranguejoRPG • Roleta Customizável da Mesa' });
 
       await (channel as TextChannel).send({ embeds: [embed] });
+      db.incrementBotMessages('chat');
       return { success: true };
     } catch (err: any) {
       console.error('Error posting roulette result to Discord:', err);
       return { success: false, error: err?.message || 'Falha ao postar resultado da roleta no Discord.' };
     }
+  }
+
+  // ==========================================
+  // REAL-TIME USAGE STATS AGGREGATOR
+  // ==========================================
+
+  public recordExternalAudioTime(seconds: number): void {
+    if (seconds > 0) {
+      this.sessionAudioPlayedSeconds += seconds;
+      db.incrementAudioPlayedSeconds(seconds);
+    }
+  }
+
+  public getRealtimeUsageStats(): RealtimeUsageStats {
+    const rawStats = db.getUsageStats();
+    const diceHistory = db.getDiceHistory();
+    const wodRolls = this.recentWodRolls;
+
+    const combinedRolls: Array<{
+      id: string;
+      timestamp: number;
+      rollerName: string;
+      formula: string;
+      total: number;
+      subtotalOrSuccesses?: number;
+      rolls: number[];
+      isCriticalSuccess?: boolean;
+      isCriticalFail?: boolean;
+      isWod?: boolean;
+      label?: string;
+      source: 'web' | 'discord';
+    }> = [];
+
+    diceHistory.forEach(d => {
+      const allNumbers: number[] = [];
+      d.groups.forEach(g => allNumbers.push(...g.allRolls));
+      combinedRolls.push({
+        id: d.id,
+        timestamp: d.timestamp,
+        rollerName: d.rollerName || 'Mestre',
+        formula: d.formula,
+        total: d.total,
+        subtotalOrSuccesses: d.total,
+        rolls: allNumbers,
+        isCriticalSuccess: d.isCriticalSuccess,
+        isCriticalFail: d.isCriticalFail,
+        isWod: false,
+        label: d.label,
+        source: d.source || 'web'
+      });
+    });
+
+    wodRolls.forEach(w => {
+      combinedRolls.push({
+        id: w.id,
+        timestamp: w.timestamp,
+        rollerName: w.rollerName || 'Mestre',
+        formula: w.command,
+        total: w.totalSuccesses,
+        subtotalOrSuccesses: w.totalSuccesses,
+        rolls: w.baseRolls,
+        isCriticalSuccess: w.totalCriticalHits > 0,
+        isCriticalFail: w.totalCriticalFails > 0 && w.totalSuccesses === 0,
+        isWod: true,
+        label: w.isKeenRoll ? 'Keen Roll (Críticos no 9 e 10)' : 'Storyteller D10',
+        source: 'discord'
+      });
+    });
+
+    combinedRolls.sort((a, b) => b.timestamp - a.timestamp);
+    const recentRolls = combinedRolls.slice(0, 30);
+
+    const totalRolls = rawStats.totalDiceRolls || combinedRolls.length;
+    let critCount = 0;
+    let failCount = 0;
+    let successCount = 0;
+    let totalSum = 0;
+
+    combinedRolls.forEach(r => {
+      if (r.isCriticalSuccess) critCount++;
+      if (r.isCriticalFail) failCount++;
+      if ((r.isWod && r.total > 0) || (!r.isWod && !r.isCriticalFail)) successCount++;
+      totalSum += r.total;
+    });
+
+    const successRate = combinedRolls.length > 0 ? Math.round((successCount / combinedRolls.length) * 100) : 100;
+    const averageTotal = combinedRolls.length > 0 ? Math.round((totalSum / combinedRolls.length) * 10) / 10 : 0;
+
+    return {
+      totalAudioPlayedSeconds: rawStats.totalAudioPlayedSeconds + this.audioTickAccumulator,
+      sessionAudioPlayedSeconds: this.sessionAudioPlayedSeconds,
+      totalBotMessagesSent: rawStats.totalBotMessagesSent,
+      totalDiceRolls: totalRolls,
+      messagesByType: rawStats.messagesByType || { narrative: 0, initiative: 0, dice: 0, npc: 0, map: 0, chat: 0 },
+      diceStats: {
+        totalRolls,
+        criticalHits: critCount,
+        criticalFails: failCount,
+        successRate,
+        averageTotal
+      },
+      recentDiceRolls: recentRolls,
+      activeAudio: {
+        isPlaying: this.isPlayingVoice,
+        currentTrack: this.currentTrackName || undefined,
+        currentTrackUrl: this.currentTrackUrl || undefined,
+        volume: this.currentTrackVolume
+      }
+    };
   }
 }
 
