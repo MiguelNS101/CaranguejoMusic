@@ -17,7 +17,9 @@ import {
   WodDiceRollResult,
   DiscordGuild,
   ActionLogItem,
-  ActionLogCategory
+  ActionLogCategory,
+  Campaign,
+  Scene
 } from '../types';
 import { safeFetchJson, apiFetch, resolveApiUrl } from '../services/api';
 import { ensureDesktopBackend } from '../services/desktopBackend';
@@ -168,6 +170,21 @@ interface AudioContextType {
   updateNpc: (id: string, updates: Partial<NPC>) => Promise<NPC>;
   deleteNpc: (id: string) => Promise<void>;
   postNpcToDiscord: (npcId: string, customChannelId?: string) => Promise<{ success: boolean; error?: string }>;
+
+  // Campaign & Scene Management
+  campaigns: Campaign[];
+  activeCampaignId: string;
+  activeCampaign: Campaign | null;
+  activeScene: Scene | null;
+  setActiveCampaignId: (campaignId: string) => Promise<void>;
+  activateScene: (campaignId: string, sceneId: string) => Promise<void>;
+  createCampaign: (campaign: Partial<Campaign>) => Promise<Campaign>;
+  updateCampaign: (id: string, updates: Partial<Campaign>) => Promise<Campaign>;
+  deleteCampaign: (id: string) => Promise<void>;
+  createScene: (campaignId: string, scene: Partial<Scene>) => Promise<Scene>;
+  updateScene: (campaignId: string, sceneId: string, updates: Partial<Scene>) => Promise<Scene>;
+  deleteScene: (campaignId: string, sceneId: string) => Promise<void>;
+  refreshCampaigns: () => Promise<void>;
 
   // Immediate Action History Log (Footer Component)
   actionLogs: ActionLogItem[];
@@ -330,6 +347,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [savedSessions, setSavedSessions] = useState<SessionSaveMeta[]>([]);
   const [wodRolls, setWodRolls] = useState<WodDiceRollResult[]>([]);
   const [npcs, setNpcs] = useState<NPC[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [activeCampaignId, setActiveCampaignIdState] = useState<string>('camp-caranguejo-1');
   const [initiativeList, setInitiativeList] = useState<Array<{ id: string; name: string; initiative: number; hp?: number; maxHp?: number; isNpc: boolean }>>([]);
   const [botConfig, setBotConfig] = useState<BotConfig>({
     token: '',
@@ -838,6 +857,8 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setSavedSessions(data.savedSessions || []);
         setWodRolls(data.wodHistory || []);
         setNpcs(data.npcs || []);
+        if (data.campaigns) setCampaigns(data.campaigns);
+        if (data.activeCampaignId) setActiveCampaignIdState(data.activeCampaignId);
         setInitiativeList(data.initiativeList || []);
         setBotConfig(data.botConfig || {});
         setBotStatus(data.botStatus || { isConfigured: false, isOnline: false, guildsCount: 0, mode: 'local_only' });
@@ -2009,6 +2030,185 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // ==========================================
+  // CAMPAIGNS & SCENES MANAGEMENT
+  // ==========================================
+
+  const activeCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0] || null;
+  const activeScene = activeCampaign?.scenes?.find(s => s.id === activeCampaign?.activeSceneId) || activeCampaign?.scenes?.[0] || null;
+
+  const refreshCampaigns = async () => {
+    try {
+      const res = await safeFetchJson<{ campaigns: Campaign[]; activeCampaignId?: string }>('/api/campaigns');
+      if (res.success && res.data) {
+        setCampaigns(res.data.campaigns || []);
+        if (res.data.activeCampaignId) setActiveCampaignIdState(res.data.activeCampaignId);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const setActiveCampaignId = async (campaignId: string) => {
+    setActiveCampaignIdState(campaignId);
+    try {
+      await safeFetchJson(`/api/campaigns/${campaignId}/activate`, { method: 'POST' });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const activateScene = async (campaignId: string, sceneId: string) => {
+    try {
+      const camp = campaigns.find(c => c.id === campaignId) || campaigns[0];
+      const scene = camp?.scenes?.find(s => s.id === sceneId);
+      if (!scene) return;
+
+      // 1. Backend sync
+      await safeFetchJson(`/api/campaigns/${campaignId}/scenes/${sceneId}/activate`, { method: 'POST' });
+
+      // 2. Client state sync
+      setActiveCampaignIdState(campaignId);
+      setCampaigns(prev => prev.map(c => {
+        if (c.id === campaignId) {
+          return { ...c, activeSceneId: sceneId };
+        }
+        return c;
+      }));
+
+      // 3. Audio & Music Association:
+      if (scene.musicTrackId) {
+        const track = musicTracks.find(t => t.id === scene.musicTrackId);
+        if (track) {
+          playTrack(track, true);
+        }
+      } else if (scene.musicPlaylistFolderId) {
+        const folderTrack = musicTracks.find(t => t.folderId === scene.musicPlaylistFolderId);
+        if (folderTrack) {
+          playTrack(folderTrack, true);
+        }
+      }
+
+      if (scene.musicVolume !== undefined) {
+        setMusicVolume(scene.musicVolume / 100);
+      }
+
+      // 4. Ambience Association:
+      if (scene.ambienceTrackId) {
+        const ambTrack = ambienceTracks.find(t => t.id === scene.ambienceTrackId);
+        if (ambTrack) {
+          playAmbienceTrack(ambTrack, true);
+        }
+      } else if (scene.ambienceFolderId) {
+        const folderAmb = ambienceTracks.find(t => t.folderId === scene.ambienceFolderId);
+        if (folderAmb) {
+          playAmbienceTrack(folderAmb, true);
+        }
+      }
+
+      if (scene.ambienceVolume !== undefined) {
+        setAmbienceVolume(scene.ambienceVolume / 100);
+      }
+
+      // 5. Soundboard Association:
+      if (scene.soundboardLayoutId) {
+        setActiveLayoutId(scene.soundboardLayoutId);
+      }
+
+      // 6. Action log feedback
+      logAction(`🎬 Cena "${scene.name}" ativada! Áudio e ${scene.assignedNpcIds?.length || 0} NPCs vinculados.`, 'system');
+    } catch (err: any) {
+      console.error('Error activating scene:', err);
+    }
+  };
+
+  const createCampaign = async (campaign: Partial<Campaign>): Promise<Campaign> => {
+    const res = await safeFetchJson<Campaign>('/api/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(campaign)
+    });
+    const created = res.data || (campaign as Campaign);
+    setCampaigns(prev => [...prev, created]);
+    setActiveCampaignIdState(created.id);
+    logAction(`Campanha "${created.name}" criada`, 'system');
+    return created;
+  };
+
+  const updateCampaign = async (id: string, updates: Partial<Campaign>): Promise<Campaign> => {
+    const res = await safeFetchJson<Campaign>(`/api/campaigns/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    const updated = res.data || (updates as Campaign);
+    setCampaigns(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
+    return updated;
+  };
+
+  const deleteCampaign = async (id: string) => {
+    await safeFetchJson(`/api/campaigns/${id}`, { method: 'DELETE' });
+    setCampaigns(prev => prev.filter(c => c.id !== id));
+    if (activeCampaignId === id) {
+      const remaining = campaigns.filter(c => c.id !== id);
+      if (remaining.length > 0) setActiveCampaignIdState(remaining[0].id);
+    }
+    logAction('Campanha excluída', 'system');
+  };
+
+  const createScene = async (campaignId: string, scene: Partial<Scene>): Promise<Scene> => {
+    const res = await safeFetchJson<Scene>(`/api/campaigns/${campaignId}/scenes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scene)
+    });
+    const created = res.data || (scene as Scene);
+    setCampaigns(prev => prev.map(c => {
+      if (c.id === campaignId) {
+        return {
+          ...c,
+          scenes: [...(c.scenes || []), created]
+        };
+      }
+      return c;
+    }));
+    logAction(`Cena "${created.name}" adicionada`, 'system');
+    return created;
+  };
+
+  const updateScene = async (campaignId: string, sceneId: string, updates: Partial<Scene>): Promise<Scene> => {
+    const res = await safeFetchJson<Scene>(`/api/campaigns/${campaignId}/scenes/${sceneId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates)
+    });
+    const updated = res.data || (updates as Scene);
+    setCampaigns(prev => prev.map(c => {
+      if (c.id === campaignId) {
+        return {
+          ...c,
+          scenes: (c.scenes || []).map(s => s.id === sceneId ? { ...s, ...updated } : s)
+        };
+      }
+      return c;
+    }));
+    return updated;
+  };
+
+  const deleteScene = async (campaignId: string, sceneId: string) => {
+    await safeFetchJson(`/api/campaigns/${campaignId}/scenes/${sceneId}`, { method: 'DELETE' });
+    setCampaigns(prev => prev.map(c => {
+      if (c.id === campaignId) {
+        return {
+          ...c,
+          scenes: (c.scenes || []).filter(s => s.id !== sceneId)
+        };
+      }
+      return c;
+    }));
+    logAction('Cena excluída', 'system');
+  };
+
   return (
     <AudioContext.Provider
       value={{
@@ -2093,6 +2293,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         musicTracks,
         soundboardItems,
         npcs,
+        campaigns,
+        activeCampaignId,
+        activeCampaign,
+        activeScene,
+        setActiveCampaignId,
+        activateScene,
+        createCampaign,
+        updateCampaign,
+        deleteCampaign,
+        createScene,
+        updateScene,
+        deleteScene,
+        refreshCampaigns,
         botConfig,
         botStatus,
         discordGuilds,

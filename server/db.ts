@@ -16,7 +16,9 @@ import {
   ScenarioMap,
   MapMarker,
   AdvancedDiceRollResult,
-  DicePreset
+  DicePreset,
+  Campaign,
+  Scene
 } from '../src/types.js';
 import { DEFAULT_DICE_PRESETS } from '../src/utils/advancedDice.js';
 
@@ -54,6 +56,8 @@ export interface DatabaseSchema {
   currentMapId?: string | null;
   diceHistory?: AdvancedDiceRollResult[];
   dicePresets?: DicePreset[];
+  campaigns?: Campaign[];
+  activeCampaignId?: string;
 }
 
 const DEFAULT_FOLDERS: Folder[] = [
@@ -118,6 +122,66 @@ const DEFAULT_BOT_CONFIG: BotConfig = {
 
 const DEFAULT_MAPS: ScenarioMap[] = [];
 
+const DEFAULT_CAMPAIGNS: Campaign[] = [
+  {
+    id: 'camp-caranguejo-1',
+    name: 'A Maldição da Ilha dos Crustáceos',
+    description: 'Campanha costeira e de mistério em busca dos tesouros do Lendário Caranguejo Dourado.',
+    genre: 'fantasy',
+    system: 'D&D 5e / Fantasia Épica',
+    bannerColor: '#6366f1',
+    activeSceneId: 'scene-tavern-1',
+    scenes: [
+      {
+        id: 'scene-tavern-1',
+        campaignId: 'camp-caranguejo-1',
+        name: 'Taverna do Siri Bêbado',
+        description: 'Taverna movimentada no cais onde os aventureiros recebem a primeira pista de navegação.',
+        icon: 'Beer',
+        themeColor: '#f59e0b',
+        ambienceFolderId: 'f-a-tavern',
+        soundboardLayoutId: 'layout-default',
+        soundboardFolderId: 'f-s-tavern',
+        assignedNpcIds: [],
+        notes: 'Pista: O velho capitão Barnabé exige um barril de rum para revelar a passagem nos recifes.',
+        createdAt: Date.now() - 3600000,
+        updatedAt: Date.now() - 3600000
+      },
+      {
+        id: 'scene-dungeon-2',
+        campaignId: 'camp-caranguejo-1',
+        name: 'Catacumbas Alagadas',
+        description: 'Caverna submersa com armadilhas antigas e sacerdotes crustáceos em vigília.',
+        icon: 'Compass',
+        themeColor: '#8b5cf6',
+        ambienceFolderId: 'f-a-dungeon',
+        soundboardFolderId: 'f-s-monsters',
+        assignedNpcIds: [],
+        notes: 'A água sobe a cada hora. Teste de Percepção Passiva CD 14 para notar correntes traiçoeiras.',
+        createdAt: Date.now() - 1800000,
+        updatedAt: Date.now() - 1800000
+      },
+      {
+        id: 'scene-combat-3',
+        campaignId: 'camp-caranguejo-1',
+        name: 'Confronto no Recife Sangrento',
+        description: 'Batalha campal sobre as rochas cortantes contra o temível Caranguejo Colossal.',
+        icon: 'Swords',
+        themeColor: '#ef4444',
+        musicPlaylistFolderId: 'f-m-combat',
+        ambienceFolderId: 'f-a-rain',
+        soundboardFolderId: 'f-s-weapons',
+        assignedNpcIds: [],
+        notes: 'Monstro principal possui carapaça com CA 18. Pontos fracos sob as patas traseiras (CA 13).',
+        createdAt: Date.now() - 600000,
+        updatedAt: Date.now() - 600000
+      }
+    ],
+    createdAt: Date.now() - 86400000,
+    updatedAt: Date.now() - 600000
+  }
+];
+
 export class JsonDatabase {
   private data: DatabaseSchema;
 
@@ -158,7 +222,9 @@ export class JsonDatabase {
           maps: parsed.maps || [],
           currentMapId: parsed.currentMapId !== undefined ? parsed.currentMapId : null,
           diceHistory: parsed.diceHistory || [],
-          dicePresets: parsed.dicePresets || DEFAULT_DICE_PRESETS
+          dicePresets: parsed.dicePresets || DEFAULT_DICE_PRESETS,
+          campaigns: parsed.campaigns && parsed.campaigns.length > 0 ? parsed.campaigns : DEFAULT_CAMPAIGNS,
+          activeCampaignId: parsed.activeCampaignId || (parsed.campaigns?.[0]?.id || DEFAULT_CAMPAIGNS[0].id)
         };
       }
     } catch (e) {
@@ -183,7 +249,9 @@ export class JsonDatabase {
       maps: [],
       currentMapId: null,
       diceHistory: [],
-      dicePresets: DEFAULT_DICE_PRESETS
+      dicePresets: DEFAULT_DICE_PRESETS,
+      campaigns: DEFAULT_CAMPAIGNS,
+      activeCampaignId: DEFAULT_CAMPAIGNS[0].id
     };
 
     this.saveData(defaultData);
@@ -496,7 +564,9 @@ export class JsonDatabase {
       maps: newState.maps || this.data.maps,
       currentMapId: newState.currentMapId !== undefined ? newState.currentMapId : this.data.currentMapId,
       diceHistory: newState.diceHistory || this.data.diceHistory,
-      dicePresets: newState.dicePresets || this.data.dicePresets
+      dicePresets: newState.dicePresets || this.data.dicePresets,
+      campaigns: newState.campaigns || this.data.campaigns,
+      activeCampaignId: newState.activeCampaignId || this.data.activeCampaignId
     };
     this.saveData();
     return this.data;
@@ -638,6 +708,109 @@ export class JsonDatabase {
     this.data.dicePresets = this.data.dicePresets.filter(p => p.id !== id);
     this.saveData();
     return this.data.dicePresets.length < prev;
+  }
+
+  // ==========================================
+  // CAMPAIGNS & SCENES MANAGEMENT
+  // ==========================================
+
+  public getCampaigns(): Campaign[] {
+    return this.data.campaigns || DEFAULT_CAMPAIGNS;
+  }
+
+  public getCampaign(id: string): Campaign | undefined {
+    return this.getCampaigns().find(c => c.id === id);
+  }
+
+  public getActiveCampaignId(): string {
+    return this.data.activeCampaignId || this.getCampaigns()[0]?.id || 'camp-caranguejo-1';
+  }
+
+  public setActiveCampaignId(id: string): void {
+    this.data.activeCampaignId = id;
+    this.saveData();
+  }
+
+  public addCampaign(campaign: Campaign): Campaign {
+    if (!this.data.campaigns) this.data.campaigns = [...DEFAULT_CAMPAIGNS];
+    this.data.campaigns.push(campaign);
+    this.data.activeCampaignId = campaign.id;
+    this.saveData();
+    return campaign;
+  }
+
+  public updateCampaign(id: string, updates: Partial<Campaign>): Campaign | null {
+    if (!this.data.campaigns) this.data.campaigns = [...DEFAULT_CAMPAIGNS];
+    const idx = this.data.campaigns.findIndex(c => c.id === id);
+    if (idx === -1) return null;
+    this.data.campaigns[idx] = {
+      ...this.data.campaigns[idx],
+      ...updates,
+      updatedAt: Date.now()
+    };
+    this.saveData();
+    return this.data.campaigns[idx];
+  }
+
+  public deleteCampaign(id: string): boolean {
+    if (!this.data.campaigns) return false;
+    const prev = this.data.campaigns.length;
+    this.data.campaigns = this.data.campaigns.filter(c => c.id !== id);
+    if (this.data.activeCampaignId === id) {
+      this.data.activeCampaignId = this.data.campaigns[0]?.id;
+    }
+    this.saveData();
+    return this.data.campaigns.length < prev;
+  }
+
+  public addScene(campaignId: string, scene: Scene): Scene | null {
+    const campaign = this.getCampaign(campaignId);
+    if (!campaign) return null;
+    if (!campaign.scenes) campaign.scenes = [];
+    campaign.scenes.push(scene);
+    campaign.updatedAt = Date.now();
+    this.saveData();
+    return scene;
+  }
+
+  public updateScene(campaignId: string, sceneId: string, updates: Partial<Scene>): Scene | null {
+    const campaign = this.getCampaign(campaignId);
+    if (!campaign || !campaign.scenes) return null;
+    const idx = campaign.scenes.findIndex(s => s.id === sceneId);
+    if (idx === -1) return null;
+    campaign.scenes[idx] = {
+      ...campaign.scenes[idx],
+      ...updates,
+      updatedAt: Date.now()
+    };
+    campaign.updatedAt = Date.now();
+    this.saveData();
+    return campaign.scenes[idx];
+  }
+
+  public deleteScene(campaignId: string, sceneId: string): boolean {
+    const campaign = this.getCampaign(campaignId);
+    if (!campaign || !campaign.scenes) return false;
+    const prev = campaign.scenes.length;
+    campaign.scenes = campaign.scenes.filter(s => s.id !== sceneId);
+    if (campaign.activeSceneId === sceneId) {
+      campaign.activeSceneId = campaign.scenes[0]?.id;
+    }
+    campaign.updatedAt = Date.now();
+    this.saveData();
+    return campaign.scenes.length < prev;
+  }
+
+  public setActiveScene(campaignId: string, sceneId: string): Scene | null {
+    const campaign = this.getCampaign(campaignId);
+    if (!campaign || !campaign.scenes) return null;
+    const scene = campaign.scenes.find(s => s.id === sceneId);
+    if (!scene) return null;
+    campaign.activeSceneId = sceneId;
+    this.data.activeCampaignId = campaignId;
+    campaign.updatedAt = Date.now();
+    this.saveData();
+    return scene;
   }
 
   // ==========================================

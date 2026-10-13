@@ -11,7 +11,8 @@ import {
   Save,
   FolderOpen,
   Settings,
-  Sparkles
+  Sparkles,
+  Clapperboard
 } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import { AudioMixerModal } from './AudioMixerModal';
@@ -29,6 +30,7 @@ interface HeaderProps {
   onOpenThemeModal?: () => void;
   onOpenPresetModal?: (initialTab?: 'encounters' | 'loot' | 'roulette' | 'timers' | 'notes' | 'rules' | 'weather' | 'diceSounds' | 'json') => void;
   onOpenConfigModal?: () => void;
+  onOpenCampaignModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -40,13 +42,17 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTutorialModal,
   onOpenThemeModal,
   onOpenPresetModal,
-  onOpenConfigModal
+  onOpenConfigModal,
+  onOpenCampaignModal
 }) => {
   const {
     botStatus,
     playbackState,
     ambiencePlaybackState,
-    activeSfxIds
+    activeSfxIds,
+    activeCampaign,
+    activeScene,
+    activateScene
   } = useAudio();
 
   const [isInternalConfigOpen, setIsInternalConfigOpen] = useState(false);
@@ -221,6 +227,42 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <span className="hidden md:inline">Sessão</span>
             </Button>
+
+            {/* Campanhas & Cenas */}
+            {onOpenCampaignModal && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onOpenCampaignModal}
+                  icon={<Clapperboard className="w-3.5 h-3.5 text-purple-400 shrink-0" />}
+                  title={`Campanhas & Cenas (${activeCampaign?.name || 'Campanha'}) - Clique para gerenciar`}
+                >
+                  <span className="hidden md:inline truncate max-w-[110px]">
+                    {activeScene?.name ? activeScene.name : 'Cenas'}
+                  </span>
+                  <span className="md:hidden">Cenas</span>
+                </Button>
+                {activeCampaign && activeCampaign.scenes && activeCampaign.scenes.length > 0 && (
+                  <select
+                    value={activeCampaign.activeSceneId || ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        activateScene(activeCampaign.id, e.target.value);
+                      }
+                    }}
+                    className="hidden xl:block bg-[#16181D] border border-[#2D3139] hover:border-purple-500/50 rounded-xl px-2 py-1 text-[11px] text-purple-200 focus:outline-none focus:border-purple-400 max-w-[130px] truncate cursor-pointer transition-colors"
+                    title="Troca rápida de cena: carrega música, clima, soundboard e NPCs automaticamente"
+                  >
+                    {activeCampaign.scenes.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        🎬 {s.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             {/* Pastas de Mídia */}
             <Button

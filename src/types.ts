@@ -641,6 +641,57 @@ export interface PlaylistImportResult {
   error?: string;
 }
 
+// ==========================================
+// CAMPAIGN & SCENE MANAGEMENT
+// ==========================================
 
+export interface Scene {
+  id: string;
+  campaignId: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  themeColor?: string;
 
+  // Audio Associations
+  musicTrackId?: string;
+  musicTrackTitle?: string;
+  musicPlaylistFolderId?: string;
+  musicVolume?: number; // 0-100
 
+  ambienceTrackId?: string;
+  ambienceTrackTitle?: string;
+  ambienceFolderId?: string;
+  ambienceVolume?: number; // 0-100
+
+  // Soundboard Association
+  soundboardLayoutId?: string;
+  soundboardFolderId?: string;
+  favoriteSfxIds?: string[];
+
+  // NPC Association
+  assignedNpcIds: string[];
+  npcFolderId?: string;
+
+  // Additional Atmospheric Context
+  weatherAtmosphereId?: string;
+  notes?: string;
+  mapId?: string;
+
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  description?: string;
+  genre?: 'fantasy' | 'scifi' | 'modern' | 'gothic' | 'cyberpunk' | 'general';
+  system?: string;
+  coverUrl?: string;
+  bannerColor?: string;
+  activeSceneId?: string;
+  scenes: Scene[];
+  createdAt: number;
+  updatedAt: number;
+}

@@ -108,6 +108,7 @@ interface MasterScreenProps {
   onOpenNpcTab: () => void;
   onOpenChatTab: () => void;
   onOpenSessionModal: () => void;
+  onOpenCampaignModal?: () => void;
   onOpenPdfExportModal?: () => void;
 }
 
@@ -446,6 +447,7 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
   onOpenNpcTab,
   onOpenChatTab,
   onOpenSessionModal,
+  onOpenCampaignModal,
   onOpenPdfExportModal
 }) => {
   const {
@@ -487,7 +489,11 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
     setActiveLayoutId,
     savedSessions,
     rollWodDiceAction,
-    announceInitiativeTurn
+    announceInitiativeTurn,
+    campaigns,
+    activeCampaign,
+    activeScene,
+    activateScene
   } = useAudio();
 
   // Layout & Widget Management State
@@ -1521,6 +1527,44 @@ export const MasterScreen: React.FC<MasterScreenProps> = ({
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-center flex-wrap">
+                {activeCampaign && (
+                  <div className="flex items-center gap-1.5 bg-[#141619] border border-[#2D3139] px-2.5 py-1 rounded-xl">
+                    <span className="text-[11px] font-bold text-purple-300 flex items-center gap-1 shrink-0">
+                      🎬 {activeCampaign.name}:
+                    </span>
+                    {activeCampaign.scenes && activeCampaign.scenes.length > 0 ? (
+                      <select
+                        value={activeCampaign.activeSceneId || ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            activateScene(activeCampaign.id, e.target.value);
+                          }
+                        }}
+                        className="bg-[#1A1D21] border border-[#2D3139] rounded-lg px-2 py-0.5 text-xs text-zinc-200 focus:outline-none focus:border-purple-400 cursor-pointer"
+                        title="Troca rápida de cena: carrega trilha sonora, clima e NPCs automaticamente"
+                      >
+                        {activeCampaign.scenes.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-[11px] text-zinc-500 italic">Sem cenas</span>
+                    )}
+                    {onOpenCampaignModal && (
+                      <button
+                        type="button"
+                        onClick={onOpenCampaignModal}
+                        className="text-[10px] text-purple-400 hover:text-purple-300 font-semibold underline ml-1 cursor-pointer shrink-0"
+                        title="Abrir gerenciador de campanhas e cenas"
+                      >
+                        Cenas
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {onOpenPdfExportModal && (
                   <button
                     type="button"

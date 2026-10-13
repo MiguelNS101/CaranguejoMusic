@@ -859,6 +859,136 @@ router.post('/config/media-dirs', (req: Request, res: Response) => {
   res.json({ success: true, mediaDirectories: updated });
 });
 
+// ==========================================
+// CAMPAIGNS & SCENES ENDPOINTS
+// ==========================================
+
+router.get('/campaigns', (req: Request, res: Response) => {
+  res.json({
+    campaigns: db.getCampaigns(),
+    activeCampaignId: db.getActiveCampaignId()
+  });
+});
+
+router.post('/campaigns', (req: Request, res: Response) => {
+  const { name, description, genre, system, bannerColor, coverUrl } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Nome da campanha é obrigatório.' });
+  }
+
+  const newCampaign = {
+    id: `camp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    name: name.trim(),
+    description: description?.trim() || '',
+    genre: genre || 'fantasy',
+    system: system?.trim() || 'D&D 5e / Fantasia Épica',
+    bannerColor: bannerColor || '#6366f1',
+    coverUrl: coverUrl?.trim() || '',
+    scenes: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const created = db.addCampaign(newCampaign);
+  res.status(201).json(created);
+});
+
+router.put('/campaigns/:id', (req: Request, res: Response) => {
+  const updated = db.updateCampaign(req.params.id, req.body);
+  if (!updated) return res.status(404).json({ error: 'Campanha não encontrada.' });
+  res.json(updated);
+});
+
+router.delete('/campaigns/:id', (req: Request, res: Response) => {
+  const success = db.deleteCampaign(req.params.id);
+  res.json({ success });
+});
+
+router.post('/campaigns/:id/activate', (req: Request, res: Response) => {
+  const campaign = db.getCampaign(req.params.id);
+  if (!campaign) return res.status(404).json({ error: 'Campanha não encontrada.' });
+  db.setActiveCampaignId(req.params.id);
+  res.json({ success: true, activeCampaignId: req.params.id, campaign });
+});
+
+router.post('/campaigns/:id/scenes', (req: Request, res: Response) => {
+  const {
+    name,
+    description,
+    icon,
+    themeColor,
+    musicTrackId,
+    musicTrackTitle,
+    musicPlaylistFolderId,
+    musicVolume,
+    ambienceTrackId,
+    ambienceTrackTitle,
+    ambienceFolderId,
+    ambienceVolume,
+    soundboardLayoutId,
+    soundboardFolderId,
+    favoriteSfxIds,
+    assignedNpcIds,
+    npcFolderId,
+    weatherAtmosphereId,
+    notes,
+    mapId
+  } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Nome da cena é obrigatório.' });
+  }
+
+  const newScene = {
+    id: `scene-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    campaignId: req.params.id,
+    name: name.trim(),
+    description: description?.trim() || '',
+    icon: icon || 'Compass',
+    themeColor: themeColor || '#6366f1',
+    musicTrackId,
+    musicTrackTitle,
+    musicPlaylistFolderId,
+    musicVolume,
+    ambienceTrackId,
+    ambienceTrackTitle,
+    ambienceFolderId,
+    ambienceVolume,
+    soundboardLayoutId,
+    soundboardFolderId,
+    favoriteSfxIds: Array.isArray(favoriteSfxIds) ? favoriteSfxIds : [],
+    assignedNpcIds: Array.isArray(assignedNpcIds) ? assignedNpcIds : [],
+    npcFolderId,
+    weatherAtmosphereId,
+    notes: notes?.trim() || '',
+    mapId,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  const created = db.addScene(req.params.id, newScene);
+  if (!created) return res.status(404).json({ error: 'Campanha não encontrada para adicionar cena.' });
+  res.status(201).json(created);
+});
+
+router.put('/campaigns/:id/scenes/:sceneId', (req: Request, res: Response) => {
+  const updated = db.updateScene(req.params.id, req.params.sceneId, req.body);
+  if (!updated) return res.status(404).json({ error: 'Cena ou campanha não encontrada.' });
+  res.json(updated);
+});
+
+router.delete('/campaigns/:id/scenes/:sceneId', (req: Request, res: Response) => {
+  const success = db.deleteScene(req.params.id, req.params.sceneId);
+  res.json({ success });
+});
+
+router.post('/campaigns/:id/scenes/:sceneId/activate', (req: Request, res: Response) => {
+  const activated = db.setActiveScene(req.params.id, req.params.sceneId);
+  if (!activated) return res.status(404).json({ error: 'Cena não encontrada.' });
+  res.json({ success: true, scene: activated, activeCampaignId: req.params.id });
+});
+
+
 // STREAM FILE BY ABSOLUTE / REFERENCE PATH (NO DUPLICATION)
 router.get('/media/file', (req: Request, res: Response) => {
   const requestedPath = req.query.path as string;

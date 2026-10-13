@@ -19,6 +19,7 @@ import { PresetManagerModal } from './components/PresetManagerModal';
 import { ConfigurationModal } from './components/ConfigurationModal';
 import { AudioMixerModal } from './components/AudioMixerModal';
 import { MasterSessionPdfExportModal } from './components/MasterSessionPdfExportModal';
+import { CampaignSceneManagerModal } from './components/CampaignSceneManagerModal';
 import { ActionLogFooter } from './components/ActionLogFooter';
 import { Button } from './components/Button';
 
@@ -43,6 +44,7 @@ export default function App() {
   const [discordModalTab, setDiscordModalTab] = useState<'bot' | 'diagnostics' | 'guide' | 'docker' | 'portable'>('bot');
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState<boolean>(false);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState<boolean>(false);
   const [isPdfExportModalOpen, setIsPdfExportModalOpen] = useState<boolean>(false);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = useState<boolean>(false);
   const [isThemeModalOpen, setIsThemeModalOpen] = useState<boolean>(false);
@@ -69,6 +71,7 @@ export default function App() {
             onOpenDiscordModal={() => setIsDiscordModalOpen(true)}
             onOpenFolderModal={() => setIsFolderModalOpen(true)}
             onOpenSessionModal={() => setIsSessionModalOpen(true)}
+            onOpenCampaignModal={() => setIsCampaignModalOpen(true)}
             onOpenTutorialModal={() => setIsTutorialModalOpen(true)}
             onOpenThemeModal={() => setIsThemeModalOpen(true)}
             onOpenPresetModal={(tab) => {
@@ -88,6 +91,7 @@ export default function App() {
                 onOpenNpcTab={() => setCurrentTab('npcs')}
                 onOpenChatTab={() => setCurrentTab('chat')}
                 onOpenSessionModal={() => setIsSessionModalOpen(true)}
+                onOpenCampaignModal={() => setIsCampaignModalOpen(true)}
                 onOpenPdfExportModal={() => setIsPdfExportModalOpen(true)}
               />
             )}
@@ -137,7 +141,7 @@ export default function App() {
                 <div className="p-8 rounded-3xl bg-[#16181D] border border-[#2D3139] shadow-xl text-center space-y-4">
                   <h2 className="text-xl font-bold text-white font-rpg">Central de Configurações da Mesa</h2>
                   <p className="text-sm text-zinc-400 max-w-xl mx-auto">
-                    Gerencie o bot do Discord, áudio mixer, customização visual com CSS, guias e predefinições.
+                    Gerencie o bot do Discord, campanhas & cenas, áudio mixer, customização visual com CSS, guias e predefinições.
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                     <Button
@@ -146,6 +150,13 @@ export default function App() {
                       onClick={() => setIsDiscordModalOpen(true)}
                     >
                       Discord Bot & Docker
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setIsCampaignModalOpen(true)}
+                    >
+                      🎬 Campanhas & Cenas
                     </Button>
                     <Button
                       variant="secondary"
@@ -251,6 +262,11 @@ export default function App() {
             isOpen={isSessionModalOpen}
             onClose={() => setIsSessionModalOpen(false)}
             onOpenPdfExportModal={() => setIsPdfExportModalOpen(true)}
+          />
+
+          <CampaignSceneManagerModal
+            isOpen={isCampaignModalOpen}
+            onClose={() => setIsCampaignModalOpen(false)}
           />
 
           <MasterSessionPdfExportModal

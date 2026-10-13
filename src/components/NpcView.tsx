@@ -29,6 +29,8 @@ import { useAudio } from '../context/AudioContext';
 import { NPC } from '../types';
 import { FolderImportModal } from './FolderImportModal';
 import { DrawingPaintStudio } from './DrawingPaintStudio';
+import { NpcNameGeneratorModal } from './NpcNameGeneratorModal';
+import { generateNpcName, NpcTheme, NPC_THEMES } from '../utils/npcNameGenerator';
 import { apiFetch, resolveApiUrl } from '../services/api';
 
 export interface NpcViewProps {
@@ -69,6 +71,8 @@ export const NpcView: React.FC<NpcViewProps> = ({ mode = 'all' }) => {
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
   const [postingNpcId, setPostingNpcId] = useState<string | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<{ url: string; title: string } | null>(null);
+  const [isNameGeneratorOpen, setIsNameGeneratorOpen] = useState<boolean>(false);
+  const [quickGeneratorTheme, setQuickGeneratorTheme] = useState<NpcTheme>('fantasy');
 
   // Form State
   const [name, setName] = useState('');
@@ -155,6 +159,17 @@ export const NpcView: React.FC<NpcViewProps> = ({ mode = 'all' }) => {
     setQuote(item.quote || '');
     setAutoNameNotice(null);
     setIsModalOpen(true);
+  };
+
+  const handleSelectNameFromModal = (generatedName: string, generatedTitle?: string) => {
+    if (!isModalOpen) {
+      handleOpenCreateModal();
+    }
+    setName(generatedName);
+    if (generatedTitle) {
+      setTitle(generatedTitle);
+    }
+    setAutoNameNotice(`Nome aplicado com sucesso: "${generatedName}"`);
   };
 
   const [isDraggingModalUpload, setIsDraggingModalUpload] = useState(false);
@@ -473,6 +488,17 @@ export const NpcView: React.FC<NpcViewProps> = ({ mode = 'all' }) => {
               <FolderUp className="w-4 h-4" />
               Importar Pasta
             </button>
+
+            {activeSubTab === 'npcs' && (
+              <button
+                onClick={() => setIsNameGeneratorOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-semibold transition-colors cursor-pointer"
+                title="Abrir gerador aleatório temático de nomes para NPCs"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                🎲 Gerador de Nomes
+              </button>
+            )}
 
             <button
               id={activeSubTab === 'npcs' ? 'btn-add-npc' : 'btn-add-general-image'}
@@ -923,9 +949,44 @@ export const NpcView: React.FC<NpcViewProps> = ({ mode = 'all' }) => {
               {/* Title & Category */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-[#E0E0E0] block mb-1">
-                    {activeSubTab === 'npcs' ? 'Nome do Personagem *' : 'Título da Imagem / Cenário *'}
-                  </label>
+                  <div className="flex items-center justify-between mb-1 gap-2">
+                    <label className="text-xs font-semibold text-[#E0E0E0] truncate">
+                      {activeSubTab === 'npcs' ? 'Nome do Personagem *' : 'Título da Imagem / Cenário *'}
+                    </label>
+                    {activeSubTab === 'npcs' && (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <select
+                          value={quickGeneratorTheme}
+                          onChange={(e) => setQuickGeneratorTheme(e.target.value as NpcTheme)}
+                          className="bg-[#141619] border border-[#2D3139] rounded-lg px-2 py-0.5 text-[10px] text-zinc-300 focus:outline-none focus:border-indigo-500"
+                          title="Tema do gerador de nomes"
+                        >
+                          <option value="fantasy">⚔️ Fantasia</option>
+                          <option value="scifi">🚀 Sci-Fi</option>
+                          <option value="modern">🕵️ Moderno</option>
+                          <option value="gothic">🩸 Gótico / WoD</option>
+                          <option value="cyberpunk">⚡ Cyberpunk</option>
+                          <option value="tavern">🍺 Taverna</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const gen = generateNpcName({ theme: quickGeneratorTheme, includeTitle: true });
+                            setName(gen.fullName);
+                            if (!title || title.trim() === '') {
+                              setTitle(gen.title || '');
+                            }
+                            setAutoNameNotice(`🎲 Nome gerado em 1-clique: "${gen.fullName}" (${gen.themeLabel})`);
+                          }}
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 text-[10px] font-bold transition-all cursor-pointer shadow-sm"
+                          title="Gera um nome aleatório com 1 clique e preenche este campo automaticamente"
+                        >
+                          <Sparkles className="w-3 h-3 text-indigo-400" />
+                          1-Clique: Rolar Nome
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
@@ -1140,6 +1201,13 @@ export const NpcView: React.FC<NpcViewProps> = ({ mode = 'all' }) => {
         isOpen={isFolderImportOpen}
         onClose={() => setIsFolderImportOpen(false)}
         defaultCategory="npc"
+      />
+
+      {/* Random NPC Name Generator Modal */}
+      <NpcNameGeneratorModal
+        isOpen={isNameGeneratorOpen}
+        onClose={() => setIsNameGeneratorOpen(false)}
+        onSelectNameForNpc={handleSelectNameFromModal}
       />
     </div>
   );
